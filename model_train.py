@@ -21,10 +21,10 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 seed = 2149
 
 epochs = 20
-batch_size = 32
-steps_per_epoch = 2000
+batch_size = 128
+steps_per_epoch = 256
 
-image_batch_size = 16
+image_batch_size = 32
 augmentation_batch_size = 16
 
 height = 480 # 240 480  960 1920
