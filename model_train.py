@@ -14,27 +14,28 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Dropout,
 ########
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
 ########
-
-seed = 2149
 
 epochs = 20
-batch_size = 128
+batch_size = 256
 steps_per_epoch = 256
 
-image_batch_size = 32
+image_batch_size = 256
 augmentation_batch_size = 16
 
-height = 480 # 240 480  960 1920
-width = 640 # 320 640 1280 2560
+height = 240 # 240 480  960 1920
+width = 320 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
+learning_rate = 1e-5
+
 ########
 ########
 
-def data_generator(batch_size=16, target_size=(1920, 2560)):
+def data_generator(batch_size=16, target_size=(1920, 2560), augmented_dir="dataset/augmentation/", seed=2149):
     datagen_arguments = dict(
         # featurewise_center=True,
         # featurewise_std_normalization=True,
@@ -51,9 +52,6 @@ def data_generator(batch_size=16, target_size=(1920, 2560)):
 
     image_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
     mask_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
-
-    seed = 2149
-    augmented_dir = "dataset/augmentation/"
 
     images = image_datagen.flow_from_directory(
         directory="dataset/train/",
@@ -183,7 +181,7 @@ def make_model(input_shape):
 
     model = keras.Model(inputs=[inputs], outputs=[conv10])
 
-    model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef, "binary_accuracy"])
+    model.compile(optimizer=Adam(lr=learning_rate), loss=dice_coef_loss, metrics=[dice_coef, "binary_accuracy"])
 
     return model
 
@@ -195,6 +193,17 @@ model.summary()
 
 checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%S')}")
 os.makedirs(checkpoint_directory)
+
+with open(os.path.join(checkpoint_directory, "hyperparameters.txt"), "w") as hyperparameters:
+    hyperparameters.write(f"epochs: {epochs}\n")
+    hyperparameters.write(f"batch_size: {batch_size}\n")
+    hyperparameters.write(f"steps_per_epoch: {steps_per_epoch}\n")
+    hyperparameters.write(f"image_batch_size: {image_batch_size}\n")
+    hyperparameters.write(f"augmentation_batch_size: {augmentation_batch_size}\n")
+    hyperparameters.write(f"height: {height}\n")
+    hyperparameters.write(f"width: {width}\n")
+    hyperparameters.write(f"input_shape: {input_shape}\n")
+    hyperparameters.write(f"learning_rate: {learning_rate}\n")
 
 callbacks = [
     #keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=10, verbose=1,  mode="auto", cooldown=1),
