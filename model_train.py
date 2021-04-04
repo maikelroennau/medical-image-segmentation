@@ -3,51 +3,52 @@ import time
 
 import cv2
 import numpy as np
-
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import backend as K
+from tensorflow.keras import layers
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, Dropout, MaxPooling2D, UpSampling2D, concatenate
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Dropout, concatenate, Conv2DTranspose
 
 ########
 ########
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
 ########
 
-epochs = 20
-batch_size = 256
-steps_per_epoch = 256
+seed = 2149
 
-image_batch_size = 256
-augmentation_batch_size = 16
+epochs = 10
+batch_size = 16
+steps_per_epoch = 32
+effective_batches = steps_per_epoch * epochs
+effective_images = batch_size * steps_per_epoch
 
-height = 240 # 240 480  960 1920
+height = 240 # 240 480 960 1920
 width = 320 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
-learning_rate = 1e-5
+learning_rate = 1e-4
 
 ########
 ########
 
-def data_generator(batch_size=16, target_size=(1920, 2560), augmented_dir="dataset/augmentation/", seed=2149):
+def data_loader(batch_size=16, target_size=(1920, 2560), augmented_dir="dataset/augmentation/", seed=2149):
     datagen_arguments = dict(
         # featurewise_center=True,
         # featurewise_std_normalization=True,
-        rotation_range=0.2,
+        rotation_range=50,
         width_shift_range=0.05,
         height_shift_range=0.05,
-        shear_range=0.05,
-        zoom_range=0.05,
-        fill_mode="reflect",
+        shear_range=0.1,
+        zoom_range=0.5,
+        fill_mode="nearest", # reflect
         horizontal_flip=True,
         vertical_flip=True,
-        rescale=1./255.
+        rescale=None
     )
 
     image_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
@@ -60,7 +61,7 @@ def data_generator(batch_size=16, target_size=(1920, 2560), augmented_dir="datas
         class_mode=None,
         color_mode="rgb",
         batch_size=batch_size,
-        # save_to_dir=f"{augmented_dir}/images",
+        save_to_dir=f"{augmented_dir}/images",
         save_prefix="image",
         seed=seed
     )
@@ -72,58 +73,62 @@ def data_generator(batch_size=16, target_size=(1920, 2560), augmented_dir="datas
         class_mode=None,
         color_mode="rgb",
         batch_size=batch_size,
-        # save_to_dir=f"{augmented_dir}/masks",
+        save_to_dir=f"{augmented_dir}/masks",
         save_prefix="image",
         seed=seed
     )
 
+    return images, masks
+
+def data_generator(images, masks):
     for images, masks in zip(images, masks):
         yield (images, masks)
 
 ########
 ########
 
-generator = data_generator(augmentation_batch_size, (height, width))
+images, masks = data_loader(batch_size, (height, width))
+generator = data_generator(images, masks)
 
 # for i, batch in enumerate(generator):
-#     if i >= image_batch_size - 1:
+#     print(f"Iteration {i}")
+#     if i + 1 == effective_batches:
 #         break
+# assert 1 == 2
 
 ########
 ########
 
-# images_path = "dataset/augmentation/images/"
-# masks_path = "dataset/augmentation/masks/"
+# images_path = "dataset/train/images/"
+# masks_path = "dataset/train/masks/"
 
 # images = os.listdir(images_path)
 # masks = os.listdir(masks_path)
 # images.sort()
 # masks.sort()
 
-# limit = len(images)
+# number_of_images = len(images)
 
-# print(f"Total images: {limit}")
-# print(f"Target shape: {(limit, height, width, 3)}")
+# print(f"Total images: {number_of_images}")
+# print(f"Target shape: {(number_of_images,) + input_shape}")
 
-# images_tensor = np.empty((limit, height, width, 3))
-# masks_tensor = np.empty((limit, height, width, 1))
+# images_tensor = np.empty((number_of_images,) + input_shape)
+# masks_tensor = np.empty((number_of_images,) + input_shape)
 
 # for i, (image, mask) in enumerate(zip(images, masks)):
-#     assert image.split("_")[-1] == mask.split("_")[-1], f"Image and maks do not correspond: {image}, {mask}"
+#     assert image.split(".")[0] == mask.split(".")[0], f"Image and maks do not correspond: {image}, {mask}"
 #     img = cv2.imread(os.path.join(images_path, image))
+#     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+#     img = cv2.resize(img, (width, height))
 #     images_tensor[i, :, :, :] = img
 
 #     msk = cv2.imread(os.path.join(masks_path, mask), cv2.IMREAD_GRAYSCALE)
-#     masks_tensor[i, :, :, 0] = msk
-#     # if i + 1 == limit:
-#         # break
+#     msk = cv2.cvtColor(msk, cv2.COLOR_BGR2RGB)
+#     msk = cv2.resize(msk, (width, height))
+#     masks_tensor[i, :, :, :] = msk
 
 # print(images_tensor.shape)
 # print(masks_tensor.shape)
-
-# def yield_data(x, y):
-#     for xx, yy in zip(x, y):
-#         yield (xx, yy)
 
 ########
 ########
@@ -142,7 +147,10 @@ def dice_coef_loss(y_true, y_pred):
 def make_model(input_shape):
     inputs = keras.Input(shape=input_shape)
 
-    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
+    x = layers.experimental.preprocessing.Rescaling(1./255)(inputs)
+    x = layers.experimental.preprocessing.Normalization()(x)
+
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
     conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
 
@@ -195,15 +203,14 @@ checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%
 os.makedirs(checkpoint_directory)
 
 with open(os.path.join(checkpoint_directory, "hyperparameters.txt"), "w") as hyperparameters:
-    hyperparameters.write(f"epochs: {epochs}\n")
-    hyperparameters.write(f"batch_size: {batch_size}\n")
-    hyperparameters.write(f"steps_per_epoch: {steps_per_epoch}\n")
-    hyperparameters.write(f"image_batch_size: {image_batch_size}\n")
-    hyperparameters.write(f"augmentation_batch_size: {augmentation_batch_size}\n")
-    hyperparameters.write(f"height: {height}\n")
-    hyperparameters.write(f"width: {width}\n")
-    hyperparameters.write(f"input_shape: {input_shape}\n")
-    hyperparameters.write(f"learning_rate: {learning_rate}\n")
+    hyperparameters.write(f"Seed: {seed}\n")
+    hyperparameters.write(f"Epochs: {epochs}\n")
+    hyperparameters.write(f"Batch size: {batch_size}\n")
+    hyperparameters.write(f"Steps per epoch: {steps_per_epoch}\n")
+    hyperparameters.write(f"Effective batches: {effective_batches}\n")
+    hyperparameters.write(f"Effective images: {effective_images}\n")
+    hyperparameters.write(f"Input shape: {input_shape}\n")
+    hyperparameters.write(f"Learning rate: {model.optimizer.get_config()['learning_rate']}\n")
 
 callbacks = [
     #keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=10, verbose=1,  mode="auto", cooldown=1),
@@ -215,13 +222,19 @@ callbacks = [
 
 start = time.time()
 print(f"Training start - {time.strftime('%x %X')}")
+print(f"  - Seed: {seed}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Batch size: {batch_size}")
-print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}\n")
+print(f"  - Steps per epoch: {steps_per_epoch}")
+print(f"  - Effective batches: {effective_batches}")
+print(f"  - Effective images: {effective_images}")
+print(f"  - Input shape: {input_shape}")
+print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
+print(f"  - Checkpoints saved at: {checkpoint_directory}\n")
 
 keras.backend.clear_session()
 history = model.fit(generator, batch_size=batch_size, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)#, validation_data=val_ds)
-# history = model.fit(images_tensor, masks_tensor, batch_size=batch_size, epochs=20, steps_per_epoch=16, callbacks=callbacks)#, validation_data=val_ds)
+# history = model.fit(images_tensor, masks_tensor, batch_size=batch_size, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)#, validation_data=val_ds)
 
 end = time.time()
 print(f"\nTraining end - {time.strftime('%x %X')}")
@@ -236,11 +249,14 @@ print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
 test_images_path = "dataset/test/"
 
 images = os.listdir(test_images_path)
+images = [image for image in images if not image.endswith("_prediction.jpg")]
 
 test_images_tensor = np.empty((len(images), height, width, 3))
+original_shape = None
 
 for i, image_path in enumerate(images):
     image = cv2.imread(os.path.join(test_images_path, image_path), cv2.IMREAD_COLOR)
+    original_shape = image.shape[:2][::-1]
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = cv2.resize(image, (width, height))
     test_images_tensor[i, :, :, :] = image
@@ -250,8 +266,11 @@ print(test_images_tensor.shape)
 ########
 ########
 
+keras.backend.clear_session()
 loaded_model = keras.models.load_model(f"{checkpoint_directory}/epoch_{epochs}.h5", custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
 predictions = loaded_model.predict(test_images_tensor, verbose=1)
 
 for i, prediction in enumerate(predictions):
-    cv2.imwrite(os.path.join(test_images_path, f"{i}_prediction.jpg"), prediction * 255)
+    name = os.path.basename(images[i]).split(".")[0]
+    prediction = cv2.resize(prediction, original_shape)
+    cv2.imwrite(os.path.join(test_images_path, f"{name}_prediction.jpg"), prediction * 255)
