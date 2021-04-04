@@ -61,7 +61,7 @@ def data_loader(batch_size=16, target_size=(1920, 2560), augmented_dir="dataset/
         class_mode=None,
         color_mode="rgb",
         batch_size=batch_size,
-        save_to_dir=f"{augmented_dir}/images",
+        # save_to_dir=f"{augmented_dir}/images",
         save_prefix="image",
         seed=seed
     )
@@ -73,7 +73,7 @@ def data_loader(batch_size=16, target_size=(1920, 2560), augmented_dir="dataset/
         class_mode=None,
         color_mode="rgb",
         batch_size=batch_size,
-        save_to_dir=f"{augmented_dir}/masks",
+        # save_to_dir=f"{augmented_dir}/masks",
         save_prefix="image",
         seed=seed
     )
