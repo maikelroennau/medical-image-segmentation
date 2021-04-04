@@ -19,11 +19,12 @@ os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 ########
 ########
 
+model_name = "AgNOR-Nucleus"
 seed = 2149
 
-epochs = 10
+epochs = 5
 batch_size = 16
-steps_per_epoch = 32
+steps_per_epoch = 16
 effective_batches = steps_per_epoch * epochs
 effective_images = batch_size * steps_per_epoch
 
@@ -45,10 +46,10 @@ def data_loader(batch_size=16, target_size=(1920, 2560), augmented_dir="dataset/
         height_shift_range=0.05,
         shear_range=0.1,
         zoom_range=0.5,
-        fill_mode="nearest", # reflect
+        fill_mode="reflect",
         horizontal_flip=True,
         vertical_flip=True,
-        rescale=None
+        rescale=1./255.
     )
 
     image_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
@@ -144,13 +145,10 @@ def dice_coef_loss(y_true, y_pred):
 ########
 ########
 
-def make_model(input_shape):
+def make_model(input_shape, name="AgNOR"):
     inputs = keras.Input(shape=input_shape)
 
-    x = layers.experimental.preprocessing.Rescaling(1./255)(inputs)
-    x = layers.experimental.preprocessing.Normalization()(x)
-
-    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
     conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
 
@@ -187,13 +185,13 @@ def make_model(input_shape):
 
     conv10 = Conv2D(1, (1, 1), activation='sigmoid')(conv9)
 
-    model = keras.Model(inputs=[inputs], outputs=[conv10])
+    model = keras.Model(inputs=[inputs], outputs=[conv10], name=model_name)
 
     model.compile(optimizer=Adam(lr=learning_rate), loss=dice_coef_loss, metrics=[dice_coef, "binary_accuracy"])
 
     return model
 
-model = make_model(input_shape=input_shape)
+model = make_model(input_shape=input_shape, name=model_name)
 model.summary()
 
 ########
@@ -203,6 +201,7 @@ checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%
 os.makedirs(checkpoint_directory)
 
 with open(os.path.join(checkpoint_directory, "hyperparameters.txt"), "w") as hyperparameters:
+    hyperparameters.write(f"Model name: {model.name}\n")
     hyperparameters.write(f"Seed: {seed}\n")
     hyperparameters.write(f"Epochs: {epochs}\n")
     hyperparameters.write(f"Batch size: {batch_size}\n")
@@ -222,6 +221,7 @@ callbacks = [
 
 start = time.time()
 print(f"Training start - {time.strftime('%x %X')}")
+print(f"  - Model name: {model.name}")
 print(f"  - Seed: {seed}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Batch size: {batch_size}")
