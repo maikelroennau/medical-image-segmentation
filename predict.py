@@ -12,23 +12,7 @@ from tensorflow.keras import backend as K
 ########
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-# os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
-
-########
-########
-
-epochs = 20
-batch_size = 256
-steps_per_epoch = 256
-
-image_batch_size = 256
-augmentation_batch_size = 16
-
-height = 240 # 240 480  960 1920
-width = 320 # 320 640 1280 2560
-input_shape = (height, width, 3)
-
-learning_rate = 1e-5
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
 ########
@@ -44,11 +28,12 @@ def dice_coef_loss(y_true, y_pred):
 ########
 ########
 
-def load_images(test_images_path):
+def load_images(test_images_path, input_shape):
+    height, width, channels = input_shape
     images = os.listdir(test_images_path)
     images = [image for image in images if not image.endswith("_prediction.jpg")]
 
-    test_images_tensor = np.empty((len(images), height, width, 3))
+    test_images_tensor = np.empty((len(images), height, width, channels))
     original_shape = None
 
     for i, image_path in enumerate(images):
@@ -65,9 +50,10 @@ def load_images(test_images_path):
 ########
 
 def predict(model, test_images_path="dataset/test/"):
-    test_images_tensor, original_shape, images = load_images(test_images_path)
-
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+    input_shape = loaded_model.input_shape[1:]
+
+    test_images_tensor, original_shape, images = load_images(test_images_path, input_shape)
     predictions = loaded_model.predict(test_images_tensor, verbose=1)
 
     for i, prediction in enumerate(predictions):
