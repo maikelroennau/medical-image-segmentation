@@ -23,7 +23,7 @@ os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 model_name = "AgNOR-Nucleus"
 seed = 2149
 
-epochs = 5
+epochs = 20
 batch_size = 16
 steps_per_epoch = 128
 effective_batches = steps_per_epoch * epochs
@@ -201,21 +201,28 @@ model.summary()
 checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%S')}")
 os.makedirs(checkpoint_directory)
 
-with open(os.path.join(checkpoint_directory, "hyperparameters.txt"), "w") as hyperparameters:
-    hyperparameters.write(f"Model name: {model.name}\n")
-    hyperparameters.write(f"Seed: {seed}\n")
-    hyperparameters.write(f"Epochs: {epochs}\n")
-    hyperparameters.write(f"Batch size: {batch_size}\n")
-    hyperparameters.write(f"Steps per epoch: {steps_per_epoch}\n")
-    hyperparameters.write(f"Effective batches: {effective_batches}\n")
-    hyperparameters.write(f"Effective images: {effective_images}\n")
-    hyperparameters.write(f"Input shape: {input_shape}\n")
-    hyperparameters.write(f"Learning rate: {model.optimizer.get_config()['learning_rate']}\n")
-
 callbacks = [
     keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.5, patience=3, verbose=1,  mode="auto", cooldown=1),
     keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="loss", save_best_only=False),
 ]
+
+########
+########
+
+train_config = {
+    "model_name": model.name,
+    "seed": seed,
+    "epochs": epochs,
+    "batch_size": batch_size,
+    "steps_per_epoch": steps_per_epoch,
+    "effective_batches": effective_batches,
+    "effective_images": effective_images,
+    "input_shape": input_shape,
+    "initial_learning_rate": model.optimizer.get_config()['learning_rate']
+}
+
+with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
+    json.dump(train_config, config_file)
 
 ########
 ########
@@ -245,9 +252,15 @@ duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
 print(f"Duration: {duration}")
 print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
 
-history.history["duration"] = duration
-with open(f"{checkpoint_directory}/train_history.json", "w") as train_history:
-    json.dump(history.history, train_history)
+train_config["duration"] = duration
+history_data = history.history
+
+for k, v in history_data.items():
+    v = [float(i) for i in v]
+    train_config[k] = v
+
+with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
+    json.dump(train_config, config_file)
 
 ########
 ########
@@ -273,7 +286,7 @@ print(test_images_tensor.shape)
 ########
 
 keras.backend.clear_session()
-loaded_model = keras.models.load_model(f"{checkpoint_directory}/epoch_{epochs}.h5", custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+loaded_model = keras.models.load_model(os.path.join(checkpoint_directory, f"epoch_{epochs}.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
 predictions = loaded_model.predict(test_images_tensor, verbose=1)
 
 for i, prediction in enumerate(predictions):
