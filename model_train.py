@@ -1,3 +1,4 @@
+import json
 import os
 import time
 
@@ -212,7 +213,7 @@ with open(os.path.join(checkpoint_directory, "hyperparameters.txt"), "w") as hyp
     hyperparameters.write(f"Learning rate: {model.optimizer.get_config()['learning_rate']}\n")
 
 callbacks = [
-    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.5, patience=10, verbose=1,  mode="auto", cooldown=1),
+    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.5, patience=3, verbose=1,  mode="auto", cooldown=1),
     keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="loss", save_best_only=False),
 ]
 
@@ -240,8 +241,13 @@ end = time.time()
 print(f"\nTraining end - {time.strftime('%x %X')}")
 hours, rem = divmod(end-start, 3600)
 minutes, seconds = divmod(rem, 60)
-print("Duration: {:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds))
+duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
+print(f"Duration: {duration}")
 print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
+
+history.history["duration"] = duration
+with open(f"{checkpoint_directory}/train_history.json", "w") as train_history:
+    json.dump(history.history, train_history)
 
 ########
 ########
