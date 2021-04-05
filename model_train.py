@@ -24,15 +24,15 @@ seed = 2149
 
 epochs = 5
 batch_size = 16
-steps_per_epoch = 64
+steps_per_epoch = 128
 effective_batches = steps_per_epoch * epochs
 effective_images = batch_size * steps_per_epoch
 
-height = 240 # 240 480 960 1920
-width = 320 # 320 640 1280 2560
+height = 960 # 240 480 960 1920
+width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
-learning_rate = 1e-4
+learning_rate = 1e-5
 
 ########
 ########
@@ -137,10 +137,10 @@ generator = data_generator(images, masks)
 def dice_coef(y_true, y_pred, smooth=1.):
     intersection = K.sum(y_true * y_pred, axis=[1,2,3])
     union = K.sum(y_true, axis=[1,2,3]) + K.sum(y_pred, axis=[1,2,3])
-    return K.mean( (2. * intersection + smooth) / (union + smooth), axis=0)
+    return K.mean((2. * intersection + smooth) / (union + smooth), axis=0)
 
 def dice_coef_loss(y_true, y_pred):
-    return -dice_coef(y_true, y_pred)
+    return 1-dice_coef(y_true, y_pred)
 
 ########
 ########
@@ -212,8 +212,8 @@ with open(os.path.join(checkpoint_directory, "hyperparameters.txt"), "w") as hyp
     hyperparameters.write(f"Learning rate: {model.optimizer.get_config()['learning_rate']}\n")
 
 callbacks = [
-    #keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=10, verbose=1,  mode="auto", cooldown=1),
-    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="val_loss", save_best_only=False),
+    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.5, patience=10, verbose=1,  mode="auto", cooldown=1),
+    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="loss", save_best_only=False),
 ]
 
 ########
