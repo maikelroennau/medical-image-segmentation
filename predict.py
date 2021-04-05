@@ -43,7 +43,7 @@ def load_images(test_images_path, input_shape):
         image = cv2.resize(image, (width, height))
         test_images_tensor[i, :, :, :] = image
 
-    print(test_images_tensor.shape)
+    print(f"Loaded tensor: {test_images_tensor.shape}")
     return test_images_tensor, original_shape, images
 
 ########
