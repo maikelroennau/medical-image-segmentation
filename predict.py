@@ -31,7 +31,7 @@ def dice_coef_loss(y_true, y_pred):
 def load_images(test_images_path, input_shape):
     height, width, channels = input_shape
     images = os.listdir(test_images_path)
-    images = [image for image in images if not image.endswith("_prediction.jpg")]
+    images = [image for image in images if image.endswith(".jpg") and not image.endswith("_prediction.jpg")]
 
     test_images_tensor = np.empty((len(images), height, width, channels))
     original_shape = None
