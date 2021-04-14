@@ -14,7 +14,7 @@ from tensorflow.keras.optimizers import Adam
 ########
 ########
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
@@ -184,9 +184,9 @@ def make_model(input_shape, name="AgNOR"):
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(up9)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv9)
 
-    conv10 = Conv2D(1, (1, 1), activation="sigmoid")(conv9)
+    outputs = Conv2D(1, (1, 1), activation="sigmoid")(conv9)
 
-    model = keras.Model(inputs=[inputs], outputs=[conv10], name=model_name)
+    model = keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
     model.compile(optimizer=Adam(lr=learning_rate), loss=dice_coef_loss, metrics=[dice_coef, "binary_accuracy"])
 
@@ -241,7 +241,7 @@ print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}\n")
 
 keras.backend.clear_session()
-history = model.fit(generator, batch_size=batch_size, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)#, validation_data=val_ds)
+history = model.fit(generator, batch_size=batch_size, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks) #, initial_epoch=10), validation_data=val_ds)
 # history = model.fit(images_tensor, masks_tensor, batch_size=batch_size, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)#, validation_data=val_ds)
 
 end = time.time()
@@ -250,7 +250,9 @@ hours, rem = divmod(end-start, 3600)
 minutes, seconds = divmod(rem, 60)
 duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
 print(f"Duration: {duration}")
-print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
+print(f"  - Model name: {model.name}")
+print(f"  - Checkpoints saved at: {checkpoint_directory}")
+print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}")
 
 train_config["duration"] = duration
 history_data = history.history
