@@ -31,7 +31,11 @@ def dice_coef_loss(y_true, y_pred):
 def load_images(test_images_path, input_shape):
     height, width, channels = input_shape
     images = os.listdir(test_images_path)
-    images = [image for image in images if image.endswith(".jpg") and not image.endswith("_prediction.jpg")]
+    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+    images = [image for image in images if os.path.splitext(image)[1].lower() in supported_types and not image.endswith("_prediction.jpg")]
+    if len(images) == 0:
+        images = os.listdir(test_images_path)
+        images = [image for image in images if os.path.splitext(image)[1].lower() in supported_types and not image.endswith("_prediction.png")]
 
     test_images_tensor = np.empty((len(images), height, width, channels))
     original_shape = None
@@ -49,12 +53,12 @@ def load_images(test_images_path, input_shape):
 ########
 ########
 
-def predict(model, test_images_path="dataset/test/"):
+def predict(model, test_images_path="dataset/test/", batch_size=1):
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
     input_shape = loaded_model.input_shape[1:]
 
     test_images_tensor, original_shape, images = load_images(test_images_path, input_shape)
-    predictions = loaded_model.predict(test_images_tensor, verbose=1)
+    predictions = loaded_model.predict(test_images_tensor, batch_size=1, verbose=1)
 
     for i, prediction in enumerate(predictions):
         name = os.path.basename(images[i]).split(".")[0]
