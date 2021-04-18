@@ -1,14 +1,14 @@
 import json
 import os
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import backend as K
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Conv2DTranspose, Dropout, MaxPooling2D, UpSampling2D, concatenate
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
 from tensorflow.keras.optimizers import Adam
 
 ########
@@ -23,8 +23,8 @@ os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 model_name = "AgNOR-Nucleus"
 seed = 2149
 
-epochs = 20
-batch_size = 16
+epochs = 1
+batch_size = 1
 steps_per_epoch = 128
 effective_batches = steps_per_epoch * epochs
 effective_images = batch_size * steps_per_epoch
@@ -136,9 +136,9 @@ generator = data_generator(images, masks)
 ########
 
 def dice_coef(y_true, y_pred, smooth=1.):
-    intersection = K.sum(y_true * y_pred, axis=[1,2,3])
-    union = K.sum(y_true, axis=[1,2,3]) + K.sum(y_pred, axis=[1,2,3])
-    return K.mean((2. * intersection + smooth) / (union + smooth), axis=0)
+    intersection = keras.backend.sum(y_true * y_pred, axis=[1,2,3])
+    union = keras.backend.sum(y_true, axis=[1,2,3]) + keras.backend.sum(y_pred, axis=[1,2,3])
+    return keras.backend.mean((2. * intersection + smooth) / (union + smooth), axis=0)
 
 def dice_coef_loss(y_true, y_pred):
     return 1-dice_coef(y_true, y_pred)
@@ -267,31 +267,26 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 ########
 
+print("\nTesting model")
+
 test_images_path = "dataset/test/"
+input_shape = model.input_shape[1:]
+height, width, channels = input_shape
 
-images = os.listdir(test_images_path)
-images = [image for image in images if not image.endswith("_prediction.jpg")]
-
-test_images_tensor = np.empty((len(images), height, width, 3))
-original_shape = None
+supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+images = [image_path for image_path in Path(test_images_path).rglob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
+images_tensor = np.empty((1, height, width, channels))
 
 for i, image_path in enumerate(images):
-    image = cv2.imread(os.path.join(test_images_path, image_path), cv2.IMREAD_COLOR)
+    image = cv2.imread(os.path.join(test_images_path, image_path.name), cv2.IMREAD_COLOR)
     original_shape = image.shape[:2][::-1]
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = cv2.resize(image, (width, height))
-    test_images_tensor[i, :, :, :] = image
+    images_tensor[0, :, :, :] = image
 
-print(test_images_tensor.shape)
-
-########
-########
-
-keras.backend.clear_session()
-loaded_model = keras.models.load_model(os.path.join(checkpoint_directory, f"epoch_{epochs}.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
-predictions = loaded_model.predict(test_images_tensor, verbose=1)
-
-for i, prediction in enumerate(predictions):
-    name = os.path.basename(images[i]).split(".")[0]
-    prediction = cv2.resize(prediction, original_shape)
-    cv2.imwrite(os.path.join(test_images_path, f"{name}_prediction.jpg"), prediction * 255)
+    prediction = model.predict(images_tensor, batch_size=1, verbose=1)
+    prediction = cv2.resize(prediction[0], original_shape)
+    prediction[prediction < 0.5] = 0
+    prediction[prediction >= 0.5] = 255
+    cv2.imwrite(os.path.join(test_images_path, f"{image_path.stem}_{model.name}_prediction.png"), prediction)
+    keras.backend.clear_session()
