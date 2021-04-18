@@ -1,4 +1,4 @@
-name: agnor
+name: ufrgs
 channels:
   - willyd
   - conda-forge
@@ -67,6 +67,7 @@ dependencies:
     - tensorflow-estimator==2.4.0
     - tensorflow-gpu==2.4.0
     - termcolor==1.1.0
+    - tqdm==4.60
     - typing-extensions==3.7.4.3
     - urllib3==1.26.4
     - werkzeug==1.0.1
