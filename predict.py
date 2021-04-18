@@ -1,12 +1,12 @@
 import os
 import sys
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import backend as K
 
 ########
 ########
@@ -28,42 +28,28 @@ def dice_coef_loss(y_true, y_pred):
 ########
 ########
 
-def load_images(test_images_path, input_shape):
+def predict(model, images_path="dataset/test/"):
+    loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+    input_shape = loaded_model.input_shape[1:]
     height, width, channels = input_shape
-    images = os.listdir(test_images_path)
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    images = [image for image in images if os.path.splitext(image)[1].lower() in supported_types and not image.endswith("_prediction.jpg")]
-    if len(images) == 0:
-        images = os.listdir(test_images_path)
-        images = [image for image in images if os.path.splitext(image)[1].lower() in supported_types and not image.endswith("_prediction.png")]
 
-    test_images_tensor = np.empty((len(images), height, width, channels))
-    original_shape = None
+    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+    images = [image_path for image_path in Path(images_path).rglob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
+    images_tensor = np.empty((1, height, width, channels))
 
     for i, image_path in enumerate(images):
-        image = cv2.imread(os.path.join(test_images_path, image_path), cv2.IMREAD_COLOR)
+        image = cv2.imread(os.path.join(images_path, image_path.name), cv2.IMREAD_COLOR)
         original_shape = image.shape[:2][::-1]
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = cv2.resize(image, (width, height))
-        test_images_tensor[i, :, :, :] = image
+        images_tensor[0, :, :, :] = image
 
-    print(f"Loaded tensor: {test_images_tensor.shape}")
-    return test_images_tensor, original_shape, images
-
-########
-########
-
-def predict(model, test_images_path="dataset/test/", batch_size=1):
-    loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
-    input_shape = loaded_model.input_shape[1:]
-
-    test_images_tensor, original_shape, images = load_images(test_images_path, input_shape)
-    predictions = loaded_model.predict(test_images_tensor, batch_size=1, verbose=1)
-
-    for i, prediction in enumerate(predictions):
-        name = os.path.basename(images[i]).split(".")[0]
-        prediction = cv2.resize(prediction, original_shape)
-        cv2.imwrite(os.path.join(test_images_path, f"{name}_prediction.jpg"), prediction * 255)
+        prediction = loaded_model.predict(images_tensor, batch_size=1, verbose=1)
+        prediction = cv2.resize(prediction[0], original_shape)
+        prediction[prediction < 0.5] = 0
+        prediction[prediction >= 0.5] = 255
+        cv2.imwrite(os.path.join(images_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), prediction)
+        keras.backend.clear_session()
 
 
 if __name__ == "__main__":
