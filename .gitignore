@@ -132,3 +132,6 @@ dmypy.json
 dataset/train/
 dataset/test/
 checkpoints/
+
+# Models
+*.h5
