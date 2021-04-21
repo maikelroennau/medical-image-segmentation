@@ -51,6 +51,7 @@ dependencies:
     - pyasn1==0.4.8
     - pyasn1-modules==0.2.8
     - pyparsing==2.4.7
+    - pysimplegui==4.39.1
     - pyqt5==5.15.4
     - pyqt5-qt5==5.15.2
     - pyqt5-sip==12.8.1
