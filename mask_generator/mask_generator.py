@@ -165,7 +165,7 @@ def main():
                 status.update("Status: no images found!")
                 continue
 
-            annotation_directory = f"{time.strftime('%Y-%m-%d-%Hh%Mm%S')}-proposed-annotations"
+            annotation_directory = f"{time.strftime('%Y-%m-%d-%Hh%Mm')}-proposed-annotations"
             if not os.path.isdir(annotation_directory):
                 os.mkdir(annotation_directory)
 
