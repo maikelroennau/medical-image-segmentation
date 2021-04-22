@@ -28,7 +28,7 @@ def dice_coef_loss(y_true, y_pred):
 ########
 ########
 
-def predict(model, images_path="dataset/test/"):
+def predict(model, images_path="dataset/test/images/"):
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
     input_shape = loaded_model.input_shape[1:]
     height, width, channels = input_shape
