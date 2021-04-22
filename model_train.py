@@ -23,9 +23,9 @@ os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 model_name = "AgNOR-Nucleus"
 seed = 2149
 
-epochs = 1
+epochs = 15
 batch_size = 1
-steps_per_epoch = 128
+steps_per_epoch = 200
 effective_batches = steps_per_epoch * epochs
 effective_images = batch_size * steps_per_epoch
 
@@ -38,99 +38,77 @@ learning_rate = 1e-5
 ########
 ########
 
-def data_loader(batch_size=16, target_size=(1920, 2560), augmented_dir="dataset/augmentation/", seed=2149):
-    datagen_arguments = dict(
-        # featurewise_center=True,
-        # featurewise_std_normalization=True,
-        rotation_range=50,
-        width_shift_range=0.05,
-        height_shift_range=0.05,
-        shear_range=0.1,
-        zoom_range=0.5,
-        fill_mode="reflect",
-        horizontal_flip=True,
-        vertical_flip=True,
-        rescale=1./255.
-    )
+def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=2149, augment=False, save_to_dir=None, save_prefix="augmented_"):
+    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+    images_paths = [image_path for image_path in Path(path).joinpath("images").glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
+    masks_paths = [mask_path for mask_path in Path(path).joinpath("masks").glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
 
-    image_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
-    mask_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
+    assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
 
-    images = image_datagen.flow_from_directory(
-        directory="dataset/train/",
-        target_size=target_size,
-        classes=["images"],
-        class_mode=None,
-        color_mode="rgb",
-        batch_size=batch_size,
-        # save_to_dir=f"{augmented_dir}/images",
-        save_prefix="image",
-        seed=seed
-    )
+    images_paths.sort()
+    masks_paths.sort()
 
-    masks = mask_datagen.flow_from_directory(
-        directory="dataset/train/",
-        target_size=target_size,
-        classes=["masks"],
-        class_mode=None,
-        color_mode="rgb",
-        batch_size=batch_size,
-        # save_to_dir=f"{augmented_dir}/masks",
-        save_prefix="image",
-        seed=seed
-    )
+    for image, mask in zip(images_paths, masks_paths):
+        assert image.stem.lower() == mask.stem.lower(), f"Image and mask do not correspond: {image.name} <==> {image.name}"
 
-    return images, masks
+    height, width = target_size
+    images = np.zeros((len(images_paths), height, width, 3))
+    masks = np.zeros((len(masks_paths), height, width, 1))
 
-def data_generator(images, masks):
-    for images, masks in zip(images, masks):
-        yield (images, masks)
+    for i, (image, mask) in enumerate(zip(images_paths, masks_paths)):
+        images[i, :, :, :] = keras.preprocessing.image.load_img(image, target_size=target_size)
+        masks[i, :, :, 0] = keras.preprocessing.image.load_img(mask, target_size=target_size, color_mode="grayscale")
+
+    if augment:
+        datagen_arguments = dict(
+            featurewise_center=True,
+            featurewise_std_normalization=True,
+            rotation_range=50,
+            width_shift_range=0.05,
+            height_shift_range=0.05,
+            shear_range=0.1,
+            zoom_range=0.5,
+            fill_mode="reflect",
+            horizontal_flip=True,
+            vertical_flip=True,
+            rescale=1./255.
+        )
+
+        images_datagen = keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
+        images_datagen.fit(images)
+
+        datagen_arguments.pop("featurewise_center")
+        datagen_arguments.pop("featurewise_std_normalization")
+        masks_datagen = keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
+
+        if save_to_dir:
+            Path(save_to_dir).mkdir(exist_ok=True)
+        train_images = images_datagen.flow(images, batch_size=batch_size, seed=seed, shuffle=True, save_prefix=save_prefix, save_to_dir=save_to_dir)
+        train_masks = masks_datagen.flow(masks, batch_size=batch_size, seed=seed, shuffle=True, save_prefix=save_prefix, save_to_dir=save_to_dir)
+
+        return train_images, train_masks
+    else:
+        train_images = images * (1./255.)
+        train_masks = masks * (1./255.)
+        return train_images, train_masks
 
 ########
 ########
 
-images, masks = data_loader(batch_size, (height, width))
-generator = data_generator(images, masks)
+train_images, train_masks = load_images_and_masks("dataset/train/", target_size=(height, width), augment=True, batch_size=batch_size)
+validation_images, validation_masks = load_images_and_masks("dataset/validation/", target_size=(height, width))
 
-# for i, batch in enumerate(generator):
-#     print(f"Iteration {i}")
-#     if i + 1 == effective_batches:
+# for i, batch in enumerate(train_images):
+#     print(batch[0].shape, batch[1].shape)
+#     if i + 1 == steps_per_epoch:
 #         break
 # assert 1 == 2
 
-########
-########
+def get_generator(train_images, train_masks):
+    for images, masks in zip(train_images, train_masks):
+        yield (images, masks)
 
-# images_path = "dataset/train/images/"
-# masks_path = "dataset/train/masks/"
-
-# images = os.listdir(images_path)
-# masks = os.listdir(masks_path)
-# images.sort()
-# masks.sort()
-
-# number_of_images = len(images)
-
-# print(f"Total images: {number_of_images}")
-# print(f"Target shape: {(number_of_images,) + input_shape}")
-
-# images_tensor = np.empty((number_of_images,) + input_shape)
-# masks_tensor = np.empty((number_of_images,) + input_shape)
-
-# for i, (image, mask) in enumerate(zip(images, masks)):
-#     assert image.split(".")[0] == mask.split(".")[0], f"Image and maks do not correspond: {image}, {mask}"
-#     img = cv2.imread(os.path.join(images_path, image))
-#     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-#     img = cv2.resize(img, (width, height))
-#     images_tensor[i, :, :, :] = img
-
-#     msk = cv2.imread(os.path.join(masks_path, mask), cv2.IMREAD_GRAYSCALE)
-#     msk = cv2.cvtColor(msk, cv2.COLOR_BGR2RGB)
-#     msk = cv2.resize(msk, (width, height))
-#     masks_tensor[i, :, :, :] = msk
-
-# print(images_tensor.shape)
-# print(masks_tensor.shape)
+train_data = get_generator(train_images, train_masks)
 
 ########
 ########
@@ -188,7 +166,7 @@ def make_model(input_shape, name="AgNOR"):
 
     model = keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
-    model.compile(optimizer=Adam(lr=learning_rate), loss=dice_coef_loss, metrics=[dice_coef, "binary_accuracy"])
+    model.compile(optimizer=Adam(lr=learning_rate), loss=dice_coef_loss, metrics=[dice_coef])
 
     return model
 
@@ -202,8 +180,8 @@ checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%
 os.makedirs(checkpoint_directory)
 
 callbacks = [
-    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.5, patience=3, verbose=1,  mode="auto", cooldown=1),
-    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="loss", save_best_only=False),
+    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.5, patience=10, verbose=1,  mode="auto", cooldown=1),
+    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="val_dice_coef", save_best_only=False),
 ]
 
 ########
@@ -241,8 +219,16 @@ print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}\n")
 
 keras.backend.clear_session()
-history = model.fit(generator, batch_size=batch_size, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks) #, initial_epoch=10), validation_data=val_ds)
-# history = model.fit(images_tensor, masks_tensor, batch_size=batch_size, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)#, validation_data=val_ds)
+history = model.fit(
+    train_data,
+    # train_masks,
+    # batch_size=batch_size,
+    epochs=epochs,
+    steps_per_epoch=steps_per_epoch,
+    validation_data=(validation_images, validation_masks),
+    # validation_batch_size=len(validation_images)//batch_size,
+    validation_steps=len(validation_images),
+    callbacks=callbacks) #, initial_epoch=10), validation_data=val_ds)
 
 end = time.time()
 print(f"\nTraining end - {time.strftime('%x %X')}")
@@ -267,9 +253,18 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 ########
 
+print("\nModel evaluation")
+test_images, test_masks = load_images_and_masks("dataset/test/", target_size=(height, width))
+loss, dice = model.evaluate(test_images, test_masks, batch_size=1)
+print("Loss: %.2f" % loss)
+print("Dice: %.2f" % dice)
+
+########
+########
+
 print("\nTesting model")
 
-test_images_path = "dataset/test/"
+test_images_path = "dataset/test/images/"
 input_shape = model.input_shape[1:]
 height, width, channels = input_shape
 
