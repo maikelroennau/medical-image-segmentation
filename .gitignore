@@ -129,8 +129,10 @@ dmypy.json
 .pyre/
 
 # Custom directories
+.vscode
 dataset/train/
 dataset/test/
+dataset/validation/
 checkpoints/
 
 # Models
