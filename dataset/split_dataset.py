@@ -8,7 +8,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-def main(path, output=".", x_split=0.70, y_split=0.90):
+def main(path, output=".", x_split=0.75, y_split=0.88):
     np.random.seed(1145)
 
     voc_dir = Path(path)
