@@ -23,9 +23,9 @@ os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 model_name = "AgNOR-Nucleus"
 seed = 1145
 
-epochs = 10
+epochs = 20
 batch_size = 1
-steps_per_epoch = 128
+steps_per_epoch = 480
 effective_batches = steps_per_epoch * epochs
 effective_images = batch_size * steps_per_epoch
 
@@ -33,7 +33,7 @@ height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
-learning_rate = 1e-6
+learning_rate = 1e-5
 
 ########
 ########
@@ -72,14 +72,14 @@ def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=11
         datagen_arguments = dict(
             # featurewise_center=True,
             # featurewise_std_normalization=True,
-            # rotation_range=10,
+            rotation_range=10,
             # width_shift_range=0.05,
             # height_shift_range=0.05,
             # shear_range=0.05,
             # zoom_range=0.05,
-            # fill_mode="reflect",
-            # horizontal_flip=True,
-            # vertical_flip=True,
+            fill_mode="reflect",
+            horizontal_flip=True,
+            vertical_flip=True,
             # rescale=1./255.
         )
 
@@ -97,13 +97,15 @@ def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=11
 
         return train_images, train_masks
     else:
+        # images = images * 1./255.
+        # masks = masks * 1./255.
         return images, masks
 
 ########
 ########
 
 train_images, train_masks = load_images_and_masks("dataset/train/", target_size=(height, width), augment=True, batch_size=batch_size, save_to_dir=None)
-# validation_images, validation_masks = load_images_and_masks("dataset/validation/", target_size=(height, width))
+validation_images, validation_masks = load_images_and_masks("dataset/validation/", target_size=(height, width))
 
 # for i, (images, masks) in enumerate(zip(train_images, train_masks)):
 #     print(images.shape)
@@ -133,11 +135,11 @@ def dice_coef_loss(y_true, y_pred):
 
 data_augmentation = keras.Sequential(
     [
-        layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
+        # layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
         # layers.experimental.preprocessing.RandomRotation(0.2, seed=seed),
         # layers.experimental.preprocessing.RandomContrast(0.1, seed=seed),
+        layers.experimental.preprocessing.Normalization(),
         # layers.experimental.preprocessing.Rescaling(1./255.),
-        layers.experimental.preprocessing.Normalization()
     ]
 )
 
@@ -199,12 +201,12 @@ model.summary()
 ########
 
 checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%S')}")
-os.makedirs(checkpoint_directory)
+os.makedirs(checkpoint_directory, exist_ok=True)
 
 callbacks = [
     keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1,  mode="auto", cooldown=1),
     keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="val_dice_coef", save_best_only=False),
-    # keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=True)
+    keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
 ]
 
 ########
@@ -216,8 +218,8 @@ train_config = {
     "epochs": epochs,
     "batch_size": batch_size,
     "steps_per_epoch": steps_per_epoch,
-    "effective_batches": effective_batches,
-    "effective_images": effective_images,
+    "effective_batches_per_epoch": effective_batches,
+    "effective_images_per_epoch": effective_images,
     "input_shape": input_shape,
     "initial_learning_rate": model.optimizer.get_config()['learning_rate']
 }
@@ -235,8 +237,8 @@ print(f"  - Seed: {seed}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Steps per epoch: {steps_per_epoch}")
-print(f"  - Effective batches: {effective_batches}")
-print(f"  - Effective images: {effective_images}")
+print(f"  - Effective batches (per epoch): {effective_batches}")
+print(f"  - Effective images (per epoch): {effective_images}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}\n")
@@ -248,10 +250,11 @@ history = model.fit(
     # batch_size=batch_size,
     epochs=epochs,
     steps_per_epoch=steps_per_epoch,
-    # validation_data=(validation_images, validation_masks),
-    # validation_batch_size=batch_size,
-    # validation_steps=len(validation_images),
-    callbacks=callbacks) #, initial_epoch=10), validation_data=val_ds)
+    validation_data=(validation_images, validation_masks),
+    validation_batch_size=batch_size,
+    validation_steps=len(validation_images),
+    # initial_epoch=22,
+    callbacks=callbacks)
 
 end = time.time()
 print(f"\nTraining end - {time.strftime('%x %X')}")
