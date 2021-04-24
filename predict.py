@@ -46,9 +46,16 @@ def predict(model, images_path="dataset/test/images/"):
 
         prediction = loaded_model.predict(images_tensor, batch_size=1, verbose=1)
         prediction = cv2.resize(prediction[0], original_shape)
-        prediction[prediction < 0.5] = 0
-        prediction[prediction >= 0.5] = 255
-        cv2.imwrite(os.path.join(images_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), prediction)
+        if len(prediction.shape) > 2:
+            for i in range(prediction.shape[-1]):
+                prediction_class = np.copy(prediction[:, :, i])
+                prediction_class[prediction_class < 0.5] = 0
+                prediction_class[prediction_class >= 0.5] = 255
+                cv2.imwrite(os.path.join(images_path, f"{image_path.stem}_{loaded_model.name}_{i}_prediction.png"), prediction_class)
+        else:
+            prediction[prediction < 0.5] = 0
+            prediction[prediction >= 0.5] = 255
+            cv2.imwrite(os.path.join(images_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), prediction)
         keras.backend.clear_session()
 
 

@@ -21,11 +21,11 @@ os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 ########
 
 model_name = "AgNOR-Nucleus"
-seed = 2149
+seed = 1145
 
-epochs = 20
+epochs = 10
 batch_size = 1
-steps_per_epoch = 200
+steps_per_epoch = 128
 effective_batches = steps_per_epoch * epochs
 effective_images = batch_size * steps_per_epoch
 
@@ -38,7 +38,7 @@ learning_rate = 1e-6
 ########
 ########
 
-def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=2149, augment=False, save_to_dir=None, save_prefix="augmented_"):
+def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=1145, augment=False, save_to_dir=None, save_prefix="augmented"):
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
     images_paths = [image_path for image_path in Path(path).joinpath("images").glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
     masks_paths = [mask_path for mask_path in Path(path).joinpath("masks").glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
@@ -58,6 +58,11 @@ def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=21
     for i, (image, mask) in enumerate(zip(images_paths, masks_paths)):
         images[i, :, :, :] = keras.preprocessing.image.load_img(image, target_size=target_size)
         masks[i, :, :, 0] = keras.preprocessing.image.load_img(mask, target_size=target_size, color_mode="grayscale")
+
+    np.random.seed(seed)
+    randomize = np.random.permutation(len(images))
+    images = np.asarray(images)[randomize]
+    masks = np.asarray(masks)[randomize]
 
     print(f"Loaded from '{path}'")
     print(f"  - Images: {len(images)}")
@@ -98,7 +103,7 @@ def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=21
 ########
 
 train_images, train_masks = load_images_and_masks("dataset/train/", target_size=(height, width), augment=True, batch_size=batch_size, save_to_dir=None)
-validation_images, validation_masks = load_images_and_masks("dataset/validation/", target_size=(height, width))
+# validation_images, validation_masks = load_images_and_masks("dataset/validation/", target_size=(height, width))
 
 # for i, (images, masks) in enumerate(zip(train_images, train_masks)):
 #     print(images.shape)
@@ -126,13 +131,25 @@ def dice_coef_loss(y_true, y_pred):
 ########
 ########
 
+data_augmentation = keras.Sequential(
+    [
+        layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
+        # layers.experimental.preprocessing.RandomRotation(0.2, seed=seed),
+        # layers.experimental.preprocessing.RandomContrast(0.1, seed=seed),
+        # layers.experimental.preprocessing.Rescaling(1./255.),
+        layers.experimental.preprocessing.Normalization()
+    ]
+)
+
+########
+########
+
 def make_model(input_shape, name="AgNOR"):
     inputs = keras.Input(shape=input_shape)
 
-    # normalized = keras.layers.experimental.preprocessing.Normalization()
-    rescaled = keras.layers.experimental.preprocessing.Rescaling(1./255.)
+    augmented = data_augmentation(inputs)
 
-    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(inputs)
+    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(augmented)
     conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
 
@@ -185,9 +202,9 @@ checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%
 os.makedirs(checkpoint_directory)
 
 callbacks = [
-    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.5, patience=10, verbose=1,  mode="auto", cooldown=1),
+    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1,  mode="auto", cooldown=1),
     keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, "epoch_{epoch}.h5"), monitor="val_dice_coef", save_best_only=False),
-    # keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch")
+    # keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=True)
 ]
 
 ########
@@ -231,9 +248,9 @@ history = model.fit(
     # batch_size=batch_size,
     epochs=epochs,
     steps_per_epoch=steps_per_epoch,
-    validation_data=(validation_images, validation_masks),
-    # validation_batch_size=len(validation_images)//batch_size,
-    validation_steps=len(validation_images),
+    # validation_data=(validation_images, validation_masks),
+    # validation_batch_size=batch_size,
+    # validation_steps=len(validation_images),
     callbacks=callbacks) #, initial_epoch=10), validation_data=val_ds)
 
 end = time.time()

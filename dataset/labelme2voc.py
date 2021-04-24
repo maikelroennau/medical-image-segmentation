@@ -88,8 +88,8 @@ def main():
             shapes=label_file.shapes,
             label_name_to_value=class_name_to_id,
         )
-        labelme.utils.lblsave(out_png_file, lbl)
-        # cv2.imwrite(out_png_file, np.where(lbl > 0, 1, 0))
+        # labelme.utils.lblsave(out_png_file, lbl)
+        cv2.imwrite(out_png_file, lbl)
 
         np.save(out_lbl_file, lbl)
 

@@ -8,8 +8,8 @@ import numpy as np
 from tqdm import tqdm
 
 
-def main(path, output=".", x_split=0.72, y_split=0.91):
-    np.random.seed(2149)
+def main(path, output=".", x_split=0.70, y_split=0.90):
+    np.random.seed(1145)
 
     voc_dir = Path(path)
     assert voc_dir.is_dir(), "Input path does not exists"
@@ -30,8 +30,8 @@ def main(path, output=".", x_split=0.72, y_split=0.91):
     images_path = np.asarray(images_path)[randomize]
     masks_path = np.asarray(masks_path)[randomize]
 
-    images_train, images_validation, images_test = np.split(images_path, [int(len(images_path) * x_split), int(len(images_path) * y_split)])
-    masks_train, masks_validation, masks_test = np.split(masks_path, [int(len(masks_path) * x_split), int(len(masks_path) * y_split)])
+    images_train, images_validation, images_test = np.split(images_path, [int(len(images_path) * float(x_split)), int(len(images_path) * float(y_split))])
+    masks_train, masks_validation, masks_test = np.split(masks_path, [int(len(masks_path) * float(x_split)), int(len(masks_path) * float(y_split))])
 
     split_dataset = Path(output)
     if not str(split_dataset) == ".":
