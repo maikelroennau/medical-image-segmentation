@@ -20,8 +20,11 @@ os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 ########
 ########
 
-model_name = "AgNOR-Nucleus"
 seed = 1145
+tf.random.set_seed(seed)
+np.random.seed(seed)
+
+model_name = "AgNOR-Nucleus"
 
 epochs = 20
 batch_size = 1
@@ -59,7 +62,6 @@ def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=11
         images[i, :, :, :] = keras.preprocessing.image.load_img(image, target_size=target_size)
         masks[i, :, :, 0] = keras.preprocessing.image.load_img(mask, target_size=target_size, color_mode="grayscale")
 
-    np.random.seed(seed)
     randomize = np.random.permutation(len(images))
     images = np.asarray(images)[randomize]
     masks = np.asarray(masks)[randomize]
