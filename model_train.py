@@ -220,7 +220,7 @@ train_config = {
     "epochs": epochs,
     "batch_size": batch_size,
     "steps_per_epoch": steps_per_epoch,
-    "effective_batches_per_epoch": effective_batches,
+    "effective_batches": effective_batches,
     "effective_images_per_epoch": effective_images,
     "input_shape": input_shape,
     "initial_learning_rate": model.optimizer.get_config()['learning_rate']
@@ -239,7 +239,7 @@ print(f"  - Seed: {seed}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Steps per epoch: {steps_per_epoch}")
-print(f"  - Effective batches (per epoch): {effective_batches}")
+print(f"  - Effective batches: {effective_batches}")
 print(f"  - Effective images (per epoch): {effective_images}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
