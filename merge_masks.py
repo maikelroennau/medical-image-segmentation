@@ -30,9 +30,19 @@ def main(images_path="dataset/test/", output_path="merged_masks"):
         if Path(nor_mask).suffix in supported_types
         and Path(nor_mask).stem.endswith("AgNOR-NOR_prediction")]
 
+    original_images.sort()
+    nuclei_masks.sort()
+    nor_masks.sort()
+
+    assert len(original_images) == len(nuclei_masks) == len(nor_masks), \
+        f"Number of images {len(original_images)}, nuclei masks {len(nuclei_masks)}, and NOR masks {len(nor_masks)} does not match"
+
     for original_image, nucleus, nor in tqdm(zip(original_images, nuclei_masks, nor_masks), total=len(original_images)):
-        nucleus_mask = cv2.imread(str(nucleus), cv2.IMREAD_UNCHANGED)
-        nor_mask = cv2.imread(str(nor), cv2.IMREAD_UNCHANGED)
+        assert nucleus.stem.split("_")[0] == nor.stem.split("_")[0], \
+            f"Masks do not match: \n  - Nucleus: {nucleus.stem.split('_')[0]} \n  - NOR....: {nor.stem.split('_')[0]}"
+
+        nucleus_mask = cv2.imread(str(Path(images_path).joinpath(str(original_image.stem).split("_")[0] + "_AgNOR-Nucleus_prediction.png")), cv2.IMREAD_UNCHANGED)
+        nor_mask = cv2.imread(str(Path(images_path).joinpath(str(original_image.stem).split("_")[0] + "_AgNOR-NOR_prediction.png")), cv2.IMREAD_UNCHANGED)
 
         nucleus_mask[nucleus_mask < 127] = 0
         nucleus_mask[nucleus_mask >= 127] = 1
