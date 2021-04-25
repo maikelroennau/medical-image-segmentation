@@ -7,7 +7,7 @@ from tensorflow import keras
 from tensorflow.keras.optimizers import Adam
 
 
-def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=1145, augment=False, save_to_dir=None, save_prefix="augmented"):
+def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=1145):
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
     images_paths = [image_path for image_path in Path(path).joinpath("images").glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
     masks_paths = [mask_path for mask_path in Path(path).joinpath("masks").glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
@@ -36,37 +36,8 @@ def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=11
     print(f"Loaded from '{path}'")
     print(f"  - Images: {len(images)}")
     print(f"  - Masks: {len(masks)}")
-
-    if augment:
-        datagen_arguments = dict(
-            # featurewise_center=True,
-            # featurewise_std_normalization=True,
-            rotation_range=10,
-            # width_shift_range=0.05,
-            # height_shift_range=0.05,
-            # shear_range=0.05,
-            # zoom_range=0.05,
-            fill_mode="reflect",
-            horizontal_flip=True,
-            vertical_flip=True,
-            # rescale=1./255.
-        )
-
-        images_datagen = keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
-        # images_datagen.fit(images)
-
-        # datagen_arguments.pop("featurewise_center")
-        # datagen_arguments.pop("featurewise_std_normalization")
-        masks_datagen = keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
-
-        if save_to_dir:
-            Path(save_to_dir).mkdir(exist_ok=True)
-        train_images = images_datagen.flow(images, batch_size=batch_size, seed=seed, shuffle=True, save_prefix=f"{save_prefix}_image", save_to_dir=save_to_dir)
-        train_masks = masks_datagen.flow(masks, batch_size=batch_size, seed=seed, shuffle=True, save_prefix=f"{save_prefix}_mask", save_to_dir=save_to_dir)
-
-        return train_images, train_masks
-    else:
-        return images, masks
+    
+    return images, masks
 
 
 def dice_coef(y_true, y_pred, smooth=1.):
@@ -78,7 +49,7 @@ def dice_coef_loss(y_true, y_pred):
     return 1-dice_coef(y_true, y_pred)
 
 
-def main(model, test_all=False, images_path="dataset/test/"):
+def main(model, images_path="dataset/test/", test_all=False):
     if not test_all:
         loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
         input_shape = loaded_model.input_shape[1:]
