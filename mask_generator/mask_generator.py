@@ -139,8 +139,8 @@ def main():
     else:
         models_base_path = sys._MEIPASS
 
-    nuclei_model = keras.models.load_model(os.path.join(models_base_path, "epoch_20_nucleus.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
-    nors_model = keras.models.load_model(os.path.join(models_base_path, "epoch_50_nor.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+    nuclei_model = keras.models.load_model(os.path.join(models_base_path, "nucleus.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+    nors_model = keras.models.load_model(os.path.join(models_base_path, "nor.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
 
     input_shape = nuclei_model.input_shape[1:]
 
@@ -187,9 +187,7 @@ def main():
                 image = cv2.resize(image, (width, height))
                 image_tensor[0, :, :, :] = image
 
-                # nuclei_prediction = nuclei_model.predict(image_tensor, batch_size=1, verbose=0)
                 nuclei_prediction = nuclei_model.predict_on_batch(image_tensor)
-                # nors_prediction = nors_model.predict(image_tensor, batch_size=1, verbose=0)
                 nors_prediction = nors_model.predict_on_batch(image_tensor)
                 save_annotation(nuclei_prediction[0], nors_prediction[0], annotation_directory, image_path, original_shape, image)
                 keras.backend.clear_session()
