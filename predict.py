@@ -47,11 +47,16 @@ def predict(model, images_path="dataset/test/images/"):
         prediction = loaded_model.predict(images_tensor, batch_size=1, verbose=1)
         prediction = cv2.resize(prediction[0], original_shape)
         if len(prediction.shape) > 2:
-            for i in range(prediction.shape[-1]):
-                prediction_class = np.copy(prediction[:, :, i])
-                prediction_class[prediction_class < 0.5] = 0
-                prediction_class[prediction_class >= 0.5] = 255
-                cv2.imwrite(os.path.join(images_path, f"{image_path.stem}_{loaded_model.name}_{i}_prediction.png"), prediction_class)
+            prediction[:, :, 0][prediction[:, :, 0] < 0.5] = 0
+            prediction[:, :, 0][prediction[:, :, 0] >= 0.5] = 255
+
+            prediction[:, :, 1][prediction[:, :, 1] == 0.] = 255
+            prediction[:, :, 1][prediction[:, :, 1] < 255.] = 0
+
+            output = np.zeros(prediction.shape[:2] + (3,))
+            output[:, :, 0:2] = prediction.astype(np.uint8)
+            
+            cv2.imwrite(os.path.join(images_path, f"{image_path.stem}_{loaded_model.name}_{i}_prediction.png"), cv2.cvtColor(output.astype(np.uint8), cv2.COLOR_BGR2RGB))
         else:
             prediction[prediction < 0.5] = 0
             prediction[prediction >= 0.5] = 255
