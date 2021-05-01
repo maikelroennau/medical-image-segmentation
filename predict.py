@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import time
@@ -28,10 +29,22 @@ def dice_coef_loss(y_true, y_pred):
 ########
 ########
 
+def update_model(model, input_shape):
+    model_weights = model.get_weights()
+    model_json = json.loads(model.to_json())
+
+    model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
+    model_json["config"]["layers"][1]["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
+
+    updated_model = keras.models.model_from_json(json.dumps(model_json))
+    updated_model.set_weights(model_weights)
+    return updated_model
+
+########
+########
+
 def predict(model, images_path="dataset/test/images/"):
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
-    input_shape = loaded_model.input_shape[1:]
-    height, width, channels = input_shape
 
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
     images = [image_path for image_path in Path(images_path).rglob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
@@ -55,7 +68,7 @@ def predict(model, images_path="dataset/test/images/"):
 
             output = np.zeros(prediction.shape[:2] + (3,))
             output[:, :, 0:2] = prediction.astype(np.uint8)
-            
+
             cv2.imwrite(os.path.join(images_path, f"{image_path.stem}_{loaded_model.name}_{i}_prediction.png"), cv2.cvtColor(output.astype(np.uint8), cv2.COLOR_BGR2RGB))
         else:
             prediction[prediction < 0.5] = 0
