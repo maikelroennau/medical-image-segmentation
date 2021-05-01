@@ -24,7 +24,7 @@ seed = 1145
 tf.random.set_seed(seed)
 np.random.seed(seed)
 
-model_name = "AgNOR-Nucleus"
+model_name = "AgNOR"
 
 epochs = 20
 batch_size = 1
@@ -207,7 +207,7 @@ os.makedirs(checkpoint_directory, exist_ok=True)
 
 callbacks = [
     keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1,  mode="auto", cooldown=1),
-    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:02d}_l{loss:.2f}_vl{val_loss:.2f}.h5"), monitor="val_dice_coef", save_best_only=False),
+    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="val_dice_coef", save_best_only=False),
     # keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
 ]
 
@@ -284,8 +284,8 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 print("\nModel evaluation")
 test_images, test_masks = load_images_and_masks("dataset/test/", target_size=(height, width))
 loss, dice = model.evaluate(test_images, test_masks, batch_size=1)
-print("Loss: %.2f" % loss)
-print("Dice: %.2f" % dice)
+print("Loss: %.4f" % loss)
+print("Dice: %.4f" % dice)
 
 ########
 ########
