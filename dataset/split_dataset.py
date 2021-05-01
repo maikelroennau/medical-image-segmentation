@@ -15,7 +15,7 @@ def main(path, output=".", x_split=0.75, y_split=0.88):
     assert voc_dir.is_dir(), "Input path does not exists"
 
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    images_path = [image_path for image_path in voc_dir.joinpath("JPEGImages").glob("*.*") if image_path.suffix.lower() in supported_types]
+    images_path = [image_path for image_path in voc_dir.joinpath("Images").glob("*.*") if image_path.suffix.lower() in supported_types]
     masks_path = [mask_path for mask_path in voc_dir.joinpath("SegmentationClassPNG").glob("*.*") if mask_path.suffix.lower() in supported_types]
 
     assert len(images_path) == len(masks_path), f"Different quantity of images ({len(images_path)}) and masks ({len(masks_path)})"
