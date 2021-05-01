@@ -36,7 +36,7 @@ def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=11
     print(f"Loaded from '{path}'")
     print(f"  - Images: {len(images)}")
     print(f"  - Masks: {len(masks)}")
-    
+
     return images, masks
 
 
@@ -50,7 +50,7 @@ def dice_coef_loss(y_true, y_pred):
 
 
 def main(model, images_path="dataset/test/", test_all=False):
-    if not test_all:
+    if not bool(test_all):
         loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
@@ -62,7 +62,7 @@ def main(model, images_path="dataset/test/", test_all=False):
         print("  - Loss: %.2f" % loss)
         print("  - Dice: %.2f" % dice)
     else:
-        models = [model_path for model_path in Path(model).glob("epoch*.h5")]
+        models = [model_path for model_path in Path(model).glob("*.h5")]
 
         loaded_model = keras.models.load_model(str(models[0]), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
         input_shape = loaded_model.input_shape[1:]
