@@ -134,7 +134,7 @@ def main():
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
 
     # Load models
-    if "epoch_20_nucleus.h5" in glob.glob("*.h5") and "epoch_50_nor.h5" in glob.glob("*.h5"):
+    if "nucleus.h5" in glob.glob("*.h5") and "nor.h5" in glob.glob("*.h5"):
         models_base_path = "."
     else:
         models_base_path = sys._MEIPASS
@@ -142,11 +142,15 @@ def main():
     nuclei_model = keras.models.load_model(os.path.join(models_base_path, "nucleus.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
     nors_model = keras.models.load_model(os.path.join(models_base_path, "nor.h5"), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
 
-    input_shape = nuclei_model.input_shape[1:]
+    input_shape_nuclei = nuclei_model.input_shape[1:]
+    input_shape_nors = nors_model.input_shape[1:]
 
     # Prepare tensor
-    height, width, channels = input_shape
-    image_tensor = np.empty((1, height, width, channels))
+    height_nuclei, width_nuclei, channels_nuclei = input_shape_nuclei
+    height_nors, width_nors, channels_nors = input_shape_nors
+    
+    image_tensor_nuclei = np.empty((1, height_nuclei, width_nuclei, channels_nuclei))
+    image_tensor_nors = np.empty((1, height_nors, width_nors, channels_nors))
 
     # UI loop
     while True:
@@ -183,12 +187,18 @@ def main():
                 image_path = str(image_path)
                 image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
                 original_shape = image.shape[:2][::-1]
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                image = cv2.resize(image, (width, height))
-                image_tensor[0, :, :, :] = image
+                
+                image_nuclei = cv2.cvtColor(np.copy(image), cv2.COLOR_BGR2RGB)
+                image_nuclei = cv2.resize(image_nuclei, (width_nuclei, height_nuclei))
+                image_tensor_nuclei[0, :, :, :] = image_nuclei
 
-                nuclei_prediction = nuclei_model.predict_on_batch(image_tensor)
-                nors_prediction = nors_model.predict_on_batch(image_tensor)
+                image_nors = cv2.cvtColor(np.copy(image), cv2.COLOR_BGR2RGB)
+                image_nors = cv2.resize(image_nors, (width_nors, height_nors))
+                image_tensor_nors[0, :, :, :] = image_nors
+
+                nuclei_prediction = nuclei_model.predict_on_batch(image_tensor_nuclei)
+                nors_prediction = nors_model.predict_on_batch(image_tensor_nors)
+                
                 save_annotation(nuclei_prediction[0], nors_prediction[0], annotation_directory, image_path, original_shape, image)
                 keras.backend.clear_session()
 
