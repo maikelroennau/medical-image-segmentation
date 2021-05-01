@@ -59,8 +59,8 @@ def main(model, images_path="dataset/test/", test_all=False):
         loaded_model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
         loss, dice = loaded_model.evaluate(images, masks, batch_size=1)
         print(f"Model {Path(model).name}")
-        print("  - Loss: %.2f" % loss)
-        print("  - Dice: %.2f" % dice)
+        print("  - Loss: %.4f" % loss)
+        print("  - Dice: %.4f" % dice)
     else:
         models = [model_path for model_path in Path(model).glob("*.h5")]
 
@@ -75,8 +75,8 @@ def main(model, images_path="dataset/test/", test_all=False):
             loaded_model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
             loss, dice = loaded_model.evaluate(images, masks, batch_size=1)
             print(f"Model {model_path.name}")
-            print("  - Loss: %.2f" % loss)
-            print("  - Dice: %.2f" % dice)
+            print("  - Loss: %.4f" % loss)
+            print("  - Dice: %.4f" % dice)
             keras.backend.clear_session()
 
 
