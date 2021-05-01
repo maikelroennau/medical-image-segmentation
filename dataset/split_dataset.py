@@ -8,7 +8,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-def main(path, output=".", x_split=0.75, y_split=0.88):
+def main(path, output=None, x_split=0.75, y_split=0.88):
     np.random.seed(1145)
 
     voc_dir = Path(path)
@@ -33,9 +33,12 @@ def main(path, output=".", x_split=0.75, y_split=0.88):
     images_train, images_validation, images_test = np.split(images_path, [int(len(images_path) * float(x_split)), int(len(images_path) * float(y_split))])
     masks_train, masks_validation, masks_test = np.split(masks_path, [int(len(masks_path) * float(x_split)), int(len(masks_path) * float(y_split))])
 
-    split_dataset = Path(output)
+    if output is None:
+        split_dataset = voc_dir.parent
+    else:
+        split_dataset = Path(output)
     if not str(split_dataset) == ".":
-        split_dataset.mkdir()
+        split_dataset.mkdir(exist_ok=True)
 
     train_images = split_dataset.joinpath("train").joinpath("images")
     train_masks = split_dataset.joinpath("train").joinpath("masks")
