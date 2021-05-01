@@ -10,6 +10,8 @@ import sys
 
 import imgviz
 import cv2
+from tqdm import tqdm
+import shutil
 import numpy as np
 
 import labelme
@@ -31,8 +33,7 @@ def main():
         print("Output directory already exists:", args.output_dir)
         sys.exit(1)
     os.makedirs(args.output_dir)
-    os.makedirs(osp.join(args.output_dir, "JPEGImages"))
-    os.makedirs(osp.join(args.output_dir, "SegmentationClass"))
+    os.makedirs(osp.join(args.output_dir, "Images"))
     os.makedirs(osp.join(args.output_dir, "SegmentationClassPNG"))
     if not args.noviz:
         os.makedirs(
@@ -59,16 +60,11 @@ def main():
         f.writelines("\n".join(class_names))
     print("Saved class_names:", out_class_names_file)
 
-    for filename in glob.glob(osp.join(args.input_dir, "*.json")):
-        print("Generating dataset from:", filename)
-
+    for filename in tqdm(glob.glob(osp.join(args.input_dir, "*.json"))):
         label_file = labelme.LabelFile(filename=filename)
 
         base = osp.splitext(osp.basename(filename))[0]
-        out_img_file = osp.join(args.output_dir, "JPEGImages", base + ".jpg")
-        out_lbl_file = osp.join(
-            args.output_dir, "SegmentationClass", base + ".npy"
-        )
+        out_img_file = osp.join(args.output_dir, "Images", label_file.imagePath)
         out_png_file = osp.join(
             args.output_dir, "SegmentationClassPNG", base + ".png"
         )
@@ -79,8 +75,7 @@ def main():
                 base + ".jpg",
             )
 
-        with open(out_img_file, "wb") as f:
-            f.write(label_file.imageData)
+        shutil.copyfile(os.path.join(args.input_dir, label_file.imagePath), out_img_file)
         img = labelme.utils.img_data_to_arr(label_file.imageData)
 
         lbl, _ = labelme.utils.shapes_to_label(
@@ -88,10 +83,8 @@ def main():
             shapes=label_file.shapes,
             label_name_to_value=class_name_to_id,
         )
-        # labelme.utils.lblsave(out_png_file, lbl)
-        cv2.imwrite(out_png_file, lbl)
 
-        np.save(out_lbl_file, lbl)
+        cv2.imwrite(out_png_file, lbl)
 
         if not args.noviz:
             viz = imgviz.label2rgb(
