@@ -45,6 +45,8 @@ def update_model(model, input_shape):
 
 def predict(model, images_path="dataset/test/images/"):
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+    input_shape = loaded_model.input_shape[1:]
+    height, width, channels = input_shape
 
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
     images = [image_path for image_path in Path(images_path).rglob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
