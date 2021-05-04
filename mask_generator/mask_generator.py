@@ -23,7 +23,12 @@ def save_annotation(nuclei_prediction, nors_prediction, annotation_directory, na
     height = original_shape[1]
 
     nuclei_prediction = cv2.resize(nuclei_prediction, (width, height))
+    nuclei_prediction[nuclei_prediction < 0.5] = 0
+    nuclei_prediction[nuclei_prediction >= 0.5] = 255
+
     nors_prediction = cv2.resize(nors_prediction, (width, height))
+    nors_prediction[nors_prediction < 0.5] = 0
+    nors_prediction[nors_prediction >= 0.5] = 255
 
     annotation = {
         "version": "4.5.7",
@@ -148,7 +153,7 @@ def main():
     # Prepare tensor
     height_nuclei, width_nuclei, channels_nuclei = input_shape_nuclei
     height_nors, width_nors, channels_nors = input_shape_nors
-    
+
     image_tensor_nuclei = np.empty((1, height_nuclei, width_nuclei, channels_nuclei))
     image_tensor_nors = np.empty((1, height_nors, width_nors, channels_nors))
 
@@ -187,7 +192,7 @@ def main():
                 image_path = str(image_path)
                 image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
                 original_shape = image.shape[:2][::-1]
-                
+
                 image_nuclei = cv2.cvtColor(np.copy(image), cv2.COLOR_BGR2RGB)
                 image_nuclei = cv2.resize(image_nuclei, (width_nuclei, height_nuclei))
                 image_tensor_nuclei[0, :, :, :] = image_nuclei
@@ -198,7 +203,7 @@ def main():
 
                 nuclei_prediction = nuclei_model.predict_on_batch(image_tensor_nuclei)
                 nors_prediction = nors_model.predict_on_batch(image_tensor_nors)
-                
+
                 save_annotation(nuclei_prediction[0], nors_prediction[0], annotation_directory, image_path, original_shape, image)
                 keras.backend.clear_session()
 
