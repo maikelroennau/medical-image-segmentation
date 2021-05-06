@@ -40,7 +40,7 @@ def slice_images(path, height, width, output):
                 output_mask.parent.mkdir(parents=True, exist_ok=True)
 
                 cv2.imwrite(str(output_image), sliced_image)
-                cv2.imwrite(str(output_mask), sliced_mask * 255.)
+                cv2.imwrite(str(output_mask), sliced_mask)
 
 
 def main():
