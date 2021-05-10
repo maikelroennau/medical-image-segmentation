@@ -1,13 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
+
+datas = [('icon.ico', '.'), ('nucleus.h5', '.'), ('nor.h5', '.')]
+binaries = []
+hiddenimports = ['tensorflow']
+tmp_ret = collect_all('tensorflow')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
 
 block_cipher = None
 
 
 a = Analysis(['mask_generator.py'],
-             pathex=['mask_generator'],
-             binaries=[],
-             datas=[('icon.ico', '.'), ('nucleus.h5', '.'), ('nor.h5', '.')],
-             hiddenimports=[],
+             pathex=['D:\\dev\\ufrgs\\AgNOR-UNet\\mask_generator'],
+             binaries=binaries,
+             datas=datas,
+             hiddenimports=hiddenimports,
              hookspath=[],
              runtime_hooks=[],
              excludes=[],
