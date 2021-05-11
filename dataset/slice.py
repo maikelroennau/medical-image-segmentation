@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-def slice_images(path, height, width, output):
+def slice_images(path, height, width, filter, output):
     input_path = Path(path)
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
     images_paths = [image_path for image_path in input_path.joinpath("images").glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
@@ -34,6 +34,10 @@ def slice_images(path, height, width, output):
                 sliced_image = image[x:x+height, y:y+width]
                 sliced_mask = mask[x:x+height, y:y+width]
 
+                if filter:
+                    if np.unique(sliced_mask).size == 1:
+                        continue
+
                 output_image = output.joinpath(image_path.parent.name).joinpath(f"{image_path.stem}_x{x}-{x+height}_y{y}-{y+width}.jpg")
                 output_mask = output.joinpath(mask_path.parent.name).joinpath(f"{mask_path.stem}_x{x}-{x+height}_y{y}-{y+width}.png")
                 output_image.parent.mkdir(parents=True, exist_ok=True)
@@ -41,6 +45,9 @@ def slice_images(path, height, width, output):
 
                 cv2.imwrite(str(output_image), sliced_image)
                 cv2.imwrite(str(output_mask), sliced_mask)
+
+    print(f"Created {len([image_path for image_path in output.joinpath('images').glob('*.*')])} images.")
+    print(f"Created {len([mask_path for mask_path in output.joinpath('masks').glob('*.*')])} masks.")
 
 
 def main():
@@ -63,10 +70,11 @@ def main():
         type=int)
 
     parser.add_argument(
-        "-s",
-        "--stride",
-        help="Stride at which move the slicing windown.",
-        type=int)
+        "-f",
+        "--filter-empty",
+        help="Filter out empty masks.",
+        default=False,
+        action="store_true")
 
     parser.add_argument(
         "-o",
@@ -76,7 +84,7 @@ def main():
         type=str)
 
     args = parser.parse_args()
-    slice_images(args.path, args.height, args.width, args.output)
+    slice_images(args.path, args.height, args.width, args.filter_empty, args.output)
 
 
 if __name__ == "__main__":
