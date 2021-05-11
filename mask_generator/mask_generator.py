@@ -18,7 +18,7 @@ from tensorflow import keras
 from utils import dice_coef, dice_coef_loss, filter_contours, smooth_contours
 
 
-def save_annotation(nuclei_prediction, nors_prediction, annotation_directory, name, original_shape, image):
+def save_annotation(nuclei_prediction, nors_prediction, annotation_directory, name, original_shape):
     logging.info(f"""Saving image annotations from {Path(name).name} annotations to {str(annotation_directory)}""")
     width = original_shape[0]
     height = original_shape[1]
@@ -256,7 +256,7 @@ def main():
                     logging.info(f"""Predict NORs""")
                     nors_prediction = nors_model.predict_on_batch(image_tensor_nors)
 
-                    save_annotation(nuclei_prediction[0], nors_prediction[0], annotation_directory, image_path, original_shape, image)
+                    save_annotation(nuclei_prediction[0], nors_prediction[0], annotation_directory, image_path, original_shape)
                     keras.backend.clear_session()
                     logging.info(f"""Done processing image {str(image_path)}""")
 
@@ -269,6 +269,7 @@ def main():
         window.close()
     except Exception as e:
         logging.error(f"""{e}""")
+
 
 if __name__ == "__main__":
     main()
