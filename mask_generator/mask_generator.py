@@ -6,13 +6,11 @@ import os
 import shutil
 import sys
 import time
-import warnings
 from pathlib import Path
 
 import cv2
 import numpy as np
 import PySimpleGUI as sg
-import tensorflow as tf
 from tensorflow import keras
 
 from utils import dice_coef, dice_coef_loss, filter_contours, smooth_contours
