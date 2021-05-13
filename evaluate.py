@@ -69,7 +69,7 @@ def main(model, images_path="dataset/test/", test_all=False):
     seed = 1145
     tf.random.set_seed(seed)
     np.random.seed(seed)
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     if not bool(test_all):
         loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
@@ -92,6 +92,7 @@ def main(model, images_path="dataset/test/", test_all=False):
         height, width, channels = input_shape
 
         evaluate_dataset = load_dataset(images_path, batch_size=1, target_shape=(height, width))
+        best = {}
 
         for i, model_path in enumerate(models):
             loaded_model = keras.models.load_model(str(model_path), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
@@ -100,7 +101,22 @@ def main(model, images_path="dataset/test/", test_all=False):
             print(f"({i+1}/{len(models)}) Model {model_path.name}")
             print("  - Loss: %.4f" % loss)
             print("  - Dice: %.4f" % dice)
+
+            if "model" in best:
+                if dice > best["dice"]:
+                    best["model"] = model_path.name
+                    best["loss"] = loss
+                    best["dice"] = dice
+            else:
+                best["model"] = model_path.name
+                best["loss"] = loss
+                best["dice"] = dice
+
             keras.backend.clear_session()
+
+        print(f"\nBest model: {best['model']}")
+        print("  - Loss: %.4f" % best['loss'])
+        print("  - Dice: %.4f" % best['dice'])
 
 
 if __name__ == "__main__":
