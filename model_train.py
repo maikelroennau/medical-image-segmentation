@@ -102,6 +102,9 @@ def load_dataset(path, batch_size=32, target_shape=(1920, 2560), seed=1145):
     images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
     masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
 
+    images_paths.sort()
+    masks_paths.sort()
+
     assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
 
     for image_path, mask_path in zip(images_paths, masks_paths):
