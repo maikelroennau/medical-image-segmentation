@@ -10,12 +10,13 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
 from tensorflow.keras.optimizers import Adam
+from tqdm import tqdm
 
 ########
 ########
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
 ########
@@ -24,13 +25,10 @@ seed = 1145
 tf.random.set_seed(seed)
 np.random.seed(seed)
 
-model_name = "AgNOR"
+model_name = "AgNOR-NOR"
 
 epochs = 20
 batch_size = 1
-steps_per_epoch = 480
-effective_batches = steps_per_epoch * epochs
-effective_images = batch_size * steps_per_epoch
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
@@ -38,122 +36,128 @@ input_shape = (height, width, 3)
 
 learning_rate = 1e-5
 
+train_dataset_path = "dataset/nucleus/train/"
+validation_dataset_path = "dataset/nucleus/validation/"
+test_dataset_path = "dataset/nucleus/test/"
+
 ########
 ########
 
-def load_images_and_masks(path, batch_size=16, target_size=(1920, 2560), seed=1145, augment=False, save_to_dir=None, save_prefix="augmented"):
+def write_dataset(dataset, output_path="dataset_visualization", max_batches=None, same_dir=False):
+    output = Path(output_path)
+    images_path = output.joinpath("images")
+
+    if same_dir:
+        masks_path = output.joinpath("images")
+    else:
+        masks_path = output.joinpath("masks")
+
+    images_path.mkdir(exist_ok=True, parents=True)
+    masks_path.mkdir(exist_ok=True, parents=True)
+
+    if max_batches:
+        if max_batches > len(dataset):
+            batches = len(dataset)
+        else:
+            batches = max_batches
+    else:
+        batches = len(dataset)
+
+    for i, batch in tqdm(enumerate(dataset), total=batches):
+        for j, (image, mask) in enumerate(zip(batch[0], batch[1])):
+            image_name = str(images_path.joinpath(f"batch_{i}_{j}.jpg"))
+            mask_name = str(masks_path.joinpath(f"batch_{i}_{j}.png"))
+            keras.preprocessing.image.save_img(image_name, image)
+            keras.preprocessing.image.save_img(mask_name, mask)
+
+        keras.backend.clear_session()
+        if i + 1 == batches:
+            break
+
+
+def load_files(image_path, target_shape=(1920, 2560)):
+    image = tf.io.read_file(image_path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    # image = tf.image.decode_image(image, channels=3)
+    image = tf.image.convert_image_dtype(image, tf.uint8)
+    image = tf.image.resize(image, target_shape)
+
+    mask_path = tf.strings.regex_replace(image_path, "images", "masks")
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    images_paths = [image_path for image_path in Path(path).joinpath("images").glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-    masks_paths = [mask_path for mask_path in Path(path).joinpath("masks").glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
+    for supported_type in supported_types:
+        mask_path = tf.strings.regex_replace(mask_path, supported_type, ".png")
+
+    mask = tf.io.read_file(mask_path)
+    mask = tf.image.decode_png(mask, channels=1)
+    mask = tf.image.convert_image_dtype(mask, tf.uint8)
+    mask = tf.image.resize(mask, target_shape)
+    return image, mask
+
+
+def load_dataset(path, batch_size=32, target_shape=(1920, 2560), seed=1145):
+    images_path = Path(path).joinpath("images")
+    masks_path = Path(path).joinpath("masks")
+
+    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+    images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
+    masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
 
     assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
 
-    images_paths.sort()
-    masks_paths.sort()
+    for image_path, mask_path in zip(images_paths, masks_paths):
+        assert image_path.stem.lower() == mask_path.stem.lower(), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
 
-    for image, mask in zip(images_paths, masks_paths):
-        assert image.stem.lower() == mask.stem.lower(), f"Image and mask do not correspond: {image.name} <==> {image.name}"
+    print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
 
-    height, width = target_size
-    images = np.zeros((len(images_paths), height, width, 3), dtype="float32")
-    masks = np.zeros((len(masks_paths), height, width, 1), dtype="float32")
+    images_paths = [str(image_path) for image_path in images_paths]
+    dataset_files = tf.data.Dataset.from_tensor_slices(images_paths)
+    dataset = dataset_files.map(lambda x: load_files(x, target_shape))
 
-    for i, (image, mask) in enumerate(zip(images_paths, masks_paths)):
-        images[i, :, :, :] = keras.preprocessing.image.load_img(image, target_size=target_size)
-        masks[i, :, :, 0] = keras.preprocessing.image.load_img(mask, target_size=target_size, color_mode="grayscale")
-
-    randomize = np.random.permutation(len(images))
-    images = np.asarray(images)[randomize]
-    masks = np.asarray(masks)[randomize]
-
-    print(f"Loaded from '{path}'")
-    print(f"  - Images: {len(images)}")
-    print(f"  - Masks: {len(masks)}")
-
-    if augment:
-        datagen_arguments = dict(
-            # featurewise_center=True,
-            # featurewise_std_normalization=True,
-            rotation_range=10,
-            # width_shift_range=0.05,
-            # height_shift_range=0.05,
-            # shear_range=0.05,
-            # zoom_range=0.05,
-            fill_mode="reflect",
-            horizontal_flip=True,
-            vertical_flip=True,
-            # rescale=1./255.
-        )
-
-        images_datagen = keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
-        # images_datagen.fit(images)
-
-        # datagen_arguments.pop("featurewise_center")
-        # datagen_arguments.pop("featurewise_std_normalization")
-        masks_datagen = keras.preprocessing.image.ImageDataGenerator(**datagen_arguments)
-
-        if save_to_dir:
-            Path(save_to_dir).mkdir(exist_ok=True)
-        train_images = images_datagen.flow(images, batch_size=batch_size, seed=seed, shuffle=True, save_prefix=f"{save_prefix}_image", save_to_dir=save_to_dir)
-        train_masks = masks_datagen.flow(masks, batch_size=batch_size, seed=seed, shuffle=True, save_prefix=f"{save_prefix}_mask", save_to_dir=save_to_dir)
-
-        return train_images, train_masks
-    else:
-        # images = images * 1./255.
-        # masks = masks * 1./255.
-        return images, masks
+    dataset = dataset.shuffle(buffer_size=len(images_paths), seed=seed)
+    # dataset = dataset.repeat()
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=batch_size)
+    return dataset
 
 ########
 ########
 
-train_images, train_masks = load_images_and_masks("dataset/train/", target_size=(height, width), augment=True, batch_size=batch_size, save_to_dir=None)
-validation_images, validation_masks = load_images_and_masks("dataset/validation/", target_size=(height, width))
-
-# for i, (images, masks) in enumerate(zip(train_images, train_masks)):
-#     print(images.shape)
-#     if i + 1 == steps_per_epoch:
-#         break
-# assert 1 == 2
-
-def get_generator(train_images, train_masks):
-    for images, masks in zip(train_images, train_masks):
-        yield (images, masks)
-
-train_data = get_generator(train_images, train_masks)
+train_dataset = load_dataset(train_dataset_path, batch_size=batch_size, target_shape=(height, width))
+validation_dataset = load_dataset(validation_dataset_path, batch_size=batch_size, target_shape=(height, width))
 
 ########
 ########
 
 def dice_coef(y_true, y_pred, smooth=1.):
-    intersection = keras.backend.sum(y_true * y_pred, axis=[1,2,3])
-    union = keras.backend.sum(y_true, axis=[1,2,3]) + keras.backend.sum(y_pred, axis=[1,2,3])
+    intersection = keras.backend.sum(y_true * y_pred, axis=[1, 2, 3])
+    union = keras.backend.sum(y_true, axis=[1, 2, 3]) + keras.backend.sum(y_pred, axis=[1, 2, 3])
     return keras.backend.mean((2. * intersection + smooth) / (union + smooth), axis=0)
 
 def dice_coef_loss(y_true, y_pred):
-    return 1-dice_coef(y_true, y_pred)
+    return 1.0-dice_coef(y_true, y_pred)
 
 ########
 ########
 
 data_augmentation = keras.Sequential(
     [
-        # layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
         # layers.experimental.preprocessing.RandomRotation(0.2, seed=seed),
-        # layers.experimental.preprocessing.RandomContrast(0.1, seed=seed),
-        layers.experimental.preprocessing.Normalization(),
-        # layers.experimental.preprocessing.Rescaling(1./255.),
+        layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
+        layers.experimental.preprocessing.RandomContrast(0.1, seed=seed),
+        # layers.experimental.preprocessing.Rescaling(1./255.)
+
     ]
 )
 
 ########
 ########
 
-def make_model(input_shape, name="AgNOR"):
+def make_model(input_shape, model_name="AgNOR"):
     inputs = keras.Input(shape=input_shape)
 
-    augmented = data_augmentation(inputs)
+    x = data_augmentation(inputs)
 
-    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(augmented)
+    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(x)
     conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
 
@@ -196,7 +200,7 @@ def make_model(input_shape, name="AgNOR"):
 
     return model
 
-model = make_model(input_shape=input_shape, name=model_name)
+model = make_model(input_shape=input_shape, model_name=model_name)
 model.summary()
 
 ########
@@ -219,9 +223,6 @@ train_config = {
     "seed": seed,
     "epochs": epochs,
     "batch_size": batch_size,
-    "steps_per_epoch": steps_per_epoch,
-    "effective_batches": effective_batches,
-    "effective_images_per_epoch": effective_images,
     "input_shape": input_shape,
     "initial_learning_rate": model.optimizer.get_config()['learning_rate']
 }
@@ -238,24 +239,15 @@ print(f"  - Model name: {model.name}")
 print(f"  - Seed: {seed}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Batch size: {batch_size}")
-print(f"  - Steps per epoch: {steps_per_epoch}")
-print(f"  - Effective batches: {effective_batches}")
-print(f"  - Effective images (per epoch): {effective_images}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}\n")
 
 keras.backend.clear_session()
 history = model.fit(
-    train_data,
-    # train_masks,
-    # batch_size=batch_size,
+    train_dataset,
     epochs=epochs,
-    steps_per_epoch=steps_per_epoch,
-    validation_data=(validation_images, validation_masks),
-    validation_batch_size=batch_size,
-    validation_steps=len(validation_images),
-    # initial_epoch=22,
+    validation_data=validation_dataset,
     callbacks=callbacks)
 
 end = time.time()
@@ -282,8 +274,8 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 
 print("\nModel evaluation")
-test_images, test_masks = load_images_and_masks("dataset/test/", target_size=(height, width))
-loss, dice = model.evaluate(test_images, test_masks, batch_size=1)
+test_dataset = load_dataset(test_dataset_path, batch_size=batch_size, target_shape=(height, width))
+loss, dice = model.evaluate(test_dataset)
 print("Loss: %.4f" % loss)
 print("Dice: %.4f" % dice)
 
@@ -291,8 +283,7 @@ print("Dice: %.4f" % dice)
 ########
 
 print("\nTesting model")
-
-test_images_path = "dataset/test/images/"
+test_images_path = str(Path(test_dataset_path).joinpath("images"))
 input_shape = model.input_shape[1:]
 height, width, channels = input_shape
 
