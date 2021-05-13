@@ -1,30 +1,28 @@
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
 import cv2
 import numpy as np
-import tensorflow as tf
 from tensorflow import keras
 
 ########
 ########
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+# os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
 ########
 
 def dice_coef(y_true, y_pred, smooth=1.):
-    intersection = K.sum(y_true * y_pred, axis=[1,2,3])
-    union = K.sum(y_true, axis=[1,2,3]) + K.sum(y_pred, axis=[1,2,3])
-    return K.mean( (2. * intersection + smooth) / (union + smooth), axis=0)
+    intersection = keras.backend.sum(y_true * y_pred, axis=[1, 2, 3])
+    union = keras.backend.sum(y_true, axis=[1, 2, 3]) + keras.backend.sum(y_pred, axis=[1, 2, 3])
+    return keras.backend.mean((2. * intersection + smooth) / (union + smooth), axis=0)
 
 def dice_coef_loss(y_true, y_pred):
-    return -dice_coef(y_true, y_pred)
+    return 1.0-dice_coef(y_true, y_pred)
 
 ########
 ########
@@ -34,7 +32,8 @@ def update_model(model, input_shape):
     model_json = json.loads(model.to_json())
 
     model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
-    model_json["config"]["layers"][1]["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
+    # model_json["config"]["layers"][1]["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
+    model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
 
     updated_model = keras.models.model_from_json(json.dumps(model_json))
     updated_model.set_weights(model_weights)
@@ -45,6 +44,7 @@ def update_model(model, input_shape):
 
 def predict(model, images_path="dataset/test/images/"):
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+    # loaded_model = update_model(loaded_model, (1920, 2560, 3))
     input_shape = loaded_model.input_shape[1:]
     height, width, channels = input_shape
 

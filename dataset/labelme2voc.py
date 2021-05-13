@@ -12,7 +12,7 @@ import imgviz
 import cv2
 from tqdm import tqdm
 import shutil
-import numpy as np
+from pathlib import Path
 
 import labelme
 
@@ -64,7 +64,7 @@ def main():
         label_file = labelme.LabelFile(filename=filename)
 
         base = osp.splitext(osp.basename(filename))[0]
-        out_img_file = osp.join(args.output_dir, "Images", label_file.imagePath)
+        out_img_file = osp.join(args.output_dir, "Images", base + ".jpg")
         out_png_file = osp.join(
             args.output_dir, "SegmentationClassPNG", base + ".png"
         )
@@ -75,7 +75,10 @@ def main():
                 base + ".jpg",
             )
 
-        shutil.copyfile(os.path.join(args.input_dir, label_file.imagePath), out_img_file)
+        # shutil.copyfile(os.path.join(args.input_dir, label_file.imagePath), out_img_file)
+        with open(out_img_file, "wb") as f:
+            f.write(label_file.imageData)
+
         img = labelme.utils.img_data_to_arr(label_file.imageData)
 
         lbl, _ = labelme.utils.shapes_to_label(
