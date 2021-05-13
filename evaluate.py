@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -68,6 +69,7 @@ def main(model, images_path="dataset/test/", test_all=False):
     seed = 1145
     tf.random.set_seed(seed)
     np.random.seed(seed)
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     if not bool(test_all):
         loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
@@ -83,6 +85,7 @@ def main(model, images_path="dataset/test/", test_all=False):
         print("  - Dice: %.4f" % dice)
     else:
         models = [model_path for model_path in Path(model).glob("*.h5")]
+        models.sort()
 
         loaded_model = keras.models.load_model(str(models[0]), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
         input_shape = loaded_model.input_shape[1:]
