@@ -29,6 +29,7 @@ model_name = "AgNOR-NOR"
 
 epochs = 20
 batch_size = 1
+steps_per_epoch = 300
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
@@ -94,7 +95,7 @@ def load_files(image_path, target_shape=(1920, 2560)):
     return image, mask
 
 
-def load_dataset(path, batch_size=32, target_shape=(1920, 2560), seed=1145):
+def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, seed=1145):
     images_path = Path(path).joinpath("images")
     masks_path = Path(path).joinpath("masks")
 
@@ -117,7 +118,8 @@ def load_dataset(path, batch_size=32, target_shape=(1920, 2560), seed=1145):
     dataset = dataset_files.map(lambda x: load_files(x, target_shape))
 
     dataset = dataset.shuffle(buffer_size=len(images_paths), seed=seed)
-    # dataset = dataset.repeat()
+    if repeat:
+        dataset = dataset.repeat()
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=batch_size)
     return dataset
@@ -125,7 +127,7 @@ def load_dataset(path, batch_size=32, target_shape=(1920, 2560), seed=1145):
 ########
 ########
 
-train_dataset = load_dataset(train_dataset_path, batch_size=batch_size, target_shape=(height, width))
+train_dataset = load_dataset(train_dataset_path, batch_size=batch_size, target_shape=(height, width), repeat=True)
 validation_dataset = load_dataset(validation_dataset_path, batch_size=batch_size, target_shape=(height, width))
 
 ########
@@ -146,7 +148,7 @@ data_augmentation = keras.Sequential(
     [
         # layers.experimental.preprocessing.RandomRotation(0.2, seed=seed),
         layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
-        layers.experimental.preprocessing.RandomContrast(0.1, seed=seed),
+        # layers.experimental.preprocessing.RandomContrast(0.1, seed=seed),
         # layers.experimental.preprocessing.Rescaling(1./255.)
 
     ]
@@ -247,9 +249,11 @@ print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}\n")
 
 keras.backend.clear_session()
+
 history = model.fit(
     train_dataset,
     epochs=epochs,
+    steps_per_epoch=steps_per_epoch,
     validation_data=validation_dataset,
     callbacks=callbacks)
 
