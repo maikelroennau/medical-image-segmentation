@@ -69,7 +69,7 @@ def main(model, images_path="dataset/test/", test_all=False):
     seed = 1145
     tf.random.set_seed(seed)
     np.random.seed(seed)
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     if not bool(test_all):
         loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
