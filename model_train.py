@@ -117,7 +117,7 @@ def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, s
     dataset_files = tf.data.Dataset.from_tensor_slices(images_paths)
     dataset = dataset_files.map(lambda x: load_files(x, target_shape))
 
-    dataset = dataset.shuffle(buffer_size=len(images_paths), seed=seed)
+    dataset = dataset.shuffle(buffer_size=int(len(images_paths) * 0.1), seed=seed)
     if repeat:
         dataset = dataset.repeat()
     dataset = dataset.batch(batch_size)
@@ -160,9 +160,9 @@ data_augmentation = keras.Sequential(
 def make_model(input_shape, model_name="AgNOR"):
     inputs = keras.Input(shape=input_shape)
 
-    x = data_augmentation(inputs)
+    # x = data_augmentation(inputs)
 
-    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(x)
+    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(inputs)
     conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
 
@@ -246,7 +246,11 @@ print(f"  - Epochs: {epochs}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
-print(f"  - Checkpoints saved at: {checkpoint_directory}\n")
+print(f"  - Checkpoints saved at: {checkpoint_directory}")
+print(f"  - Dataset:")
+print(f"    - Train: {train_dataset_path}")
+print(f"    - Validation: {validation_dataset_path}")
+print(f"    - Tesst: {test_dataset_path}\n")
 
 keras.backend.clear_session()
 
@@ -266,6 +270,10 @@ print(f"Duration: {duration}")
 print(f"  - Model name: {model.name}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}")
 print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}")
+print(f"  - Dataset:")
+print(f"    - Train: {train_dataset_path}")
+print(f"    - Validation: {validation_dataset_path}")
+print(f"    - Tesst: {test_dataset_path}\n")
 
 train_config["duration"] = duration
 history_data = history.history
