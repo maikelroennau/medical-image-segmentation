@@ -250,7 +250,7 @@ print(f"  - Checkpoints saved at: {checkpoint_directory}")
 print(f"  - Dataset:")
 print(f"    - Train: {train_dataset_path}")
 print(f"    - Validation: {validation_dataset_path}")
-print(f"    - Tesst: {test_dataset_path}\n")
+print(f"    - Test: {test_dataset_path}\n")
 
 keras.backend.clear_session()
 
@@ -273,7 +273,7 @@ print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}
 print(f"  - Dataset:")
 print(f"    - Train: {train_dataset_path}")
 print(f"    - Validation: {validation_dataset_path}")
-print(f"    - Tesst: {test_dataset_path}\n")
+print(f"    - Test: {test_dataset_path}\n")
 
 train_config["duration"] = duration
 history_data = history.history
