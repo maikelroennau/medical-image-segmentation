@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 from pathlib import Path
 
 import cv2
@@ -10,7 +11,7 @@ from losses import dice_coef, dice_coef_loss
 from utils import update_model
 
 
-def predict(model, images_path, batch_size, output_path, input_shape=None):
+def predict(model, images_path, batch_size, output_path, copy_images, input_shape=None):
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
 
     if input_shape:
@@ -48,10 +49,14 @@ def predict(model, images_path, batch_size, output_path, input_shape=None):
             output[:, :, 0:2] = prediction.astype(np.uint8)
 
             cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_{i}_prediction.png"), cv2.cvtColor(output.astype(np.uint8), cv2.COLOR_BGR2RGB))
+            if copy_images:
+                shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
         else:
             prediction[prediction < 0.5] = 0
             prediction[prediction >= 0.5] = 255
             cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), prediction)
+            if copy_images:
+                shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
         keras.backend.clear_session()
 
 
@@ -91,6 +96,13 @@ def main():
         type=int)
 
     parser.add_argument(
+        "-c",
+        "--copy-images",
+        help="Copy predicted images to output directory. Only effective when `--output` is provided.",
+        default=True,
+        action="store_true")
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -120,7 +132,10 @@ def main():
     else:
         output = args.output
 
-    predict(args.model, args.images, args.batch_size, output, input_shape)
+    if args.output != output:
+        args.copy_images = False
+
+    predict(args.model, args.images, args.batch_size, output, args.copy_images, input_shape)
 
 
 if __name__ == "__main__":
