@@ -11,7 +11,7 @@ from losses import dice_coef, dice_coef_loss
 from utils import load_dataset, update_model
 
 
-def evaluate(model, images_path, input_shape=None):
+def evaluate(model, images_path, batch_size, input_shape=None):
     if Path(model).is_file():
         loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
 
@@ -23,7 +23,7 @@ def evaluate(model, images_path, input_shape=None):
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
 
-        evaluate_dataset = load_dataset(images_path, batch_size=1, target_shape=(height, width))
+        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width))
         loss, dice = loaded_model.evaluate(evaluate_dataset)
         print(f"Model {Path(model).name}")
         print("  - Loss: %.4f" % loss)
@@ -40,7 +40,7 @@ def evaluate(model, images_path, input_shape=None):
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
 
-        evaluate_dataset = load_dataset(images_path, batch_size=1, target_shape=(height, width))
+        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width))
         best = {}
 
         for i, model_path in enumerate(models):
@@ -95,6 +95,13 @@ def main():
         type=str)
 
     parser.add_argument(
+        "-b",
+        "--batch-size",
+        help="Batch size during evaluation.",
+        default=1,
+        type=int)
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -125,7 +132,7 @@ def main():
     else:
         input_shape = None
 
-    evaluate(args.model, args.images, input_shape)
+    evaluate(args.model, args.images, args.batch_size, input_shape)
 
 
 if __name__ == "__main__":
