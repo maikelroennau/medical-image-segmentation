@@ -10,7 +10,10 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
 from tensorflow.keras.optimizers import Adam
-from tqdm import tqdm
+
+from losses import dice_coef, dice_coef_loss
+from utils import load_dataset
+
 
 ########
 ########
@@ -25,7 +28,7 @@ seed = 1145
 tf.random.set_seed(seed)
 np.random.seed(seed)
 
-model_name = "AgNOR-NOR"
+model_name = "AgNOR"
 
 epochs = 20
 batch_size = 1
@@ -44,102 +47,8 @@ test_dataset_path = "dataset/nucleus/test/"
 ########
 ########
 
-def write_dataset(dataset, output_path="dataset_visualization", max_batches=None, same_dir=False):
-    output = Path(output_path)
-    images_path = output.joinpath("images")
-
-    if same_dir:
-        masks_path = output.joinpath("images")
-    else:
-        masks_path = output.joinpath("masks")
-
-    images_path.mkdir(exist_ok=True, parents=True)
-    masks_path.mkdir(exist_ok=True, parents=True)
-
-    if max_batches:
-        if max_batches > len(dataset):
-            batches = len(dataset)
-        else:
-            batches = max_batches
-    else:
-        batches = len(dataset)
-
-    for i, batch in tqdm(enumerate(dataset), total=batches):
-        for j, (image, mask) in enumerate(zip(batch[0], batch[1])):
-            image_name = str(images_path.joinpath(f"batch_{i}_{j}.jpg"))
-            mask_name = str(masks_path.joinpath(f"batch_{i}_{j}.png"))
-            keras.preprocessing.image.save_img(image_name, image)
-            keras.preprocessing.image.save_img(mask_name, mask)
-
-        keras.backend.clear_session()
-        if i + 1 == batches:
-            break
-
-
-def load_files(image_path, target_shape=(1920, 2560)):
-    image = tf.io.read_file(image_path)
-    image = tf.image.decode_jpeg(image, channels=3)
-    # image = tf.image.decode_image(image, channels=3)
-    image = tf.image.convert_image_dtype(image, tf.uint8)
-    image = tf.image.resize(image, target_shape)
-
-    mask_path = tf.strings.regex_replace(image_path, "images", "masks")
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    for supported_type in supported_types:
-        mask_path = tf.strings.regex_replace(mask_path, supported_type, ".png")
-
-    mask = tf.io.read_file(mask_path)
-    mask = tf.image.decode_png(mask, channels=1)
-    mask = tf.image.convert_image_dtype(mask, tf.uint8)
-    mask = tf.image.resize(mask, target_shape)
-    return image, mask
-
-
-def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, seed=1145):
-    images_path = Path(path).joinpath("images")
-    masks_path = Path(path).joinpath("masks")
-
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-    masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
-
-    images_paths.sort()
-    masks_paths.sort()
-
-    assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
-
-    for image_path, mask_path in zip(images_paths, masks_paths):
-        assert image_path.stem.lower() == mask_path.stem.lower(), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
-
-    print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
-
-    images_paths = [str(image_path) for image_path in images_paths]
-    dataset_files = tf.data.Dataset.from_tensor_slices(images_paths)
-    dataset = dataset_files.map(lambda x: load_files(x, target_shape))
-
-    dataset = dataset.shuffle(buffer_size=int(len(images_paths) * 0.1), seed=seed)
-    if repeat:
-        dataset = dataset.repeat()
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=batch_size)
-    return dataset
-
-########
-########
-
 train_dataset = load_dataset(train_dataset_path, batch_size=batch_size, target_shape=(height, width), repeat=True)
 validation_dataset = load_dataset(validation_dataset_path, batch_size=batch_size, target_shape=(height, width))
-
-########
-########
-
-def dice_coef(y_true, y_pred, smooth=1.):
-    intersection = keras.backend.sum(y_true * y_pred, axis=[1, 2, 3])
-    union = keras.backend.sum(y_true, axis=[1, 2, 3]) + keras.backend.sum(y_pred, axis=[1, 2, 3])
-    return keras.backend.mean((2. * intersection + smooth) / (union + smooth), axis=0)
-
-def dice_coef_loss(y_true, y_pred):
-    return 1.0-dice_coef(y_true, y_pred)
 
 ########
 ########
@@ -216,7 +125,7 @@ os.makedirs(checkpoint_directory, exist_ok=True)
 
 callbacks = [
     keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1,  mode="auto", cooldown=1),
-    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="val_dice_coef", save_best_only=False),
+    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="loss", save_best_only=False),
     # keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
 ]
 
