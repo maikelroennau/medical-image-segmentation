@@ -65,6 +65,7 @@ def main(path, output=None, x_split=0.75, y_split=0.88):
         shutil.copyfile(mask, test_masks.joinpath(mask.name))
     print("Done!")
 
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         main(*sys.argv[1:])
