@@ -10,7 +10,7 @@ from losses import dice_coef, dice_coef_loss
 from utils import update_model
 
 
-def predict(model, images_path, output_path, input_shape=None):
+def predict(model, images_path, batch_size, output_path, input_shape=None):
     loaded_model = keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
 
     if input_shape:
@@ -35,7 +35,7 @@ def predict(model, images_path, output_path, input_shape=None):
         image = cv2.resize(image, (width, height))
         images_tensor[0, :, :, :] = image
 
-        prediction = loaded_model.predict(images_tensor, batch_size=1, verbose=1)
+        prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
         prediction = cv2.resize(prediction[0], original_shape)
         if len(prediction.shape) > 2:
             prediction[:, :, 0][prediction[:, :, 0] < 0.5] = 0
@@ -84,6 +84,13 @@ def main():
         type=str)
 
     parser.add_argument(
+        "-b",
+        "--batch-size",
+        help="Batch size during evaluation.",
+        default=1,
+        type=int)
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -113,7 +120,7 @@ def main():
     else:
         output = args.output
 
-    predict(args.model, args.images, output, input_shape)
+    predict(args.model, args.images, args.batch_size, output, input_shape)
 
 
 if __name__ == "__main__":
