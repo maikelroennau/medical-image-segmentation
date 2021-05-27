@@ -3,23 +3,20 @@ import os
 import time
 from pathlib import Path
 
-import cv2
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D
 from tensorflow.keras.optimizers import Adam
 
-from losses import dice_coef, dice_coef_loss
-from utils import load_dataset
-
+import losses
+import utils
 
 ########
 ########
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-# os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
 ########
@@ -28,9 +25,9 @@ seed = 1145
 tf.random.set_seed(seed)
 np.random.seed(seed)
 
-model_name = "AgNOR"
+model_name = "AgNOR-NOR"
 
-epochs = 20
+epochs = 10
 batch_size = 1
 steps_per_epoch = 300
 
@@ -39,21 +36,35 @@ width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 learning_rate = 1e-5
+one_hot_encoded = False
 
-train_dataset_path = "dataset/nucleus/train/"
-validation_dataset_path = "dataset/nucleus/validation/"
-test_dataset_path = "dataset/nucleus/test/"
+train_dataset_path = "dataset/train/"
+validation_dataset_path = "dataset/validation/"
+test_dataset_path = "dataset/test/"
 
-########
-########
-
-train_dataset = load_dataset(train_dataset_path, batch_size=batch_size, target_shape=(height, width), repeat=True)
-validation_dataset = load_dataset(validation_dataset_path, batch_size=batch_size, target_shape=(height, width))
+find_best_model = True
 
 ########
 ########
 
-data_augmentation = keras.Sequential(
+train_dataset = utils.load_dataset(
+    train_dataset_path,
+    batch_size=batch_size,
+    target_shape=(height, width),
+    repeat=True,
+    shuffle=True,
+    one_hot_encoded=one_hot_encoded)
+
+validation_dataset = utils.load_dataset(
+    validation_dataset_path,
+    batch_size=batch_size,
+    target_shape=(height, width),
+    one_hot_encoded=one_hot_encoded)
+
+########
+########
+
+data_augmentation = tf.keras.Sequential(
     [
         # layers.experimental.preprocessing.RandomRotation(0.2, seed=seed),
         layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
@@ -66,8 +77,8 @@ data_augmentation = keras.Sequential(
 ########
 ########
 
-def make_model(input_shape, model_name="AgNOR"):
-    inputs = keras.Input(shape=input_shape)
+def make_model(input_shape, model_name="U-Net"):
+    inputs = tf.keras.Input(shape=input_shape)
 
     # x = data_augmentation(inputs)
 
@@ -90,27 +101,27 @@ def make_model(input_shape, model_name="AgNOR"):
     conv5 = Conv2D(512, (3, 3), activation="relu", padding="same")(pool4)
     conv5 = Conv2D(512, (3, 3), activation="relu", padding="same")(conv5)
 
-    up6 = concatenate([Conv2DTranspose(256, (2, 2), strides=(2, 2), padding="same")(conv5), conv4], axis=3)
+    up6 = layers.concatenate([Conv2DTranspose(256, (2, 2), strides=(2, 2), padding="same")(conv5), conv4], axis=3)
     conv6 = Conv2D(256, (3, 3), activation="relu", padding="same")(up6)
     conv6 = Conv2D(256, (3, 3), activation="relu", padding="same")(conv6)
 
-    up7 = concatenate([Conv2DTranspose(128, (2, 2), strides=(2, 2), padding="same")(conv6), conv3], axis=3)
+    up7 = layers.concatenate([Conv2DTranspose(128, (2, 2), strides=(2, 2), padding="same")(conv6), conv3], axis=3)
     conv7 = Conv2D(128, (3, 3), activation="relu", padding="same")(up7)
     conv7 = Conv2D(128, (3, 3), activation="relu", padding="same")(conv7)
 
-    up8 = concatenate([Conv2DTranspose(64, (2, 2), strides=(2, 2), padding="same")(conv7), conv2], axis=3)
+    up8 = layers.concatenate([Conv2DTranspose(64, (2, 2), strides=(2, 2), padding="same")(conv7), conv2], axis=3)
     conv8 = Conv2D(64, (3, 3), activation="relu", padding="same")(up8)
     conv8 = Conv2D(64, (3, 3), activation="relu", padding="same")(conv8)
 
-    up9 = concatenate([Conv2DTranspose(32, (2, 2), strides=(2, 2), padding="same")(conv8), conv1], axis=3)
+    up9 = layers.concatenate([Conv2DTranspose(32, (2, 2), strides=(2, 2), padding="same")(conv8), conv1], axis=3)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(up9)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv9)
 
     outputs = Conv2D(1, (1, 1), activation="sigmoid")(conv9)
 
-    model = keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
+    model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
-    model.compile(optimizer=Adam(lr=learning_rate), loss=dice_coef_loss, metrics=[dice_coef])
+    model.compile(optimizer=Adam(lr=learning_rate), loss=losses.dice_coef_loss, metrics=[losses.dice_coef])
 
     return model
 
@@ -124,9 +135,9 @@ checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%
 os.makedirs(checkpoint_directory, exist_ok=True)
 
 callbacks = [
-    keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1,  mode="auto", cooldown=1),
-    keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="loss", save_best_only=False),
-    # keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
+    tf.keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1,  mode="auto", cooldown=1),
+    tf.keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="loss", save_best_only=True),
+    # tf.keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
 ]
 
 ########
@@ -137,8 +148,12 @@ train_config = {
     "seed": seed,
     "epochs": epochs,
     "batch_size": batch_size,
+    "steps_per_epoch": steps_per_epoch,
     "input_shape": input_shape,
-    "initial_learning_rate": model.optimizer.get_config()['learning_rate']
+    "initial_learning_rate": model.optimizer.get_config()['learning_rate'],
+    "train_dataset": train_dataset_path,
+    "validation_dataset": validation_dataset_path,
+    "test_dataset": test_dataset_path,
 }
 
 with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
@@ -161,7 +176,7 @@ print(f"    - Train: {train_dataset_path}")
 print(f"    - Validation: {validation_dataset_path}")
 print(f"    - Test: {test_dataset_path}\n")
 
-keras.backend.clear_session()
+tf.keras.backend.clear_session()
 
 history = model.fit(
     train_dataset,
@@ -177,6 +192,9 @@ minutes, seconds = divmod(rem, 60)
 duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
 print(f"Duration: {duration}")
 print(f"  - Model name: {model.name}")
+print(f"  - Epochs: {epochs}")
+print(f"  - Batch size: {batch_size}")
+print(f"  - Input shape: {input_shape}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}")
 print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Dataset:")
@@ -197,34 +215,23 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 ########
 
-print("\nModel evaluation")
-test_dataset = load_dataset(test_dataset_path, batch_size=batch_size, target_shape=(height, width))
-loss, dice = model.evaluate(test_dataset)
-print("Loss: %.4f" % loss)
-print("Dice: %.4f" % dice)
+if find_best_model:
+    print("\nEvaluate all models on test data")
+    best_model = utils.evaluate(checkpoint_directory, test_dataset_path, batch_size, input_shape=None, one_hot_encoded=one_hot_encoded)
+    model_path = Path(checkpoint_directory).joinpath(best_model["model"])
+else:
+    model_path = [path for path in Path(checkpoint_directory).glob("*.h5")][-1]
+    print("\nEvaluate last model on test data")
+    utils.evaluate(model_path, test_dataset_path, batch_size, input_shape=None, one_hot_encoded=one_hot_encoded)
 
 ########
 ########
 
-print("\nTesting model")
-test_images_path = str(Path(test_dataset_path).joinpath("images"))
-input_shape = model.input_shape[1:]
-height, width, channels = input_shape
-
-supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-images = [image_path for image_path in Path(test_images_path).rglob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-images_tensor = np.empty((1, height, width, channels))
-
-for i, image_path in enumerate(images):
-    image = cv2.imread(os.path.join(test_images_path, image_path.name), cv2.IMREAD_COLOR)
-    original_shape = image.shape[:2][::-1]
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = cv2.resize(image, (width, height))
-    images_tensor[0, :, :, :] = image
-
-    prediction = model.predict(images_tensor, batch_size=1, verbose=1)
-    prediction = cv2.resize(prediction[0], original_shape)
-    prediction[prediction < 0.5] = 0
-    prediction[prediction >= 0.5] = 255
-    cv2.imwrite(os.path.join(test_images_path, f"{image_path.stem}_{model.name}_prediction.png"), prediction)
-    keras.backend.clear_session()
+print("\n\nPredict on test data")
+utils.predict(
+    model_path,
+    images_path=Path(test_dataset_path).joinpath("images"),
+    batch_size=batch_size,
+    output_path=Path(test_dataset_path).joinpath("images"),
+    copy_images=False,
+    input_shape=None)
