@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
-from losses import dice_coef, dice_coef_loss
+import losses
 
 
 def write_dataset(dataset, output_path="dataset_visualization", max_batches=None, same_dir=False):
@@ -115,12 +115,12 @@ def update_model(model, input_shape):
 
 def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=False):
     if Path(model).is_file():
-        loaded_model = tf.keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+        loaded_model = tf.keras.models.load_model(model, custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
 
-        loaded_model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
+        loaded_model.compile(optimizer=Adam(lr=1e-5), loss=losses.dice_coef_loss, metrics=[losses.dice_coef])
 
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
@@ -134,7 +134,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=F
         models = [model_path for model_path in Path(model).glob("*.h5")]
         models.sort()
 
-        loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+        loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
@@ -146,12 +146,12 @@ def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=F
         best_model = {}
 
         for i, model_path in enumerate(models):
-            loaded_model = tf.keras.models.load_model(str(model_path), custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+            loaded_model = tf.keras.models.load_model(str(model_path), custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
 
             if input_shape:
                 loaded_model = update_model(loaded_model, input_shape)
 
-            loaded_model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
+            loaded_model.compile(optimizer=Adam(lr=1e-5), loss=losses.dice_coef_loss, metrics=[losses.dice_coef])
             loss, dice = loaded_model.evaluate(evaluate_dataset)
             print(f"({i+1}/{len(models)}) Model {model_path.name}")
             print("  - Loss: %.4f" % loss)
@@ -176,7 +176,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=F
 
 
 def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, input_shape=None):
-    loaded_model = tf.keras.models.load_model(model, custom_objects={"dice_coef_loss": dice_coef_loss, "dice_coef": dice_coef})
+    loaded_model = tf.keras.models.load_model(model, custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
 
     if input_shape:
         loaded_model = update_model(loaded_model, input_shape)

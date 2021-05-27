@@ -19,7 +19,7 @@ def main():
         "-i",
         "--images",
         help="Path to the directory containing the images to predict or to a single image file.",
-        required=True,
+        default="dataset/test/images/",
         type=str)
 
     parser.add_argument(
