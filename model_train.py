@@ -16,7 +16,7 @@ import utils
 ########
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+# os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 ########
 ########
@@ -25,7 +25,7 @@ seed = 1145
 tf.random.set_seed(seed)
 np.random.seed(seed)
 
-model_name = "AgNOR-NOR"
+model_name = "AgNOR-Multiclass"
 
 epochs = 10
 batch_size = 1
@@ -117,7 +117,7 @@ def make_model(input_shape, model_name="U-Net"):
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(up9)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv9)
 
-    outputs = Conv2D(1, (1, 1), activation="sigmoid")(conv9)
+    outputs = Conv2D(3, (1, 1), activation="softmax")(conv9)
 
     model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
