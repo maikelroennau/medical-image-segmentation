@@ -36,7 +36,7 @@ width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 learning_rate = 1e-5
-one_hot_encoded = False
+one_hot_encoded = True
 
 train_dataset_path = "dataset/train/"
 validation_dataset_path = "dataset/validation/"
@@ -167,6 +167,7 @@ print(f"Training start - {time.strftime('%x %X')}")
 print(f"  - Model name: {model.name}")
 print(f"  - Seed: {seed}")
 print(f"  - Epochs: {epochs}")
+print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
@@ -193,6 +194,7 @@ duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
 print(f"Duration: {duration}")
 print(f"  - Model name: {model.name}")
 print(f"  - Epochs: {epochs}")
+print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}")
