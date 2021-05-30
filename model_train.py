@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D, Dense
 from tensorflow.keras.optimizers import Adam
 
 import losses
@@ -25,24 +25,24 @@ seed = 1145
 tf.random.set_seed(seed)
 np.random.seed(seed)
 
-model_name = "AgNOR-Multiclass"
+model_name = "AgNOR"
 
-epochs = 10
-batch_size = 1
+epochs = 5
+batch_size = 4
 steps_per_epoch = 300
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
+classes = 3
 learning_rate = 1e-5
 one_hot_encoded = True
+find_best_model = True
 
 train_dataset_path = "dataset/train/"
 validation_dataset_path = "dataset/validation/"
 test_dataset_path = "dataset/test/"
-
-find_best_model = True
 
 ########
 ########
@@ -53,12 +53,14 @@ train_dataset = utils.load_dataset(
     target_shape=(height, width),
     repeat=True,
     shuffle=True,
+    classes=classes,
     one_hot_encoded=one_hot_encoded)
 
 validation_dataset = utils.load_dataset(
     validation_dataset_path,
     batch_size=batch_size,
     target_shape=(height, width),
+    classes=classes,
     one_hot_encoded=one_hot_encoded)
 
 ########
@@ -77,7 +79,7 @@ data_augmentation = tf.keras.Sequential(
 ########
 ########
 
-def make_model(input_shape, model_name="U-Net"):
+def make_model(input_shape, classes, model_name="U-Net"):
     inputs = tf.keras.Input(shape=input_shape)
 
     # x = data_augmentation(inputs)
@@ -117,7 +119,7 @@ def make_model(input_shape, model_name="U-Net"):
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(up9)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv9)
 
-    outputs = Conv2D(3, (1, 1), activation="softmax")(conv9)
+    outputs = Conv2D(classes, (1, 1), activation="sigmoid" if classes == 1 else "softmax")(conv9)
 
     model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
@@ -125,7 +127,7 @@ def make_model(input_shape, model_name="U-Net"):
 
     return model
 
-model = make_model(input_shape=input_shape, model_name=model_name)
+model = make_model(input_shape=input_shape, classes=classes, model_name=model_name)
 model.summary()
 
 ########
