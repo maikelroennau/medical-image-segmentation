@@ -28,7 +28,7 @@ np.random.seed(seed)
 model_name = "AgNOR"
 
 epochs = 5
-batch_size = 4
+batch_size = 1
 steps_per_epoch = 300
 
 height = 960 # 240 480 960 1920
