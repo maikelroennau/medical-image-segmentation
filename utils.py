@@ -44,23 +44,22 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
             break
 
 
-def load_files(image_path, target_shape=(1920, 2560), one_hot_encoded=False):
+def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=3, one_hot_encoded=False):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, target_shape)
-
-    mask_path = tf.strings.regex_replace(image_path, "images", "masks")
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    for supported_type in supported_types:
-        mask_path = tf.strings.regex_replace(mask_path, supported_type, ".png")
+    image = image / 255.
 
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
     mask = tf.image.resize(mask, target_shape)
 
+    if classes > 1:
+        mask = mask - 1
+
     if one_hot_encoded:
-        mask = tf.cast(mask, dtype=tf.uint8)
-        mask = tf.one_hot(mask, depth=3, axis=2, dtype=tf.uint8)
+        mask = tf.cast(mask, dtype=tf.int32)
+        mask = tf.one_hot(mask, depth=classes, axis=2, dtype=tf.int32)
         mask = tf.squeeze(mask)
 
     image = tf.cast(image, dtype=tf.float32)
@@ -68,7 +67,7 @@ def load_files(image_path, target_shape=(1920, 2560), one_hot_encoded=False):
     return image, mask
 
 
-def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, shuffle=False, one_hot_encoded=False, seed=1145):
+def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=3, one_hot_encoded=False, seed=1145):
     images_path = Path(path).joinpath("images")
     masks_path = Path(path).joinpath("masks")
 
@@ -87,8 +86,9 @@ def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, s
     print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
 
     images_paths = [str(image_path) for image_path in images_paths]
-    dataset_files = tf.data.Dataset.from_tensor_slices(images_paths)
-    dataset = dataset_files.map(lambda x: load_files(x, target_shape, one_hot_encoded))
+    masks_paths = [str(masks_path) for masks_path in masks_paths]
+    dataset_files = tf.data.Dataset.from_tensor_slices((images_paths, masks_paths))
+    dataset = dataset_files.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
 
     if shuffle:
         dataset = dataset.shuffle(buffer_size=int(len(images_paths) * 0.1), seed=seed)
