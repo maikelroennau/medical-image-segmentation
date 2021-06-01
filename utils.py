@@ -40,7 +40,7 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
             tf.keras.preprocessing.image.save_img(mask_name, mask)
 
         tf.keras.backend.clear_session()
-        if i + 1 == batches:
+        if i == batches:
             break
 
 
