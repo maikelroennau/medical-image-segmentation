@@ -7,12 +7,10 @@ import glob
 import os
 import os.path as osp
 import sys
+import cv2
 
 import imgviz
-import cv2
 from tqdm import tqdm
-import shutil
-from pathlib import Path
 
 import labelme
 
@@ -21,12 +19,32 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("input_dir", help="input annotated directory")
-    parser.add_argument("output_dir", help="output dataset directory")
-    parser.add_argument("--labels", help="labels file", required=True)
+
     parser.add_argument(
-        "--noviz", help="no visualization", action="store_true"
-    )
+        "input_dir",
+        help="input annotated directory")
+
+    parser.add_argument(
+        "output_dir",
+        help="output dataset directory")
+
+    parser.add_argument(
+        "--labels",
+        help="labels file",
+        required=True)
+
+    parser.add_argument(
+        "--noviz",
+        help="no visualization",
+        action="store_true")
+
+    parser.add_argument(
+        "--color",
+        "-c",
+        help="Generate RGB segmentation masks",
+        default=False,
+        action="store_true")
+
     args = parser.parse_args()
 
     if osp.exists(args.output_dir):
@@ -75,10 +93,8 @@ def main():
                 base + ".jpg",
             )
 
-        # shutil.copyfile(os.path.join(args.input_dir, label_file.imagePath), out_img_file)
         with open(out_img_file, "wb") as f:
             f.write(label_file.imageData)
-
         img = labelme.utils.img_data_to_arr(label_file.imageData)
 
         lbl, _ = labelme.utils.shapes_to_label(
@@ -87,7 +103,10 @@ def main():
             label_name_to_value=class_name_to_id,
         )
 
-        cv2.imwrite(out_png_file, lbl)
+        if not args.color:
+            cv2.imwrite(out_png_file, lbl)
+        else:
+            labelme.utils.lblsave(out_png_file, lbl)
 
         if not args.noviz:
             viz = imgviz.label2rgb(
