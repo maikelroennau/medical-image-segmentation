@@ -56,14 +56,13 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=3, one_
 
     if classes > 1:
         mask = mask - 1
+        mask = tf.abs(mask)
 
     if one_hot_encoded:
         mask = tf.cast(mask, dtype=tf.int32)
-        mask = tf.one_hot(mask, depth=classes, axis=2, dtype=tf.int32)
+        mask = tf.one_hot(mask, depth=classes, axis=2, dtype=tf.float32)
         mask = tf.squeeze(mask)
 
-    image = tf.cast(image, dtype=tf.float32)
-    mask = tf.cast(mask, dtype=tf.float32)
     return image, mask
 
 
@@ -197,15 +196,16 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
     images_tensor = np.empty((1, height, width, channels))
     Path(output_path).mkdir(exist_ok=True, parents=True)
 
-    for i, image_path in enumerate(images):
-        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-        original_shape = image.shape[:2][::-1]
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = cv2.resize(image, (width, height))
+    for image_path in images:
+        image = tf.io.read_file(str(image_path))
+        image = tf.image.decode_jpeg(image, channels=3)
+        original_shape = image.shape[:2]
+        image = tf.image.resize(image, (height, width))
+
         images_tensor[0, :, :, :] = image
 
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
-        prediction = cv2.resize(prediction[0], original_shape)
+        prediction = tf.image.resize(prediction[0], original_shape).numpy()
 
         prediction[prediction < 0.5] = 0
         prediction[prediction >= 0.5] = 255
