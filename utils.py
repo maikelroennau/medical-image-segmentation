@@ -65,7 +65,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=3, one_
     return image, mask
 
 
-def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=3, one_hot_encoded=False, seed=1145):
+def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=3, one_hot_encoded=False, seed=1145):
     images_path = Path(path).joinpath("images")
     masks_path = Path(path).joinpath("masks")
 
