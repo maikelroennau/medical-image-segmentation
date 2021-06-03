@@ -175,7 +175,10 @@ def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=F
 
 
 def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, input_shape=None):
-    loaded_model = tf.keras.models.load_model(model, custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
+    if isinstance(model, str) or isinstance(model, Path):
+        loaded_model = tf.keras.models.load_model(str(model), custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
+    else:
+        loaded_model = model
 
     if input_shape:
         loaded_model = update_model(loaded_model, input_shape)
@@ -207,8 +210,8 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
         prediction = tf.image.resize(prediction[0], original_shape).numpy()
 
-        prediction[prediction < 0.5] = 0
-        prediction[prediction >= 0.5] = 255
+        prediction[prediction < 0.5] = 0.
+        prediction[prediction >= 0.5] = 255.
 
         cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), prediction)
 
