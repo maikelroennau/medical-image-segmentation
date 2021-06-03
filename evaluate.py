@@ -37,6 +37,12 @@ def main():
         type=int)
 
     parser.add_argument(
+        "--ohe",
+        help="Wheter or not to convert masks to one-hot-encoded.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -67,7 +73,7 @@ def main():
     else:
         input_shape = None
 
-    evaluate(args.model, args.images, args.batch_size, input_shape)
+    evaluate(args.model, args.images, args.batch_size, input_shape, args.ohe)
 
 
 if __name__ == "__main__":
