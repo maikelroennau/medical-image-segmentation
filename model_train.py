@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D, Dense
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D
 from tensorflow.keras.optimizers import Adam
 
 import losses
@@ -37,7 +37,7 @@ input_shape = (height, width, 3)
 
 classes = 3
 learning_rate = 1e-5
-one_hot_encoded = True
+one_hot_encoded = True if classes > 1 else False
 find_best_model = True
 
 train_dataset_path = "dataset/train/"
@@ -133,10 +133,12 @@ callbacks = [
 train_config = {
     "model_name": model.name,
     "seed": seed,
+    "classes": classes,
     "epochs": epochs,
     "batch_size": batch_size,
     "steps_per_epoch": steps_per_epoch,
     "input_shape": input_shape,
+    "one_hot_encoded": one_hot_encoded,
     "initial_learning_rate": model.optimizer.get_config()['learning_rate'],
     "train_dataset": train_dataset_path,
     "validation_dataset": validation_dataset_path,
@@ -153,11 +155,13 @@ start = time.time()
 print(f"Training start - {time.strftime('%x %X')}")
 print(f"  - Model name: {model.name}")
 print(f"  - Seed: {seed}")
+print(f"  - Classes: {classes}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
-print(f"  - Learning rate: {model.optimizer.get_config()['learning_rate']}")
+print(f"  - One hot encoded: {one_hot_encoded}")
+print(f"  - Initial Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}")
 print(f"  - Dataset:")
 print(f"    - Train: {train_dataset_path}")
@@ -180,10 +184,12 @@ minutes, seconds = divmod(rem, 60)
 duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
 print(f"Duration: {duration}")
 print(f"  - Model name: {model.name}")
+print(f"  - Classes: {classes}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
+print(f"  - One hot encoded: {one_hot_encoded}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}")
 print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Dataset:")
