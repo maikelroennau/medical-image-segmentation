@@ -29,7 +29,7 @@ model_name = "AgNOR"
 
 epochs = 5
 batch_size = 1
-steps_per_epoch = 300
+steps_per_epoch = 120
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
@@ -66,23 +66,8 @@ validation_dataset = utils.load_dataset(
 ########
 ########
 
-data_augmentation = tf.keras.Sequential(
-    [
-        # layers.experimental.preprocessing.RandomRotation(0.2, seed=seed),
-        layers.experimental.preprocessing.RandomFlip(mode="horizontal_and_vertical", seed=seed),
-        # layers.experimental.preprocessing.RandomContrast(0.1, seed=seed),
-        # layers.experimental.preprocessing.Rescaling(1./255.)
-
-    ]
-)
-
-########
-########
-
 def make_model(input_shape, classes, model_name="U-Net"):
     inputs = tf.keras.Input(shape=input_shape)
-
-    # x = data_augmentation(inputs)
 
     conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(inputs)
     conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv1)
