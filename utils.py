@@ -56,7 +56,6 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=3, one_
 
     if classes > 1:
         mask = mask - 1
-        mask = tf.abs(mask)
 
     if one_hot_encoded:
         mask = tf.cast(mask, dtype=tf.int32)
@@ -95,7 +94,7 @@ def load_dataset(path, batch_size=32, target_shape=(1920, 2560), repeat=False, s
         dataset = dataset.repeat()
 
     dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     return dataset
 
 
@@ -174,14 +173,14 @@ def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=F
         return best_model
 
 
-def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, input_shape=None):
+def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None):
     if isinstance(model, str) or isinstance(model, Path):
         loaded_model = tf.keras.models.load_model(str(model), custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
     else:
         loaded_model = model
 
-    if input_shape:
-        loaded_model = update_model(loaded_model, input_shape)
+    if new_input_shape:
+        loaded_model = update_model(loaded_model, new_input_shape)
 
     input_shape = loaded_model.input_shape[1:]
     height, width, channels = input_shape
