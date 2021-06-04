@@ -209,8 +209,8 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
         prediction = tf.image.resize(prediction[0], original_shape).numpy()
 
-        prediction[prediction < 0.5] = 0.
-        prediction[prediction >= 0.5] = 255.
+        prediction[prediction < 0.5] = 0
+        prediction[prediction >= 0.5] = 255
 
         cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), prediction)
 
