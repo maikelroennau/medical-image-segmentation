@@ -37,6 +37,13 @@ def main():
         type=int)
 
     parser.add_argument(
+        "-c",
+        "--classes",
+        help="Number of classes.",
+        default=1,
+        type=int)
+
+    parser.add_argument(
         "--ohe",
         help="Wheter or not to convert masks to one-hot-encoded.",
         default=False,
@@ -73,7 +80,13 @@ def main():
     else:
         input_shape = None
 
-    evaluate(args.model, args.images, args.batch_size, input_shape, args.ohe)
+    evaluate(
+        model=args.model,
+        images_path=args.images,
+        batch_size=args.batch_size,
+        input_shape=input_shape,
+        classes=args.classes,
+        one_hot_encoded=args.ohe)
 
 
 if __name__ == "__main__":

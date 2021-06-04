@@ -27,22 +27,22 @@ np.random.seed(seed)
 
 model_name = "AgNOR"
 
-epochs = 5
+epochs = 10
 batch_size = 1
 steps_per_epoch = 120
 
-height = 960 # 240 480 960 1920
-width = 1280 # 320 640 1280 2560
+height = 480 # 240 480 960 1920
+width = 640 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
-classes = 3
+classes = 1
 learning_rate = 1e-5
 one_hot_encoded = True if classes > 1 else False
 find_best_model = True
 
-train_dataset_path = "dataset/train/"
-validation_dataset_path = "dataset/validation/"
-test_dataset_path = "dataset/test/"
+train_dataset_path = "dataset/nucleus/train/"
+validation_dataset_path = "dataset/nucleus/validation/"
+test_dataset_path = "dataset/nucleus/test/"
 
 ########
 ########
@@ -212,12 +212,12 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 
 if find_best_model:
     print("\nEvaluate all models on test data")
-    best_model = utils.evaluate(checkpoint_directory, test_dataset_path, batch_size, input_shape=None, one_hot_encoded=one_hot_encoded)
+    best_model = utils.evaluate(checkpoint_directory, test_dataset_path, batch_size, input_shape=None, classes=classes, one_hot_encoded=one_hot_encoded)
     model_path = Path(checkpoint_directory).joinpath(best_model["model"])
 else:
     model_path = [path for path in Path(checkpoint_directory).glob("*.h5")][-1]
     print("\nEvaluate last model on test data")
-    utils.evaluate(model_path, test_dataset_path, batch_size, input_shape=None, one_hot_encoded=one_hot_encoded)
+    utils.evaluate(model_path, test_dataset_path, batch_size, input_shape=None, classes=classes, one_hot_encoded=one_hot_encoded)
 
 ########
 ########
@@ -229,4 +229,4 @@ utils.predict(
     batch_size=batch_size,
     output_path=Path(test_dataset_path).joinpath("images"),
     copy_images=False,
-    input_shape=None)
+    new_input_shape=None)
