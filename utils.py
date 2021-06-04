@@ -44,7 +44,7 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
             break
 
 
-def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=3, one_hot_encoded=False):
+def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_hot_encoded=False):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, target_shape)
@@ -65,7 +65,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=3, one_
     return image, mask
 
 
-def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=3, one_hot_encoded=False, seed=1145):
+def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, seed=1145):
     images_path = Path(path).joinpath("images")
     masks_path = Path(path).joinpath("masks")
 
@@ -111,7 +111,7 @@ def update_model(model, input_shape):
     return updated_model
 
 
-def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=False):
+def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_hot_encoded=False):
     if Path(model).is_file():
         loaded_model = tf.keras.models.load_model(model, custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
 
@@ -123,7 +123,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=F
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
 
-        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), one_hot_encoded=one_hot_encoded)
+        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
         loss, dice = loaded_model.evaluate(evaluate_dataset)
         print(f"Model {str(Path(model))}")
         print("  - Loss: %.4f" % loss)
@@ -140,7 +140,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, one_hot_encoded=F
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
 
-        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), one_hot_encoded=one_hot_encoded)
+        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
         best_model = {}
 
         for i, model_path in enumerate(models):

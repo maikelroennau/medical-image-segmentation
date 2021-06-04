@@ -80,7 +80,13 @@ def main():
     if args.output != output:
         args.copy_images = False
 
-    predict(args.model, args.images, args.batch_size, output, args.copy_images, input_shape)
+    predict(
+        model=args.model,
+        images_path=args.images,
+        batch_size=args.batch_size,
+        output_path=output,
+        copy_images=args.copy_images,
+        new_input_shape=input_shape)
 
 
 if __name__ == "__main__":
