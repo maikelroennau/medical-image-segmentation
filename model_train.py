@@ -27,16 +27,16 @@ np.random.seed(seed)
 
 model_name = "AgNOR"
 
-epochs = 50
-batch_size = 10
-steps_per_epoch = 60
+epochs = 20
+batch_size = 3
+steps_per_epoch = 120
 
-height = 960 # 240 480 960 1920
-width = 1280 # 320 640 1280 2560
+height = 480 # 240 480 960 1920
+width = 640 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
-learning_rate = 1e-4
+learning_rate = 1e-3
 one_hot_encoded = True if classes > 1 else False
 find_best_model = True
 
@@ -134,7 +134,7 @@ def make_model(input_shape, classes, model_name="U-Net"):
 
     model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
-    model.compile(optimizer=Adam(lr=learning_rate), loss=losses.dice_coef_loss, metrics=[losses.dice_coef])
+    model.compile(optimizer=Adam(lr=learning_rate), loss="binary_crossentropy", metrics=[losses.dice_coef])
 
     return model
 
@@ -149,7 +149,7 @@ os.makedirs(checkpoint_directory, exist_ok=True)
 
 callbacks = [
     tf.keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1,  mode="auto", cooldown=1),
-    tf.keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="loss", save_best_only=True),
+    tf.keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="val_loss", save_best_only=True),
     # tf.keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
 ]
 
