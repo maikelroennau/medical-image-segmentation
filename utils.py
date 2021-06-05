@@ -6,6 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import backend
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
@@ -48,7 +49,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, target_shape)
-    image = image / 255.
+    image = image / 255
 
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
@@ -113,7 +114,7 @@ def update_model(model, input_shape):
 
 def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_hot_encoded=False):
     if Path(model).is_file():
-        loaded_model = tf.keras.models.load_model(model, custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
+        loaded_model = tf.keras.models.load_model(model, custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
@@ -132,7 +133,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         models = [model_path for model_path in Path(model).glob("*.h5")]
         models.sort()
 
-        loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
+        loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
@@ -144,7 +145,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         best_model = {}
 
         for i, model_path in enumerate(models):
-            loaded_model = tf.keras.models.load_model(str(model_path), custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
+            loaded_model = tf.keras.models.load_model(str(model_path), custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
 
             if input_shape:
                 loaded_model = update_model(loaded_model, input_shape)
@@ -175,7 +176,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
 
 def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None):
     if isinstance(model, str) or isinstance(model, Path):
-        loaded_model = tf.keras.models.load_model(str(model), custom_objects={"dice_coef_loss": losses.dice_coef_loss, "dice_coef": losses.dice_coef})
+        loaded_model = tf.keras.models.load_model(str(model), custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
     else:
         loaded_model = model
 
@@ -209,10 +210,9 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
         prediction = tf.image.resize(prediction[0], original_shape).numpy()
 
-        prediction[prediction < 0.5] = 0
-        prediction[prediction >= 0.5] = 255
-
-        cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), prediction)
+        # prediction[prediction < 0.5] = 0
+        # prediction[prediction >= 0.5] = 255
+        cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), cv2.cvtColor(prediction * 255, cv2.COLOR_BGR2RGB))
 
         if copy_images:
             shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
