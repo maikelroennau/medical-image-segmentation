@@ -13,6 +13,14 @@ from tqdm import tqdm
 import losses
 
 
+CUSTOM_OBJECTS = {
+    "dice_coef": losses.dice_coef,
+    "dice_coef_loss": losses.dice_coef_loss,
+    "jaccard_index": losses.jaccard_index,
+    "jaccard_index_loss": losses.jaccard_index_loss
+}
+
+
 def write_dataset(dataset, output_path="dataset_visualization", max_batches=None, same_dir=False):
     output = Path(output_path)
     images_path = output.joinpath("images")
@@ -49,19 +57,26 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, target_shape)
-    image = image / 255
+    # image = image / 255
 
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
     mask = tf.image.resize(mask, target_shape)
 
-    if classes > 1:
-        mask = mask - 1
-
     if one_hot_encoded:
         mask = tf.cast(mask, dtype=tf.int32)
-        mask = tf.one_hot(mask, depth=classes, axis=2, dtype=tf.float32)
+        mask = tf.one_hot(mask, depth=classes, axis=2, dtype=tf.int32)
         mask = tf.squeeze(mask)
+
+    if classes > 1:
+        slices = []
+        for i in range(classes):
+            if i == 0:
+                slices.append(tf.scalar_mul(0, mask[:, :, i]))
+            else:
+                slices.append(tf.scalar_mul(1, mask[:, :, i]))
+
+        mask = tf.stack(slices, axis=-1)
 
     return image, mask
 
@@ -90,7 +105,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
     dataset = dataset_files.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
 
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=int(len(images_paths) * 0.1), seed=seed)
+        dataset = dataset.shuffle(buffer_size=batch_size * 2, seed=seed)
     if repeat:
         dataset = dataset.repeat()
 
@@ -114,12 +129,12 @@ def update_model(model, input_shape):
 
 def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_hot_encoded=False):
     if Path(model).is_file():
-        loaded_model = tf.keras.models.load_model(model, custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
+        loaded_model = tf.keras.models.load_model(model, custom_objects=CUSTOM_OBJECTS)
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
 
-        loaded_model.compile(optimizer=Adam(lr=1e-5), loss=losses.dice_coef_loss, metrics=[losses.dice_coef])
+        loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=["accuracy"])
 
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
@@ -133,7 +148,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         models = [model_path for model_path in Path(model).glob("*.h5")]
         models.sort()
 
-        loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
+        loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects=CUSTOM_OBJECTS)
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
@@ -145,12 +160,12 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         best_model = {}
 
         for i, model_path in enumerate(models):
-            loaded_model = tf.keras.models.load_model(str(model_path), custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
+            loaded_model = tf.keras.models.load_model(str(model_path), custom_objects=CUSTOM_OBJECTS)
 
             if input_shape:
                 loaded_model = update_model(loaded_model, input_shape)
 
-            loaded_model.compile(optimizer=Adam(lr=1e-5), loss=losses.dice_coef_loss, metrics=[losses.dice_coef])
+            loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=["accuracy"])
             loss, dice = loaded_model.evaluate(evaluate_dataset)
             print(f"({i+1}/{len(models)}) Model {model_path.name}")
             print("  - Loss: %.4f" % loss)
@@ -176,7 +191,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
 
 def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None):
     if isinstance(model, str) or isinstance(model, Path):
-        loaded_model = tf.keras.models.load_model(str(model), custom_objects={"binary_crossentropy": tf.keras.losses.BinaryCrossentropy(), "dice_coef": losses.dice_coef})
+        loaded_model = tf.keras.models.load_model(str(model), custom_objects=CUSTOM_OBJECTS)
     else:
         loaded_model = model
 
@@ -210,9 +225,9 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
         prediction = tf.image.resize(prediction[0], original_shape).numpy()
 
-        # prediction[prediction < 0.5] = 0
-        # prediction[prediction >= 0.5] = 255
-        cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), cv2.cvtColor(prediction * 255, cv2.COLOR_BGR2RGB))
+        prediction[prediction < 0.5] = 0
+        prediction[prediction >= 0.5] = 255
+        cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
 
         if copy_images:
             shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
