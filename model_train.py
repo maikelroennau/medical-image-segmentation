@@ -47,21 +47,25 @@ test_dataset_path = "dataset/test/"
 ########
 ########
 
-train_dataset = utils.load_dataset(
+train_dataset = utils.load_generator(
     train_dataset_path,
     batch_size=batch_size,
     target_shape=(height, width),
-    repeat=True,
     shuffle=True,
     classes=classes,
-    one_hot_encoded=one_hot_encoded)
+    one_hot_encoded=one_hot_encoded,
+    visualize=True,
+    seed=1145)
 
-validation_dataset = utils.load_dataset(
+validation_dataset = utils.load_generator(
     validation_dataset_path,
     batch_size=batch_size,
     target_shape=(height, width),
+    shuffle=True,
     classes=classes,
-    one_hot_encoded=one_hot_encoded)
+    one_hot_encoded=one_hot_encoded,
+    visualize=True,
+    seed=1145)
 
 ########
 ########
