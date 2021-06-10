@@ -131,39 +131,43 @@ def load_generator(path, batch_size=1, target_shape=(1920, 2560), shuffle=False,
         assert image_path.stem.lower() == mask_path.stem.lower(), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
 
     print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
-    
+
     images = np.zeros((len(images_paths), target_shape[0], target_shape[1], 3))
-    masks = np.zeros((len(images_paths), target_shape[0], target_shape[1], classes))
-    
+    masks = np.zeros((len(images_paths), target_shape[0], target_shape[1]))
+
     for i, (image, mask) in enumerate(zip(images_paths, masks_paths)):
         image = cv2.imread(str(image), cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = cv2.resize(image, target_shape[::-1])
         # image = image / 255
-        
-        mask = cv2.imread(str(mask), cv2.IMREAD_GRAYSCALE)
+
+        # mask = cv2.imread(str(mask), cv2.IMREAD_GRAYSCALE)
+        mask = cv2.imdecode(np.fromfile(str(mask), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
         mask = cv2.resize(mask, target_shape[::-1])
-        
+
         images[i, :, :, :] = image.astype(np.float32)
         if one_hot_encoded:
             masks[i, :, :, :] = tf.keras.utils.to_categorical(mask, num_classes=classes, dtype=np.int32)
         else:
-            masks[i, :, :, :] = mask.astype(np.int32)
-        masks[i, :, :, 0] = 0
-        
+            masks[i, :, :] = mask.astype(np.int32)
+        # masks[i, :, :, 0] = 0
+
     if visualize:
         print("Writing images")
         images_dir = Path("dataset_visualization").joinpath(Path(path).name).joinpath("images")
         images_dir.mkdir(exist_ok=True, parents=True)
         masks_dir = Path("dataset_visualization").joinpath(Path(path).name).joinpath("masks")
         masks_dir.mkdir(exist_ok=True, parents=True)
-        
+
         for i in range(len(images)):
             cv2.imwrite(str(images_dir.joinpath(f"{i}.jpg")), cv2.cvtColor(images[i, :, :, :].astype(np.float32), cv2.COLOR_BGR2RGB))
             cv2.imwrite(str(masks_dir.joinpath(f"{i}.png")), cv2.cvtColor(masks[i, :, :, :].astype(np.uint8) * 255, cv2.COLOR_BGR2RGB))
-    
+
     images_generator = tf.keras.preprocessing.image.ImageDataGenerator()
-    
+        # fill_mode="reflect",
+        # horizontal_flip=True,
+        # vertical_flip=True)
+
     generator = images_generator.flow(
         images,
         masks,
@@ -171,7 +175,7 @@ def load_generator(path, batch_size=1, target_shape=(1920, 2560), shuffle=False,
         shuffle=shuffle,
         sample_weight=None,
         seed=seed)
-        
+
     return generator
 
 
