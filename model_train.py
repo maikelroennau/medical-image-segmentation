@@ -28,11 +28,11 @@ seed = 1145
 model_name = "AgNOR"
 
 epochs = 10
-batch_size = 1
+batch_size = 60
 steps_per_epoch = 60
 
-height = 960 # 240 480 960 1920
-width = 1280 # 320 640 1280 2560
+height = 1920 # 240 480 960 1920
+width = 2560 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
@@ -53,9 +53,36 @@ train_dataset = utils.load_generator(
     target_shape=(height, width),
     shuffle=True,
     classes=classes,
-    one_hot_encoded=one_hot_encoded,
-    visualize=True,
+    one_hot_encoded=False,
+    visualize=False,
     seed=1145)
+
+import cv2
+from tqdm import tqdm
+images_path = Path("augmentation/images")
+images_path.mkdir(parents=True, exist_ok=True)
+masks_path = Path("augmentation/masks")
+masks_path.mkdir(parents=True, exist_ok=True)
+
+batches = 1
+for i, batch in tqdm(enumerate(train_dataset), total=batches):
+    for j in range(batch_size):
+        image = batch[0][j].astype(np.float32)
+        cv2.imwrite(str(images_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{0}.jpg")), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(str(images_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{1}.jpg")), cv2.cvtColor(np.flip(image, axis=0), cv2.COLOR_BGR2RGB))
+        cv2.imwrite(str(images_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{2}.jpg")), cv2.cvtColor(np.flip(image, axis=1), cv2.COLOR_BGR2RGB))
+        cv2.imwrite(str(images_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{3}.jpg")), cv2.cvtColor(np.flip(np.flip(image, axis=1), axis=0), cv2.COLOR_BGR2RGB))
+
+        mask = batch[1][j].astype(np.uint8)
+        cv2.imwrite(str(masks_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{0}.png")), cv2.cvtColor(mask, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(str(masks_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{1}.png")), cv2.cvtColor(np.flip(mask, axis=0), cv2.COLOR_BGR2RGB))
+        cv2.imwrite(str(masks_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{2}.png")), cv2.cvtColor(np.flip(mask, axis=1), cv2.COLOR_BGR2RGB))
+        cv2.imwrite(str(masks_path.joinpath(f"b{str(i).zfill(3)}_i{str(j).zfill(3)}_t{3}.png")), cv2.cvtColor(np.flip(np.flip(mask, axis=1), axis=0), cv2.COLOR_BGR2RGB))
+    if batches == 1:
+        break
+    batches += 1
+
+assert 1 == 2
 
 validation_dataset = utils.load_generator(
     validation_dataset_path,
@@ -64,7 +91,7 @@ validation_dataset = utils.load_generator(
     shuffle=True,
     classes=classes,
     one_hot_encoded=one_hot_encoded,
-    visualize=True,
+    visualize=False,
     seed=1145)
 
 ########
