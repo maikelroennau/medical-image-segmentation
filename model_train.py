@@ -59,9 +59,9 @@ train_dataset = utils.load_generator(
 
 import cv2
 from tqdm import tqdm
-images_path = Path("augmentation/images")
+images_path = Path("dataset/augmentation/images")
 images_path.mkdir(parents=True, exist_ok=True)
-masks_path = Path("augmentation/masks")
+masks_path = Path("dataset/augmentation/masks")
 masks_path.mkdir(parents=True, exist_ok=True)
 
 batches = 1
