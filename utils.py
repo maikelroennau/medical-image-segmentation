@@ -6,7 +6,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import backend
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
@@ -20,6 +19,11 @@ CUSTOM_OBJECTS = {
     "jaccard_index_loss": losses.jaccard_index_loss
 }
 
+METRICS = [
+    "accuracy",
+    losses.dice_coef,
+    losses.jaccard_index,
+]
 
 def write_dataset(dataset, output_path="dataset_visualization", max_batches=None, same_dir=False):
     output = Path(output_path)
@@ -57,7 +61,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, target_shape)
-    # image = image / 255
+    # image = image / 255.
 
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
@@ -81,7 +85,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
     return image, mask
 
 
-def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, seed=1145):
+def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, seed=7613):
     images_path = Path(path).joinpath("images")
     masks_path = Path(path).joinpath("masks")
 
@@ -134,16 +138,28 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
 
-        loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=["accuracy"])
+        loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[METRICS])
 
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
 
         evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
-        loss, dice = loaded_model.evaluate(evaluate_dataset)
-        print(f"Model {str(Path(model))}")
-        print("  - Loss: %.4f" % loss)
-        print("  - Dice: %.4f" % dice)
+        evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
+
+        print(f"Model {str(model)}")
+        print("  - Loss: %.4f" % evaluation_metrics[0])
+
+        model = Path(model)
+        model_metrics = {}
+        model_metrics["model"] = str(model)
+        model_metrics["loss"] = evaluation_metrics[0]
+
+        for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
+            metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
+            print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
+            model_metrics[metric] = evaluation_metric
+
+        return model_metrics
     else:
         models = [model_path for model_path in Path(model).glob("*.h5")]
         models.sort()
@@ -157,6 +173,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         height, width, channels = input_shape
 
         evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
+        models_metrics = {}
         best_model = {}
 
         for i, model_path in enumerate(models):
@@ -165,28 +182,45 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
             if input_shape:
                 loaded_model = update_model(loaded_model, input_shape)
 
-            loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=["accuracy"])
-            loss, dice = loaded_model.evaluate(evaluate_dataset)
-            print(f"({i+1}/{len(models)}) Model {model_path.name}")
-            print("  - Loss: %.4f" % loss)
-            print("  - Dice: %.4f" % dice)
+            loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[METRICS])
+            evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
+            print(f"Model {str(model_path)}")
+            print(f"  - Loss: {np.round(evaluation_metrics[0], 4)}")
+            for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
+                metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
+                print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
 
+            # Add model metrics to dict
+            models_metrics[model_path.name] = {}
+            models_metrics[model_path.name]["model"] = str(model_path)
+            models_metrics[model_path.name]["loss"] = evaluation_metrics[0]
+            for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
+                metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
+                models_metrics[model_path.name][metric] = evaluation_metric
+
+            # Check for the best model
             if "model" in best_model:
-                if dice > best_model["dice"]:
-                    best_model["model"] = model_path.name
-                    best_model["loss"] = loss
-                    best_model["dice"] = dice
+                if evaluation_metrics[0] > best_model["loss"]:
+                    best_model["model"] = str(model_path)
+                    best_model["loss"] = evaluation_metrics[0]
+                    for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
+                        metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
+                        best_model[metric] = evaluation_metric
             else:
-                best_model["model"] = model_path.name
-                best_model["loss"] = loss
-                best_model["dice"] = dice
+                best_model["model"] = str(model_path)
+                best_model["loss"] = evaluation_metrics[0]
+                for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
+                    metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
+                    best_model[metric] = evaluation_metric
 
             tf.keras.backend.clear_session()
 
-        print(f"\nBest model: {Path(model).joinpath(best_model['model'])}")
-        print("  - Loss: %.4f" % best_model['loss'])
-        print("  - Dice: %.4f" % best_model['dice'])
-        return best_model
+        print(f"\nBest model: {best_model['model']}")
+        print(f"  - Loss: {best_model['loss']}")
+        for metric, value in list(best_model.items())[2:]:
+            print(f"  - {metric}: {np.round(value, 4)}")
+
+        return best_model, models_metrics
 
 
 def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None):
@@ -225,6 +259,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
         prediction = tf.image.resize(prediction[0], original_shape).numpy()
 
+        prediction[:, :, 0] = 0
         prediction[prediction < 0.5] = 0
         prediction[prediction >= 0.5] = 255
         cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
@@ -232,3 +267,36 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         if copy_images:
             shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
         tf.keras.backend.clear_session()
+
+
+def plot_metrics(history, output=".", figsize=(15, 15)):
+    import pandas as pd
+
+    if not isinstance(history, dict):
+        if not isinstance(history, str):
+            print("\nOject type not suported for plotting training history.")
+            return
+        else:
+            if Path(history).is_file():
+                with open(str(history)) as json_file:
+                    history = json.load(json_file)
+
+    validation_metrics = [key for key in history.keys() if key.startswith("val_")]
+    train_metrics = [key.replace("val_", "") for key in validation_metrics]
+    history_keys = train_metrics + validation_metrics + ["lr"]
+
+    df_data = { key: history[key] for key in history_keys }
+    df = pd.DataFrame(df_data)
+    df.index = range(1, len(df.index) + 1)
+
+    output_path = Path(output)
+    output_path.mkdir(exist_ok=True, parents=True)
+
+    validation_image = df[validation_metrics].plot(grid=True, figsize=figsize).get_figure()
+    validation_image.savefig(output_path.joinpath("validation_metrics.png"))
+
+    train_image = df[train_metrics].plot(grid=True, figsize=figsize).get_figure()
+    train_image.savefig(output_path.joinpath("train_metrics.png"))
+
+    lr_image = df[["lr"]].plot(grid=True, figsize=figsize).get_figure()
+    lr_image.savefig(output_path.joinpath("learning_rate.png"))

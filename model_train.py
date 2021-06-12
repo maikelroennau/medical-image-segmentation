@@ -3,13 +3,11 @@ import os
 import time
 from pathlib import Path
 
-import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D, BatchNormalization
+from tensorflow.keras.layers import BatchNormalization, Conv2D, Conv2DTranspose, MaxPooling2D
 from tensorflow.keras.optimizers import Adam
 
-import losses
 import utils
 
 ########
@@ -21,9 +19,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 ########
 ########
 
-seed = 1145
-# tf.random.set_seed(seed)
-# np.random.seed(seed)
+seed = 7613
+tf.random.set_seed(seed)
 
 model_name = "AgNOR"
 
@@ -236,19 +233,28 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 ########
 
-if find_best_model:
-    print("\nEvaluate all models on test data")
-    best_model = utils.evaluate(checkpoint_directory, test_dataset_path, batch_size, input_shape=None, classes=classes, one_hot_encoded=one_hot_encoded)
-    model_path = Path(checkpoint_directory).joinpath(best_model["model"])
-else:
-    model_path = [path for path in Path(checkpoint_directory).glob("*.h5")][-1]
-    print("\nEvaluate last model on test data")
-    utils.evaluate(model_path, test_dataset_path, batch_size, input_shape=None, classes=classes, one_hot_encoded=one_hot_encoded)
+print("\nEvaluate all saved models on test data")
+best_model, models_metrics = utils.evaluate(
+    checkpoint_directory,
+    test_dataset_path,
+    batch_size,
+    input_shape=None,
+    classes=classes,
+    one_hot_encoded=one_hot_encoded)
+
+train_config["best_model"] = best_model
+train_config["models_metrics"] = models_metrics
+model_path = best_model["model"]
+
+with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
+    json.dump(train_config, config_file)
+
+utils.plot_metrics(history.history, output=checkpoint_directory)
 
 ########
 ########
 
-print("\n\nPredict on test data")
+print("\n\nPredict with best model on test data")
 utils.predict(
     model_path,
     images_path=Path(test_dataset_path).joinpath("images"),

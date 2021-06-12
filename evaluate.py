@@ -1,7 +1,6 @@
 import argparse
 import os
 
-import numpy as np
 import tensorflow as tf
 
 from utils import evaluate
@@ -72,7 +71,6 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = str(args.memory_growth).lower()
     tf.random.set_seed(args.seed)
-    np.random.seed(args.seed)
 
     if args.input_shape:
         input_shape = args.input_shape.lower().split("x")
