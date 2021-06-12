@@ -130,10 +130,9 @@ dmypy.json
 
 # Custom directories
 .vscode
-dataset/train/
-dataset/test/
-dataset/validation/
 checkpoints/
+dataset/**
+!dataset/*.py
 
 # Models
 *.h5
