@@ -216,7 +216,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
             tf.keras.backend.clear_session()
 
         print(f"\nBest model: {best_model['model']}")
-        print(f"  - Loss: {best_model['loss']}")
+        print(f"  - Loss: {np.round(best_model['loss'], 4)}")
         for metric, value in list(best_model.items())[2:]:
             print(f"  - {metric}: {np.round(value, 4)}")
 
