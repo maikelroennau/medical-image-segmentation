@@ -3,6 +3,7 @@ import os
 import time
 from pathlib import Path
 
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.layers import BatchNormalization, Conv2D, Conv2DTranspose, MaxPooling2D
@@ -20,26 +21,27 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 ########
 
 seed = 7613
+np.random.seed(seed)
 tf.random.set_seed(seed)
 
 model_name = "AgNOR"
 
-epochs = 10
-batch_size = 1
-steps_per_epoch = 60
+epochs = 100
+batch_size = 10
+steps_per_epoch = 240
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
-learning_rate = 1e-4
+learning_rate = 1e-5
 one_hot_encoded = True if classes > 1 else False
 find_best_model = True
 
-train_dataset_path = "dataset/train/"
-validation_dataset_path = "dataset/validation/"
-test_dataset_path = "dataset/test/"
+train_dataset_path = "dataset/augmentation/train/"
+validation_dataset_path = "dataset/augmentation/validation/"
+test_dataset_path = "dataset/augmentation/test/"
 
 ########
 ########
