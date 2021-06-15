@@ -21,8 +21,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 ########
 
 seed = 7613
-np.random.seed(seed)
-tf.random.set_seed(seed)
+# np.random.seed(seed)
+# tf.random.set_seed(seed)
 
 model_name = "AgNOR"
 
