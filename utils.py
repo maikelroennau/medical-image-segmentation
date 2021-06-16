@@ -61,7 +61,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.image.resize(image, target_shape)
-    # image = image / 255.
+    image = image / 255.
 
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
@@ -72,41 +72,43 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
         mask = tf.one_hot(mask, depth=classes, axis=2, dtype=tf.int32)
         mask = tf.squeeze(mask)
 
-    if classes > 1:
-        slices = []
-        for i in range(classes):
-            if i == 0:
-                slices.append(tf.scalar_mul(0, mask[:, :, i]))
-            else:
-                slices.append(tf.scalar_mul(1, mask[:, :, i]))
-
-        mask = tf.stack(slices, axis=-1)
+    mask = tf.cast(mask, dtype=tf.float32)
 
     return image, mask
 
 
-def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, seed=7613):
-    images_path = Path(path).joinpath("images")
-    masks_path = Path(path).joinpath("masks")
+def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, validate_masks=False, seed=7613):
+    if validate_masks:
+        images_path = Path(path).joinpath("images")
+        masks_path = Path(path).joinpath("masks")
 
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-    masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
+        supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+        images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
+        masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
 
-    images_paths.sort()
-    masks_paths.sort()
+        images_paths.sort()
+        masks_paths.sort()
 
-    assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
+        assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
 
-    for image_path, mask_path in zip(images_paths, masks_paths):
-        assert image_path.stem.lower() == mask_path.stem.lower(), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
+        for image_path, mask_path in zip(images_paths, masks_paths):
+            assert image_path.stem.lower() == mask_path.stem.lower(), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
 
-    print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
+        print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
 
-    images_paths = [str(image_path) for image_path in images_paths]
-    masks_paths = [str(masks_path) for masks_path in masks_paths]
-    dataset_files = tf.data.Dataset.from_tensor_slices((images_paths, masks_paths))
-    dataset = dataset_files.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
+        images_paths = [str(image_path) for image_path in images_paths]
+        masks_paths = [str(masks_path) for masks_path in masks_paths]
+        dataset = tf.data.Dataset.from_tensor_slices((images_paths, masks_paths))
+    else:
+        images_path = Path(path).joinpath("images").joinpath("*.*")
+        masks_path = Path(path).joinpath("masks").joinpath("*.*")
+
+        images = tf.data.Dataset.list_files(str(images_path), shuffle=True, seed=seed)
+        masks = tf.data.Dataset.list_files(str(masks_path), shuffle=True, seed=seed)
+        dataset = tf.data.Dataset.zip((images, masks))
+        print(f"Dataset '{str(images_path.parent)}' contains {dataset.cardinality()} images and masks.")
+
+    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
 
     if shuffle:
         dataset = dataset.shuffle(buffer_size=batch_size * 2, seed=seed)

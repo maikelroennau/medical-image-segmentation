@@ -21,13 +21,13 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 ########
 
 seed = 7613
-# np.random.seed(seed)
-# tf.random.set_seed(seed)
+np.random.seed(seed)
+tf.random.set_seed(seed)
 
 model_name = "AgNOR"
 
 epochs = 100
-batch_size = 10
+batch_size = 1
 steps_per_epoch = 240
 
 height = 960 # 240 480 960 1920
@@ -53,14 +53,16 @@ train_dataset = utils.load_dataset(
     repeat=True,
     shuffle=True,
     classes=classes,
-    one_hot_encoded=one_hot_encoded)
+    one_hot_encoded=one_hot_encoded,
+    validate_masks=True)
 
 validation_dataset = utils.load_dataset(
     validation_dataset_path,
     batch_size=batch_size,
     target_shape=(height, width),
     classes=classes,
-    one_hot_encoded=one_hot_encoded)
+    one_hot_encoded=one_hot_encoded,
+    validate_masks=True)
 
 ########
 ########
