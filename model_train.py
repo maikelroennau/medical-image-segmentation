@@ -9,6 +9,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.layers import BatchNormalization, Conv2D, Conv2DTranspose, MaxPooling2D
 from tensorflow.keras.optimizers import Adam
 
+import losses
 import utils
 
 ########
@@ -35,7 +36,7 @@ width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
-learning_rate = 1e-5
+learning_rate = 1e-4
 one_hot_encoded = True if classes > 1 else False
 find_best_model = True
 
@@ -135,7 +136,7 @@ def make_model(input_shape, classes, model_name="U-Net"):
 
     model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
-    model.compile(optimizer=Adam(lr=learning_rate), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=["accuracy"])
+    model.compile(optimizer=Adam(lr=learning_rate), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[losses.dice_coef])
 
     return model
 

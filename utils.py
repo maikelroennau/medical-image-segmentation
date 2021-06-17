@@ -202,7 +202,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
 
             # Check for the best model
             if "model" in best_model:
-                if evaluation_metrics[0] > best_model["loss"]:
+                if evaluation_metrics[0] < best_model["loss"]:
                     best_model["model"] = str(model_path)
                     best_model["loss"] = evaluation_metrics[0]
                     for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
