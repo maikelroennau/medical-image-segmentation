@@ -16,7 +16,8 @@ CUSTOM_OBJECTS = {
     "dice_coef": losses.dice_coef,
     "dice_coef_loss": losses.dice_coef_loss,
     "jaccard_index": losses.jaccard_index,
-    "jaccard_index_loss": losses.jaccard_index_loss
+    "jaccard_index_loss": losses.jaccard_index_loss,
+    "weighted_categorical_crossentropy": losses.weighted_categorical_crossentropy
 }
 
 METRICS = [
@@ -234,7 +235,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
             models = [model_path for model_path in model.glob("*.h5")]
             if len(models) > 0:
                 print(f"No models found at {str(model)}")
-                for i, model_path in enumerate(models):
+                for model_path in models:
                     predict(model_path, images_path, batch_size, output_path=str(model.joinpath("predictions").joinpath(model_path.name)), copy_images=copy_images, new_input_shape=new_input_shape)
             return
     else:
