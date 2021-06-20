@@ -227,7 +227,16 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
 
 def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None):
     if isinstance(model, str) or isinstance(model, Path):
-        loaded_model = tf.keras.models.load_model(str(model), custom_objects=CUSTOM_OBJECTS)
+        model = Path(model)
+        if model.is_file():
+            loaded_model = tf.keras.models.load_model(str(model), custom_objects=CUSTOM_OBJECTS)
+        elif model.is_dir():
+            models = [model_path for model_path in model.glob("*.h5")]
+            if len(models) > 0:
+                print(f"No models found at {str(model)}")
+                for i, model_path in enumerate(models):
+                    predict(model_path, images_path, batch_size, output_path=str(model.joinpath("predictions").joinpath(model_path.name)), copy_images=copy_images, new_input_shape=new_input_shape)
+            return
     else:
         loaded_model = model
 
@@ -261,7 +270,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
         prediction = tf.image.resize(prediction[0], original_shape).numpy()
 
-        prediction[:, :, 0] = 0
+        # prediction[:, :, 0] = 0
         prediction[prediction < 0.5] = 0
         prediction[prediction >= 0.5] = 255
         cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
