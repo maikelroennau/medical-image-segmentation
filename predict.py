@@ -44,7 +44,7 @@ def main():
         "-c",
         "--copy-images",
         help="Copy predicted images to output directory. Only effective when `--output` is provided.",
-        default=True,
+        default=False,
         action="store_true")
 
     parser.add_argument(
@@ -76,9 +76,6 @@ def main():
         output = Path(args.images)
     else:
         output = args.output
-
-    if args.output != output:
-        args.copy_images = False
 
     predict(
         model=args.model,
