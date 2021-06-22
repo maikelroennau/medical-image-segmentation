@@ -167,7 +167,11 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         models = [model_path for model_path in Path(model).glob("*.h5")]
         models.sort()
 
-        loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects=CUSTOM_OBJECTS)
+        if len(models) > 0:
+            loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects=CUSTOM_OBJECTS)
+        else:
+            print("No models found")
+            return None, None
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
@@ -234,12 +238,15 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         elif model.is_dir():
             models = [model_path for model_path in model.glob("*.h5")]
             if len(models) > 0:
-                print(f"No models found at {str(model)}")
+                print(f"No model(s) found at {str(model)}")
                 for model_path in models:
                     predict(model_path, images_path, batch_size, output_path=str(model.joinpath("predictions").joinpath(model_path.name)), copy_images=copy_images, new_input_shape=new_input_shape)
             return
-    else:
+    elif model != None:
         loaded_model = model
+    else:
+        print("No model(s) found")
+        return
 
     if new_input_shape:
         loaded_model = update_model(loaded_model, new_input_shape)
