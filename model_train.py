@@ -26,6 +26,7 @@ np.random.seed(seed)
 tf.random.set_seed(seed)
 
 model_name = "AgNOR"
+description = """Experiment description."""
 
 epochs = 50
 batch_size = 1
@@ -163,6 +164,7 @@ callbacks = [
 
 train_config = {
     "model_name": model.name,
+    "description": description,
     "seed": seed,
     "classes": classes,
     "epochs": epochs,
