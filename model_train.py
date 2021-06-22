@@ -27,7 +27,7 @@ tf.random.set_seed(seed)
 
 model_name = "AgNOR"
 
-epochs = 20
+epochs = 50
 batch_size = 1
 steps_per_epoch = 240
 
@@ -43,6 +43,9 @@ find_best_model = True
 train_dataset_path = "dataset/augmentation/train/"
 validation_dataset_path = "dataset/augmentation/validation/"
 test_dataset_path = "dataset/augmentation/test/"
+
+loss_function = losses.weighted_categorical_crossentropy
+metrics = [losses.dice_coef]
 
 ########
 ########
@@ -136,7 +139,7 @@ def make_model(input_shape, classes, model_name="U-Net"):
 
     model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
-    model.compile(optimizer=Adam(lr=learning_rate), loss=losses.weighted_categorical_crossentropy, metrics=[losses.dice_coef])
+    model.compile(optimizer=Adam(lr=learning_rate), loss=loss_function, metrics=metrics)
 
     return model
 
@@ -167,6 +170,8 @@ train_config = {
     "steps_per_epoch": steps_per_epoch,
     "input_shape": input_shape,
     "one_hot_encoded": one_hot_encoded,
+    "loss_fuction": loss_function.__name__,
+    "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
     "initial_learning_rate": model.optimizer.get_config()['learning_rate'],
     "train_dataset": train_dataset_path,
     "validation_dataset": validation_dataset_path,
@@ -180,7 +185,7 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 
 start = time.time()
-print(f"Training start - {time.strftime('%x %X')}")
+print(f"Training start: {time.strftime('%x %X')}")
 print(f"  - Model name: {model.name}")
 print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
@@ -189,6 +194,8 @@ print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - One hot encoded: {one_hot_encoded}")
+print(f"  - Loss function: {loss_function.__name__}")
+print(f"  - Metrics: {[metric if isinstance(metric, str) else metric.__name__ for metric in metrics]}")
 print(f"  - Initial Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}")
 print(f"  - Dataset:")
@@ -198,39 +205,49 @@ print(f"    - Test: {test_dataset_path}\n")
 
 tf.keras.backend.clear_session()
 
-history = model.fit(
-    train_dataset,
-    epochs=epochs,
-    steps_per_epoch=steps_per_epoch,
-    validation_data=validation_dataset,
-    callbacks=callbacks)
+try:
+    history = model.fit(
+        train_dataset,
+        epochs=epochs,
+        steps_per_epoch=steps_per_epoch,
+        validation_data=validation_dataset,
+        callbacks=callbacks)
+except Exception as e:
+    print(f"\nThere was an error during training that caused it to stop: \n{e}")
+    history = None
 
 end = time.time()
-print(f"\nTraining end - {time.strftime('%x %X')}")
 hours, rem = divmod(end-start, 3600)
 minutes, seconds = divmod(rem, 60)
 duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
+train_config["duration"] = duration
+
+print(f"Training start: {time.strftime('%x %X')}")
+print(f"Training end: {time.strftime('%x %X')}")
 print(f"Duration: {duration}")
 print(f"  - Model name: {model.name}")
+print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
 print(f"  - Epochs: {epochs}")
 print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - One hot encoded: {one_hot_encoded}")
-print(f"  - Checkpoints saved at: {checkpoint_directory}")
+print(f"  - Loss function: {loss_function.__name__}")
+print(f"  - Metrics: {[metric if isinstance(metric, str) else metric.__name__ for metric in metrics]}")
+print(f"  - Initial Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}")
+print(f"  - Checkpoints saved at: {checkpoint_directory}")
 print(f"  - Dataset:")
 print(f"    - Train: {train_dataset_path}")
 print(f"    - Validation: {validation_dataset_path}")
 print(f"    - Test: {test_dataset_path}\n")
 
-train_config["duration"] = duration
-history_data = history.history
-
-for k, v in history_data.items():
-    v = [float(i) for i in v]
-    train_config[k] = v
+if history:
+    history_data = history.history
+    for k, v in history_data.items():
+        v = [float(i) for i in v]
+        train_config[k] = v
 
 with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
     json.dump(train_config, config_file)
@@ -238,7 +255,7 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 ########
 
-print("\nEvaluate all saved models on test data")
+print(f"\nEvaluate all saved models on test data '{test_dataset_path}'")
 best_model, models_metrics = utils.evaluate(
     checkpoint_directory,
     test_dataset_path,
@@ -247,19 +264,22 @@ best_model, models_metrics = utils.evaluate(
     classes=classes,
     one_hot_encoded=one_hot_encoded)
 
-train_config["best_model"] = best_model
-train_config["models_metrics"] = models_metrics
-model_path = best_model["model"]
+if best_model is not None or models_metrics is not None:
+    train_config["best_model"] = best_model
+    train_config["models_metrics"] = models_metrics
+    model_path = best_model["model"]
 
-with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
-    json.dump(train_config, config_file)
+    with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
+        json.dump(train_config, config_file)
 
-utils.plot_metrics(history.history, output=checkpoint_directory)
+    utils.plot_metrics(history.history, output=checkpoint_directory)
+else:
+    model_path = None
 
 ########
 ########
 
-print("\n\nPredict with best model on test data")
+print(f"\n\nPredict with best model on test data '{test_dataset_path}'")
 utils.predict(
     model_path,
     images_path=Path(test_dataset_path).joinpath("images"),
