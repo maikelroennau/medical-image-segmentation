@@ -39,12 +39,12 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
     masks_path.mkdir(exist_ok=True, parents=True)
 
     if max_batches:
-        if max_batches > dataset.cardinality():
-            batches = dataset.cardinality()
+        if max_batches > len(dataset):
+            batches = len(dataset)
         else:
             batches = max_batches
     else:
-        batches = dataset.cardinality()
+        batches = len(dataset)
 
     for i, batch in tqdm(enumerate(dataset), total=batches):
         for j, (image, mask) in enumerate(zip(batch[0], batch[1])):
@@ -107,7 +107,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         images = tf.data.Dataset.list_files(str(images_path), shuffle=True, seed=seed)
         masks = tf.data.Dataset.list_files(str(masks_path), shuffle=True, seed=seed)
         dataset = tf.data.Dataset.zip((images, masks))
-        print(f"Dataset '{str(images_path.parent)}' contains {dataset.cardinality()} images and masks.")
+        print(f"Dataset '{str(images_path.parent)}' contains {len(dataset)} images and masks.")
 
     dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
 
@@ -126,7 +126,6 @@ def update_model(model, input_shape):
     model_json = json.loads(model.to_json())
 
     model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
-    # model_json["config"]["layers"][1]["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
     model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
 
     updated_model = tf.keras.models.model_from_json(json.dumps(model_json))
@@ -311,20 +310,26 @@ def plot_metrics(history, output=".", figsize=(15, 15)):
     output_path = Path(output)
     output_path.mkdir(exist_ok=True, parents=True)
 
-    validation_image = df[validation_metrics].plot(grid=True, figsize=figsize).get_figure()
-    validation_image.savefig(output_path.joinpath("validation_metrics.png"))
+    train_image = df[train_metrics].plot(grid=True, figsize=figsize)
+    train_image.set(xlabel="Epoch", title="Train metrics")
+    train_image = train_image.get_figure()
+    train_image.savefig(output_path.joinpath("01_train_metrics.png"))
 
-    train_image = df[train_metrics].plot(grid=True, figsize=figsize).get_figure()
-    train_image.savefig(output_path.joinpath("train_metrics.png"))
+    validation_image = df[validation_metrics].plot(grid=True, figsize=figsize)
+    validation_image.set(xlabel="Epoch", title="Validation metrics")
+    validation_image = validation_image.get_figure()
+    validation_image.savefig(output_path.joinpath("02_validation_metrics.png"))
 
-    lr_image = df[["lr"]].plot(grid=True, figsize=figsize).get_figure()
-    lr_image.savefig(output_path.joinpath("learning_rate.png"))
+    lr_image = df[["lr"]].plot(grid=True, figsize=figsize)
+    lr_image.set(xlabel="Epoch", title="Learning rate")
+    lr_image = lr_image.get_figure()
+    lr_image.savefig(output_path.joinpath("03_learning_rate.png"))
 
 
-def compute_class_weights(dataset, batches=1, plot=True, figsize=(20, 10), output="."):
+def compute_classes_weights(dataset, batches=1, plot=True, figsize=(20, 10), output="."):
     class_occurence = []
 
-    for i, batch in tqdm(enumerate(dataset), total=batches):
+    for i, batch in enumerate(dataset):
         if i == batches:
             break
 
@@ -343,19 +348,21 @@ def compute_class_weights(dataset, batches=1, plot=True, figsize=(20, 10), outpu
 
     if plot:
         import pandas as pd
+
         output_path = Path(output)
         output_path.mkdir(exist_ok=True, parents=True)
+
         df = pd.DataFrame(class_occurence.numpy(), columns=["Background", "Nucleus", "NOR"])
         class_weights_figure = df.plot.bar(stacked=True, figsize=figsize)
         class_weights_figure.set(xlabel="Image instance", ylabel="Number of pixels", title="Pixel class distribution (dataset)")
         class_weights_figure = class_weights_figure.get_figure()
-        class_weights_figure.savefig(output_path.joinpath("class_weights.png"))
+        class_weights_figure.savefig(output_path.joinpath("classes_distribution.png"))
 
         df = pd.DataFrame(class_weights.values()).transpose()
         df.columns = ["Background", "Nucleus", "NOR"]
         class_weights_figure = df.plot.bar(stacked=True, figsize=(10, 10))
         class_weights_figure.set(ylabel="Number of pixels", title="Pixel class distribution (dataset mean)")
         class_weights_figure = class_weights_figure.get_figure()
-        class_weights_figure.savefig(output_path.joinpath("class_weights_dataset_mean.png"))
+        class_weights_figure.savefig(output_path.joinpath("classes_distribution_dataset_mean.png"))
 
     return class_weights

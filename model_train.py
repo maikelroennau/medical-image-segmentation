@@ -39,7 +39,6 @@ input_shape = (height, width, 3)
 classes = 3
 learning_rate = 1e-4
 one_hot_encoded = True if classes > 1 else False
-find_best_model = True
 
 train_dataset_path = "dataset/augmentation/train/"
 validation_dataset_path = "dataset/augmentation/validation/"
@@ -186,8 +185,16 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 ########
 ########
 
+classes_weights = utils.compute_classes_weights(train_dataset, batches=steps_per_epoch//batch_size, plot=True, output=checkpoint_directory)
+print("\nClasses weights:")
+for class_number, weight in classes_weights.items():
+    print(f"  - Class {class_number}: {weight}")
+
+########
+########
+
 start = time.time()
-print(f"Training start: {time.strftime('%x %X')}")
+print(f"\nTraining start: {time.strftime('%x %X')}")
 print(f"  - Model name: {model.name}")
 print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
