@@ -171,7 +171,7 @@ train_config = {
     "steps_per_epoch": steps_per_epoch,
     "input_shape": input_shape,
     "one_hot_encoded": one_hot_encoded,
-    "loss_fuction": loss_function.__name__,
+    "loss_fuction": loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name,
     "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
     "initial_learning_rate": model.optimizer.get_config()['learning_rate'],
     "train_dataset": train_dataset_path,
@@ -203,7 +203,7 @@ print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - One hot encoded: {one_hot_encoded}")
-print(f"  - Loss function: {loss_function.__name__}")
+print(f"  - Loss function: {loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name}")
 print(f"  - Metrics: {[metric if isinstance(metric, str) else metric.__name__ for metric in metrics]}")
 print(f"  - Initial Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Checkpoints saved at: {checkpoint_directory}")
@@ -242,7 +242,7 @@ print(f"  - Steps per epoch: {steps_per_epoch}")
 print(f"  - Batch size: {batch_size}")
 print(f"  - Input shape: {input_shape}")
 print(f"  - One hot encoded: {one_hot_encoded}")
-print(f"  - Loss function: {loss_function.__name__}")
+print(f"  - Loss function: {loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name}")
 print(f"  - Metrics: {[metric if isinstance(metric, str) else metric.__name__ for metric in metrics]}")
 print(f"  - Initial Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}")
