@@ -62,6 +62,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
     image = tf.io.read_file(image_path)
     image = tf.image.decode_png(image, channels=3)
     image = tf.image.resize(image, target_shape, method="nearest")
+    image = tf.cast(image, dtype=tf.float32)
     image = image / 255.
 
     mask = tf.io.read_file(mask_path)
