@@ -61,12 +61,12 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
 def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_hot_encoded=False):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_png(image, channels=3)
-    image = tf.image.resize(image, target_shape)
+    image = tf.image.resize(image, target_shape, method="nearest")
     image = image / 255.
 
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
-    mask = tf.image.resize(mask, target_shape)
+    mask = tf.image.resize(mask, target_shape, method="nearest")
 
     if one_hot_encoded:
         mask = tf.cast(mask, dtype=tf.int32)
