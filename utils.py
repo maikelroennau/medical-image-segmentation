@@ -48,7 +48,7 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
 
     for i, batch in tqdm(enumerate(dataset), total=batches):
         for j, (image, mask) in enumerate(zip(batch[0], batch[1])):
-            image_name = str(images_path.joinpath(f"batch_{i}_{j}.jpg"))
+            image_name = str(images_path.joinpath(f"batch_{i}_{j}.png"))
             mask_name = str(masks_path.joinpath(f"batch_{i}_{j}.png"))
             tf.keras.preprocessing.image.save_img(image_name, image)
             tf.keras.preprocessing.image.save_img(mask_name, mask)
@@ -60,7 +60,7 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
 
 def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_hot_encoded=False):
     image = tf.io.read_file(image_path)
-    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.decode_png(image, channels=3)
     image = tf.image.resize(image, target_shape)
     image = image / 255.
 
