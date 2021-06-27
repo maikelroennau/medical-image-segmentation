@@ -141,7 +141,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
 
-        loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[METRICS])
+        loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[METRICS])
 
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
@@ -189,7 +189,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
             if input_shape:
                 loaded_model = update_model(loaded_model, input_shape)
 
-            loaded_model.compile(optimizer=Adam(lr=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[METRICS])
+            loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[METRICS])
             evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
             print(f"Model {str(model_path)}")
             print(f"  - Loss: {np.round(evaluation_metrics[0], 4)}")

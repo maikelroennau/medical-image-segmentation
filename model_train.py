@@ -140,7 +140,7 @@ def make_model(input_shape, classes, model_name="U-Net"):
 
     model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
-    model.compile(optimizer=Adam(lr=learning_rate), loss=loss_function, metrics=metrics)
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
 
     return model
 
