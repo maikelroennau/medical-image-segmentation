@@ -94,7 +94,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
 
         for image_path, mask_path in zip(images_paths, masks_paths):
-            assert image_path.stem.lower() == mask_path.stem.lower(), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
+            assert image_path.stem.lower().replace("image", "") == mask_path.stem.lower().replace("mask", ""), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
 
         print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
 
