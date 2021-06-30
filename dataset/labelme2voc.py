@@ -1,6 +1,6 @@
 import argparse
 import glob
-import os.path as osp
+import os
 from pathlib import Path
 
 import cv2
@@ -58,12 +58,12 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
             viz_dir.mkdir(exist_ok=True, parents=True)
 
 
-        for filename in tqdm(glob.glob(osp.join(input_dir, "*.json")), desc=res_name):
+        for filename in tqdm(glob.glob(os.path.join(input_dir, "*.json")), desc=res_name):
             label_file = labelme.LabelFile(filename=filename)
             if filter_labels:
                 label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in filter_labels]
 
-            base = osp.splitext(osp.basename(filename))[0]
+            base = os.path.splitext(os.path.basename(filename))[0]
             out_img_file = str(images_dir.joinpath(base + ".png"))
             out_png_file = str(segmentation_dir.joinpath(base + ".png"))
 
