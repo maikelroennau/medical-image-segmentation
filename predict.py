@@ -48,6 +48,13 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "-n",
+        "--normalize",
+        help="Normalize input images in range [0, 1].",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -83,6 +90,7 @@ def main():
         batch_size=args.batch_size,
         output_path=output,
         copy_images=args.copy_images,
+        normalize=args.normalize,
         new_input_shape=input_shape)
 
 
