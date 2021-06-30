@@ -6,8 +6,8 @@ import numpy as np
 from tqdm import tqdm
 
 
-def slice_images(path, height, width, filter, output):
-    input_path = Path(path)
+def slice_images(input_dir, height, width, filter, output):
+    input_path = Path(input_dir)
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
     images_paths = [image_path for image_path in input_path.joinpath("images").glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
     masks_paths = [mask_path for mask_path in input_path.joinpath("masks").glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
@@ -20,7 +20,11 @@ def slice_images(path, height, width, filter, output):
     for image, mask in zip(images_paths, masks_paths):
         assert image.stem.lower() == mask.stem.lower(), f"Image and mask do not correspond: {image.name} <==> {image.name}"
 
-    output = input_path.joinpath(output)
+    if output:
+        output = Path(output)
+        output.mkdir(exist_ok=True, parents=True)
+    else:
+        output = input_path.joinpath("sliced")
 
     for image_path, mask_path in tqdm(zip(images_paths, masks_paths), total=len(images_paths)):
         image = cv2.imread(str(image_path))
@@ -54,8 +58,8 @@ def main():
     parser = argparse.ArgumentParser(description="Slice")
 
     parser.add_argument(
-        "-p",
-        "--path",
+        "-i",
+        "--input-dir",
         help="Path to the images directory.",
         type=str)
 
@@ -79,12 +83,12 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        help="Path where to save the sliced images.",
-        default="sliced",
+        help="Path where to save the sliced images. If not specified, will save in `input-dir`.",
+        default=None,
         type=str)
 
     args = parser.parse_args()
-    slice_images(args.path, args.height, args.width, args.filter_empty, args.output)
+    slice_images(args.input_dir, args.height, args.width, args.filter_empty, args.output)
 
 
 if __name__ == "__main__":
