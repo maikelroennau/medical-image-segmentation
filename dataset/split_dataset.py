@@ -50,7 +50,9 @@ def split_dataset(input_dir, output_dir, multiple_datasets, train, validation, t
 
         if len(datasets) > 1:
             dataset_output_dir = output_dir.joinpath(dataset.name)
-        output_dir.mkdir(exist_ok=True, parents=True)
+        else:
+            dataset_output_dir = output_dir
+        dataset_output_dir.mkdir(exist_ok=True, parents=True)
 
         train_images = dataset_output_dir.joinpath("train").joinpath("images")
         train_masks = dataset_output_dir.joinpath("train").joinpath("masks")
