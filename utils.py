@@ -230,7 +230,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         return best_model, models_metrics
 
 
-def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None):
+def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None, normalize=False):
     if isinstance(model, str) or isinstance(model, Path):
         model = Path(model)
         if model.is_file():
@@ -269,9 +269,13 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
 
     for image_path in images:
         image = tf.io.read_file(str(image_path))
-        image = tf.image.decode_jpeg(image, channels=3)
+        image = tf.image.decode_png(image, channels=3)
         original_shape = image.shape[:2]
         image = tf.image.resize(image, (height, width))
+        
+        if normalize:
+            image = tf.cast(image, dtype=tf.float32)
+            image = image / 255.
 
         images_tensor[0, :, :, :] = image
 
