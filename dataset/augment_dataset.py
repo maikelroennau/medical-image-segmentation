@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-from unicodedata import numeric
 
 import albumentations as A
 import cv2
@@ -10,7 +9,10 @@ from tqdm import tqdm
 
 def get_transformations():
     transformations = []
-
+    
+    ###########
+    ## Set 1 ##
+    ###########
     transformations.append(
         A.Compose([
             A.HorizontalFlip(p=1)
@@ -30,23 +32,47 @@ def get_transformations():
         ])
     )
 
+    ###########
+    ## Set 2 ##
+    ###########
+    transformations.append(
+        A.Compose([
+            A.HorizontalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+        ])
+    )
+
+    transformations.append(
+        A.Compose([
+            A.VerticalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+        ])
+    )
+
+    transformations.append(
+        A.Compose([
+            A.HorizontalFlip(p=1),
+            A.VerticalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+        ])
+    )
+
+    ###########
+    ## Set 3 ##
+    ###########
     transformations.append(
         A.Compose([
             A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+            A.HorizontalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
         ])
     )
 
     transformations.append(
         A.Compose([
             A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-            A.HorizontalFlip(p=1)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-            A.VerticalFlip(p=1)
+            A.VerticalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
         ])
     )
 
@@ -54,7 +80,35 @@ def get_transformations():
         A.Compose([
             A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
             A.HorizontalFlip(p=1),
-            A.VerticalFlip(p=1)
+            A.VerticalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+        ])
+    )
+
+    transformations.append(
+        A.Compose([
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+            A.HorizontalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+            A.VerticalFlip(p=1),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+        ])
+    )
+
+    ###########
+    ## Set 4 ##
+    ###########
+    transformations.append(
+        A.Compose([
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+        ])
+    )
+
+    transformations.append(
+        A.Compose([
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+
         ])
     )
 
@@ -83,7 +137,7 @@ def augment_dataset(input_dir, output_dir, seed=None):
 
     print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
 
-    tranformations = get_transformations()
+    transformations = get_transformations()
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
 
@@ -100,7 +154,7 @@ def augment_dataset(input_dir, output_dir, seed=None):
         cv2.imwrite(str(images_output.joinpath(f"{i}_image_{image_path.name}")), image)
         cv2.imwrite(str(masks_output.joinpath(f"{i}_mask_{mask_path.name}")), mask)
 
-        for j, tranformation in enumerate(tranformations):
+        for j, tranformation in enumerate(transformations):
             transormed = tranformation(image=image, mask=mask)
             transformed_image = transormed["image"]
             transformed_mask = transormed["mask"]
