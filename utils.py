@@ -58,6 +58,34 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
             break
 
 
+def list_files(path, validate_masks=False):
+    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+
+    images_path = Path(path).joinpath("images")
+    masks_path = Path(path).joinpath("masks")
+
+    images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
+    masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
+
+    assert len(images_paths) > 0, f"No images found at '{images_path}'."
+    assert len(masks_paths) > 0, f"No masks found at '{masks_paths}'."
+
+    images_paths.sort()
+    masks_paths.sort()
+
+    if validate_masks:
+        assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
+
+        for image_path, mask_path in zip(images_paths, masks_paths):
+            assert image_path.stem.lower().replace("image", "") == mask_path.stem.lower().replace("mask", ""), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
+
+    print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
+
+    images_paths = [str(image_path) for image_path in images_paths]
+    masks_paths = [str(masks_path) for masks_path in masks_paths]
+    return images_paths, masks_paths
+
+
 def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_hot_encoded=False):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_png(image, channels=3)
@@ -81,33 +109,19 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
 
 def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, validate_masks=False, seed=7613):
     if validate_masks:
-        images_path = Path(path).joinpath("images")
-        masks_path = Path(path).joinpath("masks")
-
-        supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-        images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-        masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
-
-        images_paths.sort()
-        masks_paths.sort()
-
-        assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
-
-        for image_path, mask_path in zip(images_paths, masks_paths):
-            assert image_path.stem.lower().replace("image", "") == mask_path.stem.lower().replace("mask", ""), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
-
-        print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
-
-        images_paths = [str(image_path) for image_path in images_paths]
-        masks_paths = [str(masks_path) for masks_path in masks_paths]
+        images_paths, masks_paths = list_files(path, validate_masks=validate_masks)
         dataset = tf.data.Dataset.from_tensor_slices((images_paths, masks_paths))
     else:
         images_path = Path(path).joinpath("images").joinpath("*.*")
         masks_path = Path(path).joinpath("masks").joinpath("*.*")
 
-        images = tf.data.Dataset.list_files(str(images_path), shuffle=True, seed=seed)
-        masks = tf.data.Dataset.list_files(str(masks_path), shuffle=True, seed=seed)
-        dataset = tf.data.Dataset.zip((images, masks))
+        images_paths = tf.data.Dataset.list_files(str(images_path), shuffle=True, seed=seed)
+        masks_paths = tf.data.Dataset.list_files(str(masks_path), shuffle=True, seed=seed)
+
+        assert len(images_paths) > 0, f"No images found at '{images_path}'."
+        assert len(masks_paths) > 0, f"No masks found at '{masks_path}'."
+
+        dataset = tf.data.Dataset.zip((images_paths, masks_paths))
         print(f"Dataset '{str(images_path.parent)}' contains {len(dataset)} images and masks.")
 
     dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
