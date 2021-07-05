@@ -124,7 +124,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         dataset = tf.data.Dataset.zip((images_paths, masks_paths))
         print(f"Dataset '{str(images_path.parent)}' contains {len(dataset)} images and masks.")
 
-    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
+    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if shuffle:
         dataset = dataset.shuffle(buffer_size=batch_size * 2, seed=seed)
@@ -285,7 +285,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         image = tf.io.read_file(str(image_path))
         image = tf.image.decode_png(image, channels=3)
         original_shape = image.shape[:2]
-        image = tf.image.resize(image, (height, width))
+        image = tf.image.resize(image, (height, width), method="nearest")
         
         if normalize:
             image = tf.cast(image, dtype=tf.float32)
@@ -294,7 +294,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         images_tensor[0, :, :, :] = image
 
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
-        prediction = tf.image.resize(prediction[0], original_shape).numpy()
+        prediction = tf.image.resize(prediction[0], original_shape, method="nearest").numpy()
 
         # prediction[:, :, 0] = 0
         prediction[prediction < 0.5] = 0
