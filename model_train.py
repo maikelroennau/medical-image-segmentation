@@ -221,7 +221,7 @@ try:
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
         validation_data=validation_dataset,
-        callbacks=callbacks)    
+        callbacks=callbacks)
 except Exception as e:
     print(f"\nThere was an error during training that caused it to stop: \n{e}")
     train_config["error"] = str(e)
