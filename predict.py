@@ -77,12 +77,12 @@ def main():
     else:
         input_shape = None
 
-    if not args.output and Path(args.images).is_file():
-        output = Path(args.images).parent
-    elif not args.output and not Path(args.images).is_file():
-        output = Path(args.images)
-    else:
+    if args.output:
         output = args.output
+    elif not args.output and Path(args.model).is_file():
+        output = Path(args.images)
+    elif not args.output and Path(args.model).is_dir():
+        output = Path(args.model).joinpath("predictions")
 
     predict(
         model=args.model,

@@ -254,7 +254,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
             if len(models) > 0:
                 print(f"No model(s) found at {str(model)}")
                 for model_path in models:
-                    predict(model_path, images_path, batch_size, output_path=str(model.joinpath("predictions").joinpath(model_path.name)), copy_images=copy_images, new_input_shape=new_input_shape)
+                    predict(model_path, images_path, batch_size, output_path=str(Path(output_path).joinpath(model_path.name)), copy_images=copy_images, new_input_shape=new_input_shape)
             return
     elif model != None:
         loaded_model = model
