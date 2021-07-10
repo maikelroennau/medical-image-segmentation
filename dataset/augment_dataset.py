@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 import albumentations as A
+from albumentations.augmentations.transforms import GridDistortion
 import cv2
 import numpy as np
 from tqdm import tqdm
@@ -9,89 +10,42 @@ from tqdm import tqdm
 
 def get_transformations():
     transformations = []
-    
+
     ###########
     ## Set 1 ##
     ###########
     transformations.append(
         A.Compose([
-            A.HorizontalFlip(p=1)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.VerticalFlip(p=1)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.HorizontalFlip(p=1),
-            A.VerticalFlip(p=1)
-        ])
-    )
-
-    ###########
-    ## Set 2 ##
-    ###########
-    transformations.append(
-        A.Compose([
-            A.HorizontalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
         ])
     )
 
     transformations.append(
         A.Compose([
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
         ])
     )
 
     transformations.append(
         A.Compose([
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.HorizontalFlip(p=1),
             A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
         ])
     )
 
-    ###########
-    ## Set 3 ##
-    ###########
     transformations.append(
         A.Compose([
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.HorizontalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-            A.HorizontalFlip(p=1),
-            A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-            A.HorizontalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-            A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
         ])
     )
 
@@ -100,15 +54,9 @@ def get_transformations():
     ###########
     transformations.append(
         A.Compose([
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-            A.ElasticTransform(p=1, interpolation=cv2.INTER_NEAREST),
-
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
+            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
         ])
     )
 
