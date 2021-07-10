@@ -72,7 +72,7 @@ def get_masks_properties(masks_paths):
     return polygons, rects
 
 
-def mix_segmentation(path, output):
+def mix_segmentation(path, output, max_mixes):
     images_paths, masks_paths = list_files(path, validate_masks=True)
 
     output = Path(output)
@@ -90,17 +90,19 @@ def mix_segmentation(path, output):
         height = target_image.shape[0]
         width = target_mask.shape[1]
 
-        for (polygon_key, polygon_value), (rect_key, rect_value) in zip(polygons.items(), rects.items()):
+        polygon_keys = list(polygons.keys())
+        random.shuffle(polygon_keys)
+        for i, polygon_key in enumerate(polygon_keys):
             # Add new nucleis if randomly over 0.5 and nucleus not already in image
             if tf.random.uniform(()) > 0.5 and Path(image_path).stem != polygon_key.split("_")[0]:
                 source_image = load_image(Path(Path(image_path).parent).joinpath(f"{polygon_key.split('_')[0]}{Path(image_path).suffix}"))
                 source_mask = load_mask(Path(Path(mask_path).parent).joinpath(f"{polygon_key.split('_')[0]}{Path(mask_path).suffix}"))
 
                 source_mask_roi = np.zeros_like(source_mask)
-                cv2.drawContours(source_mask_roi, contours=[polygon_value], contourIdx=-1, color=1, thickness=cv2.FILLED)
+                cv2.drawContours(source_mask_roi, contours=[polygons[polygon_key]], contourIdx=-1, color=1, thickness=cv2.FILLED)
                 source_mask_roi *= source_mask
 
-                x, y, w, h = rect_value["x"], rect_value["y"], rect_value["w"], rect_value["h"]
+                x, y, w, h = rects[polygon_key]["x"], rects[polygon_key]["y"], rects[polygon_key]["w"], rects[polygon_key]["h"]
                 source_image_rect_roi = source_image[y:y+h, x:x+w].copy()
                 source_mask_rect_roi = source_mask_roi[y:y+h, x:x+w].copy()
 
@@ -147,8 +149,12 @@ def mix_segmentation(path, output):
                 mask_roi[mask_roi == 255] = 1
                 target_image *= mask_roi[:, :, None]
                 target_image += image_roi
-        cv2.imwrite(f"{images_output.joinpath(Path(image_path).name)}", cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB))
-        cv2.imwrite(f"{masks_output.joinpath(Path(mask_path).name)}", target_mask * 127)
+
+            if i == max_mixes - 1:
+                break
+
+        cv2.imwrite(f"{images_output.joinpath(Path(image_path).stem)}_mixed_{Path(image_path).suffix}", cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(f"{masks_output.joinpath(Path(mask_path).stem)}_mixed_{Path(mask_path).suffix}", target_mask)
 
 
 def main():
@@ -169,6 +175,13 @@ def main():
         type=str)
 
     parser.add_argument(
+        "-m",
+        "--max-mixes",
+        help="Max number of mixes. Defaults to 10.",
+        default=15,
+        type=int)
+
+    parser.add_argument(
         "-s",
         "--seed",
         help="Seed for reproducibility.",
@@ -186,9 +199,9 @@ def main():
     tf.random.set_seed(seed)
 
     if not args.output_dir:
-        args.output_dir = str(Path(args.input_dir).joinpath("mixed"))
+        args.output_dir = "mixed"
 
-    mix_segmentation(args.input_dir, args.output_dir)
+    mix_segmentation(args.input_dir, args.output_dir, args.max_mixes)
 
 
 if __name__ == "__main__":
