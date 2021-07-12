@@ -38,7 +38,7 @@ width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
-learning_rate = 1e-5
+learning_rate = 1e-4
 one_hot_encoded = True if classes > 1 else False
 
 train_dataset_path = "dataset/multiclass/train/"
