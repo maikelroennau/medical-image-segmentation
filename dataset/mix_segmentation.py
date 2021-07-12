@@ -95,7 +95,7 @@ def get_contrast_groups(images_paths, masks_paths):
     return groups
 
 
-def mix_segmentation(input, output, max_mixes, group_by_contrast=False):
+def mix_segmentation(input, output, max_mixes, group_by_contrast=False, suffix=""):
     if isinstance(input, str) or isinstance(input, Path):
         images_paths, masks_paths = list_files(input, validate_masks=True)
 
@@ -188,8 +188,8 @@ def mix_segmentation(input, output, max_mixes, group_by_contrast=False):
             if i == max_mixes - 1:
                 break
 
-        cv2.imwrite(f"{images_output.joinpath(Path(image_path).stem)}_mixed_{Path(image_path).suffix}", cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB))
-        cv2.imwrite(f"{masks_output.joinpath(Path(mask_path).stem)}_mixed_{Path(mask_path).suffix}", target_mask)
+        cv2.imwrite(f"{images_output.joinpath(Path(image_path).stem)}_m{i}{suffix}{Path(image_path).suffix}", cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(f"{masks_output.joinpath(Path(mask_path).stem)}_m{i}{suffix}{Path(mask_path).suffix}", target_mask)
 
 
 def main():
@@ -224,6 +224,12 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "--suffix",
+        help="Suffix for the generated images.",
+        default="",
+        type=str)
+
+    parser.add_argument(
         "-s",
         "--seed",
         help="Seed for reproducibility.",
@@ -243,7 +249,10 @@ def main():
     if not args.output_dir:
         args.output_dir = "mixed"
 
-    mix_segmentation(args.input_dir, args.output_dir, args.max_mixes, args.group_contrasts)
+    if len(args.suffix) > 0:
+        args.suffix = f"_{args.suffix}"
+
+    mix_segmentation(args.input_dir, args.output_dir, args.max_mixes, args.group_contrasts, args.suffix)
 
 
 if __name__ == "__main__":
