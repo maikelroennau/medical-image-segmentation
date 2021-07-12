@@ -2,7 +2,6 @@ import argparse
 from pathlib import Path
 
 import albumentations as A
-from albumentations.augmentations.transforms import GridDistortion
 import cv2
 import numpy as np
 from tqdm import tqdm
@@ -16,36 +15,33 @@ def get_transformations():
     ###########
     transformations.append(
         A.Compose([
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.HorizontalFlip(p=1),
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1)
         ])
     )
 
     transformations.append(
         A.Compose([
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.VerticalFlip(p=1),
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1)
         ])
     )
 
     transformations.append(
         A.Compose([
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
             A.HorizontalFlip(p=1),
             A.VerticalFlip(p=1),
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1)
         ])
     )
 
     transformations.append(
         A.Compose([
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
+            A.GridDistortion(p=1),
             A.HorizontalFlip(p=1),
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
+            A.GridDistortion(p=1),
             A.VerticalFlip(p=1),
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1)
         ])
     )
 
@@ -54,16 +50,15 @@ def get_transformations():
     ###########
     transformations.append(
         A.Compose([
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST),
-            A.GridDistortion(p=1, interpolation=cv2.INTER_NEAREST)
+            A.GridDistortion(p=1),
+            A.GridDistortion(p=1)
         ])
     )
 
     return transformations
 
 
-def augment_dataset(input_dir, output_dir, seed=None):
+def augment_dataset(input_dir, output_dir, sufix="", seed=None):
     if seed:
         np.random.seed(seed)
 
@@ -99,16 +94,16 @@ def augment_dataset(input_dir, output_dir, seed=None):
         image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
         mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
 
-        cv2.imwrite(str(images_output.joinpath(f"{i}_image_{image_path.name}")), image)
-        cv2.imwrite(str(masks_output.joinpath(f"{i}_mask_{mask_path.name}")), mask)
+        cv2.imwrite(str(images_output.joinpath(f"{image_path.name}")), image)
+        cv2.imwrite(str(masks_output.joinpath(f"{mask_path.name}")), mask)
 
         for j, tranformation in enumerate(transformations):
             transormed = tranformation(image=image, mask=mask)
             transformed_image = transormed["image"]
             transformed_mask = transormed["mask"]
 
-            cv2.imwrite(str(images_output.joinpath(f"{i}_image_{image_path.stem}_t{j}{image_path.suffix}")), transformed_image)
-            cv2.imwrite(str(masks_output.joinpath(f"{i}_mask_{mask_path.stem}_t{j}{mask_path.suffix}")), transformed_mask)
+            cv2.imwrite(str(images_output.joinpath(f"{image_path.stem}_t{j}_{sufix}{image_path.suffix}")), transformed_image)
+            cv2.imwrite(str(masks_output.joinpath(f"{mask_path.stem}_t{j}_{sufix}{mask_path.suffix}")), transformed_mask)
 
 
 def main():
@@ -129,8 +124,14 @@ def main():
         default="augmented",
         type=str)
 
+    parser.add_argument(
+        "--sufix",
+        help="Suffix for the generated images.",
+        default="",
+        type=str)
+
     args = parser.parse_args()
-    augment_dataset(args.input_dir, args.output_dir)
+    augment_dataset(args.input_dir, args.output_dir, args.sufix)
 
 
 if __name__ == "__main__":
