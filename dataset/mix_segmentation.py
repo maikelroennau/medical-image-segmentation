@@ -72,8 +72,43 @@ def get_masks_properties(masks_paths):
     return polygons, rects
 
 
-def mix_segmentation(path, output, max_mixes):
-    images_paths, masks_paths = list_files(path, validate_masks=True)
+def get_rms(array, normalized=False):
+    if not normalized:
+        array = array / 255.
+    return np.sqrt(np.mean(array * array))
+
+
+def get_contrast_groups(images_paths, masks_paths):
+    groups = { f"{i}qt": { "images": [], "masks": [] } for i in range(2) }
+
+    for image_path, mask_path in zip(images_paths, masks_paths):
+        image = load_image(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        rms = get_rms(image)
+
+        if rms >= 0. and rms < 0.5:
+            groups["1qt"]["images"].append(image_path)
+            groups["1qt"]["masks"].append(mask_path)
+        elif rms >= 0.5 and rms <= 1.:
+            groups["2qt"]["images"].append(image_path)
+            groups["2qt"]["masks"].append(mask_path)
+    return groups
+
+
+def mix_segmentation(input, output, max_mixes, group_by_contrast=False):
+    if isinstance(input, str) or isinstance(input, Path):
+        images_paths, masks_paths = list_files(input, validate_masks=True)
+
+        if group_by_contrast:
+            contrast_groups = get_contrast_groups(images_paths, masks_paths)
+            for group in contrast_groups.keys():
+                mix_segmentation(
+                    (contrast_groups[group]["images"], contrast_groups[group]["masks"]),
+                    output=output,
+                    max_mixes=max_mixes,
+                    group_by_contrast=False)
+    else:
+        images_paths, masks_paths = input
 
     output = Path(output)
     images_output = output.joinpath("images")
@@ -182,6 +217,13 @@ def main():
         type=int)
 
     parser.add_argument(
+        "-g",
+        "--group-contrasts",
+        help="Mixes images considering similar contrasts.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-s",
         "--seed",
         help="Seed for reproducibility.",
@@ -201,7 +243,7 @@ def main():
     if not args.output_dir:
         args.output_dir = "mixed"
 
-    mix_segmentation(args.input_dir, args.output_dir, args.max_mixes)
+    mix_segmentation(args.input_dir, args.output_dir, args.max_mixes, args.group_contrasts)
 
 
 if __name__ == "__main__":
