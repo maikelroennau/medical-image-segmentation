@@ -58,7 +58,7 @@ def get_transformations():
     return transformations
 
 
-def augment_dataset(input_dir, output_dir, sufix="", seed=None):
+def augment_dataset(input_dir, output_dir, suffix="", seed=None):
     if seed:
         np.random.seed(seed)
 
@@ -102,8 +102,8 @@ def augment_dataset(input_dir, output_dir, sufix="", seed=None):
             transformed_image = transormed["image"]
             transformed_mask = transormed["mask"]
 
-            cv2.imwrite(str(images_output.joinpath(f"{image_path.stem}_t{j}_{sufix}{image_path.suffix}")), transformed_image)
-            cv2.imwrite(str(masks_output.joinpath(f"{mask_path.stem}_t{j}_{sufix}{mask_path.suffix}")), transformed_mask)
+            cv2.imwrite(str(images_output.joinpath(f"{image_path.stem}_t{j}_{suffix}{image_path.suffix}")), transformed_image)
+            cv2.imwrite(str(masks_output.joinpath(f"{mask_path.stem}_t{j}_{suffix}{mask_path.suffix}")), transformed_mask)
 
 
 def main():
@@ -125,13 +125,13 @@ def main():
         type=str)
 
     parser.add_argument(
-        "--sufix",
+        "--suffix",
         help="Suffix for the generated images.",
         default="",
         type=str)
 
     args = parser.parse_args()
-    augment_dataset(args.input_dir, args.output_dir, args.sufix)
+    augment_dataset(args.input_dir, args.output_dir, args.suffix)
 
 
 if __name__ == "__main__":
