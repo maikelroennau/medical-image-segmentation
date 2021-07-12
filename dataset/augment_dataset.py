@@ -102,8 +102,8 @@ def augment_dataset(input_dir, output_dir, suffix="", seed=None):
             transformed_image = transormed["image"]
             transformed_mask = transormed["mask"]
 
-            cv2.imwrite(str(images_output.joinpath(f"{image_path.stem}_t{j}_{suffix}{image_path.suffix}")), transformed_image)
-            cv2.imwrite(str(masks_output.joinpath(f"{mask_path.stem}_t{j}_{suffix}{mask_path.suffix}")), transformed_mask)
+            cv2.imwrite(str(images_output.joinpath(f"{image_path.stem}_t{j}{suffix}{image_path.suffix}")), transformed_image)
+            cv2.imwrite(str(masks_output.joinpath(f"{mask_path.stem}_t{j}{suffix}{mask_path.suffix}")), transformed_mask)
 
 
 def main():
@@ -131,6 +131,10 @@ def main():
         type=str)
 
     args = parser.parse_args()
+
+    if len(args.suffix) > 0:
+        args.suffix = f"_{args.suffix}"
+
     augment_dataset(args.input_dir, args.output_dir, args.suffix)
 
 
