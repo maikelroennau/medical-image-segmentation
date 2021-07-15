@@ -79,7 +79,7 @@ def get_rms(array, normalized=False):
 
 
 def get_contrast_groups(images_paths, masks_paths):
-    groups = { f"{i}qt": { "images": [], "masks": [] } for i in range(2) }
+    groups = { f"{i}qt": { "images": [], "masks": [] } for i in range(1, 3) }
 
     for image_path, mask_path in zip(images_paths, masks_paths):
         image = load_image(image_path)
