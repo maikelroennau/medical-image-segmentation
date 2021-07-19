@@ -7,10 +7,11 @@ import cv2
 import imgviz
 import labelme
 import numpy as np
+import tifffile
 from tqdm import tqdm
 
 
-def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None, color=False, noviz=False):
+def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None, multiple_resolutions=False, tif=False, color=False, noviz=False):
     resolutions = ((1920, 2560), (960, 1280), (480, 640), (240, 320))
     factors = (1, 0.5, 0.25, 0.125)
     class_names = []
@@ -38,9 +39,18 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
 
     print("class_names:", class_names)
 
+    if not multiple_resolutions:
+        resolutions = resolutions[:1]
+        factors = factors[:1]
+
     for resolution, factor in zip(resolutions, factors):
-        res_name = "x".join([str(x) for x in resolution])
-        current_general_path = Path(output_dir).joinpath(res_name)
+        if multiple_resolutions:
+            res_name = "x".join([str(x) for x in resolution])
+            current_general_path = Path(output_dir).joinpath(res_name)
+        else:
+            res_name = ""
+            current_general_path = Path(output_dir)
+
         current_general_path.mkdir(exist_ok=True, parents=True)
 
         classes_file = str(current_general_path.joinpath("class_names.txt"))
@@ -57,14 +67,14 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
             viz_dir = current_general_path.joinpath("SegmentationClassVisualization")
             viz_dir.mkdir(exist_ok=True, parents=True)
 
-
         for filename in tqdm(glob.glob(os.path.join(input_dir, "*.json")), desc=res_name):
             label_file = labelme.LabelFile(filename=filename)
             if filter_labels:
                 label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in filter_labels]
 
             base = os.path.splitext(os.path.basename(filename))[0]
-            out_img_file = str(images_dir.joinpath(base + ".png"))
+            image_type = ".tif" if tif else ".png"
+            out_img_file = str(images_dir.joinpath(base + image_type))
             out_png_file = str(segmentation_dir.joinpath(base + ".png"))
 
             if not noviz:
@@ -73,7 +83,10 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
             # Save image to dir
             img = labelme.utils.img_data_to_arr(label_file.imageData)
             img = cv2.resize(img, dsize=resolution[::-1], interpolation=cv2.INTER_NEAREST)
-            cv2.imwrite(out_img_file, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            if tif:
+                tifffile.imwrite(out_img_file, img, photometric="rgb")
+            else:
+                cv2.imwrite(out_img_file, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
             # Rescale points accordingly to resolution factor
             for i in range(len(label_file.shapes)):
@@ -133,6 +146,20 @@ def main():
         type=str)
 
     parser.add_argument(
+        "-m",
+        "--multiple-resolutions",
+        help="Generate images and masks in multiple resolutions.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
+        "-t",
+        "--tif",
+        help="Save images using `.tif` format.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-c",
         "--color",
         help="Generate RGB segmentation masks.",
@@ -152,7 +179,16 @@ def main():
     if args.filter_labels:
         args.filter_labels = args.filter_labels.split(",")
 
-    convert_labels(args.input_dir, args.output_dir, args.labels, args.filter_labels, args.color, args.noviz)
+    convert_labels(
+        args.input_dir,
+        args.output_dir,
+        args.labels,
+        args.filter_labels,
+        args.multiple_resolutions,
+        args.tif,
+        args.color,
+        args.noviz
+    )
 
 
 if __name__ == "__main__":
