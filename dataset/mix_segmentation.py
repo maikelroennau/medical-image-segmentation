@@ -95,7 +95,7 @@ def get_contrast_groups(images_paths, masks_paths):
     return groups
 
 
-def mix_segmentation(input, output, max_mixes, group_by_contrast=False, suffix=""):
+def mix_segmentation(input, output, max_mixes, group_by_contrast=False, blend=False, suffix=""):
     if isinstance(input, str) or isinstance(input, Path):
         images_paths, masks_paths = list_files(input, validate_masks=True)
 
@@ -106,7 +106,9 @@ def mix_segmentation(input, output, max_mixes, group_by_contrast=False, suffix="
                     (contrast_groups[group]["images"], contrast_groups[group]["masks"]),
                     output=output,
                     max_mixes=max_mixes,
-                    group_by_contrast=False)
+                    group_by_contrast=False,
+                    blend=blend)
+            return
     else:
         images_paths, masks_paths = input
 
@@ -173,17 +175,27 @@ def mix_segmentation(input, output, max_mixes, group_by_contrast=False, suffix="
                     else:
                         break
 
+                # Add new nucleus and NORs mask to the target mask
                 target_mask += mask_roi.copy()
 
+                # Create new image containing only the RGB pixels of the new nucleus and NORs
                 image_roi = np.zeros_like(target_image)
                 image_roi[new_y:new_y+h, new_x:new_x+w] = source_image_rect_roi
 
-                mask_roi[mask_roi > 0] = 1
-                mask_roi[mask_roi == 0] = 255
-                mask_roi[mask_roi == 1] = 0
-                mask_roi[mask_roi == 255] = 1
-                target_image *= mask_roi[:, :, None]
-                target_image += image_roi
+                # Obtain the contour that will be used for bleding the nucleus and NORs to the target image
+                blend_contours, hierarchy = cv2.findContours(mask_roi, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                blend_roi = np.zeros_like(target_image)
+                cv2.drawContours(blend_roi, contours=blend_contours, contourIdx=-1, color=[255, 255, 255], thickness=cv2.FILLED)
+
+                # Add nucleus and NORs to the target image then blur it
+                target_image = np.where(blend_roi == np.array([255, 255, 255]), image_roi, target_image)
+                blured_image_roi = cv2.GaussianBlur(target_image.copy(), (15, 15), 0)
+
+                # Copy only the blured pixels that belong to the contour and replace it in the target image
+                if blend:
+                    blend_roi = np.zeros_like(target_image)
+                    cv2.drawContours(blend_roi, contours=blend_contours, contourIdx=-1, color=[255, 255, 255], thickness=7)
+                    target_image = np.where(blend_roi == np.array([255, 255, 255]), blured_image_roi, target_image)
 
             if i == max_mixes - 1:
                 break
@@ -224,6 +236,13 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "-b",
+        "--blend",
+        help="Blend segmented areas using Gaussian blur.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "--suffix",
         help="Suffix for the generated images.",
         default="",
@@ -252,7 +271,7 @@ def main():
     if len(args.suffix) > 0:
         args.suffix = f"_{args.suffix}"
 
-    mix_segmentation(args.input_dir, args.output_dir, args.max_mixes, args.group_contrasts, args.suffix)
+    mix_segmentation(args.input_dir, args.output_dir, args.max_mixes, args.group_contrasts, args.blend, args.suffix)
 
 
 if __name__ == "__main__":
