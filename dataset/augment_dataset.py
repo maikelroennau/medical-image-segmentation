@@ -37,6 +37,7 @@ def list_files(path, validate_masks=False):
 
 
 def get_transformations():
+    # augmented_v6
     transformations = []
 
     ###########
@@ -75,12 +76,22 @@ def get_transformations():
     )
 
     ###########
-    ## Set 4 ##
+    ## Set 2 ##
     ###########
     transformations.append(
         A.Compose([
             A.ElasticTransform(p=1),
             A.ElasticTransform(p=1)
+        ])
+    )
+
+    ###########
+    ## Set 3 ##
+    ###########
+    transformations.append(
+        A.OneOf([
+            A.RandomBrightness(p=0.5),
+            A.RandomContrast(p=0.5),
         ])
     )
 
