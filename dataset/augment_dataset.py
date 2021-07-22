@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import multiprocessing
 from pathlib import Path
 
@@ -38,64 +39,22 @@ def list_files(path, validate_masks=False):
 
 def get_transformations():
     # augmented_v6
-    transformations = []
+    transformations = [
+        A.RandomBrightness(always_apply=True),
+        A.RandomContrast(always_apply=True),
+        A.VerticalFlip(always_apply=True),
+        A.HorizontalFlip(always_apply=True),
+        A.ElasticTransform(always_apply=True),
+        A.ElasticTransform(always_apply=True)
+    ]
 
-    ###########
-    ## Set 1 ##
-    ###########
-    transformations.append(
-        A.Compose([
-            A.HorizontalFlip(p=1),
-            A.ElasticTransform(p=1)
-        ])
-    )
+    combinations = [
+        A.Compose(transformation_step)
+        for transformation_step
+        in list(itertools.combinations(transformations, 4))
+    ]
 
-    transformations.append(
-        A.Compose([
-            A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.HorizontalFlip(p=1),
-            A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1)
-        ])
-    )
-
-    transformations.append(
-        A.Compose([
-            A.ElasticTransform(p=1),
-            A.HorizontalFlip(p=1),
-            A.ElasticTransform(p=1),
-            A.VerticalFlip(p=1),
-            A.ElasticTransform(p=1)
-        ])
-    )
-
-    ###########
-    ## Set 2 ##
-    ###########
-    transformations.append(
-        A.Compose([
-            A.ElasticTransform(p=1),
-            A.ElasticTransform(p=1)
-        ])
-    )
-
-    ###########
-    ## Set 3 ##
-    ###########
-    transformations.append(
-        A.OneOf([
-            A.RandomBrightness(p=0.5),
-            A.RandomContrast(p=0.5),
-        ])
-    )
-
-    return transformations
+    return combinations
 
 
 class ImageAugmentation:
