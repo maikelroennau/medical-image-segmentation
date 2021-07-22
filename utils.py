@@ -244,7 +244,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         return best_model, models_metrics
 
 
-def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None, normalize=False):
+def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None, normalize=False, verbose=1):
     if isinstance(model, str) or isinstance(model, Path):
         model = Path(model)
         if model.is_file():
@@ -253,8 +253,15 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
             models = [model_path for model_path in model.glob("*.h5")]
             if len(models) > 0:
                 print(f"No model(s) found at {str(model)}")
-                for model_path in models:
-                    predict(model_path, images_path, batch_size, output_path=str(Path(output_path).joinpath(model_path.name)), copy_images=copy_images, new_input_shape=new_input_shape)
+                for model_path in tqdm(models):
+                    predict(
+                        model_path,
+                        images_path,
+                        batch_size,
+                        output_path=str(Path(output_path).joinpath(model_path.name)),
+                        copy_images=copy_images,
+                        new_input_shape=new_input_shape,
+                        verbose=0)
             return
     elif model != None:
         loaded_model = model
@@ -286,14 +293,14 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         image = tf.image.decode_png(image, channels=3)
         original_shape = image.shape[:2]
         image = tf.image.resize(image, (height, width), method="nearest")
-        
+
         if normalize:
             image = tf.cast(image, dtype=tf.float32)
             image = image / 255.
 
         images_tensor[0, :, :, :] = image
 
-        prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=1)
+        prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=verbose)
         prediction = tf.image.resize(prediction[0], original_shape, method="nearest").numpy()
 
         # prediction[:, :, 0] = 0
