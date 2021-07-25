@@ -352,11 +352,13 @@ def plot_metrics(history, output=".", figsize=(15, 15)):
     lr_image.savefig(output_path.joinpath("03_learning_rate.png"))
 
 
-def compute_classes_weights(dataset, batches=1, plot=True, figsize=(20, 10), output="."):
+def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10), output=".", get_as_weights=False, classes=["Background", "Nucleus", "NOR"]):
     class_occurence = []
+    batch_size = None
 
     for i, batch in enumerate(dataset):
         if i == batches:
+            batch_size = batch[0].shape[0]
             break
 
         for mask in batch[1]:
@@ -366,11 +368,16 @@ def compute_classes_weights(dataset, batches=1, plot=True, figsize=(20, 10), out
             class_occurence.append(class_count)
 
     class_occurence = tf.convert_to_tensor(class_occurence, dtype=tf.int64)
-    class_occurence_mean = tf.math.reduce_mean(class_occurence, axis=0)
+    class_distribution = tf.reduce_sum(class_occurence, axis=0) / (batches * batch_size)
+    class_distribution = class_distribution.numpy()
+    class_distribution = class_distribution * 100 / (dataset.element_spec[0].shape[1] * dataset.element_spec[0].shape[2])
+    if get_as_weights:
+        class_distribution = (100 - class_distribution) / 100
+        class_distribution = np.round(class_distribution, 2)
 
-    class_weights = {}
-    for i, occurence in enumerate(class_occurence_mean):
-        class_weights[i] = float(occurence)
+    distribution = {}
+    for occurence, class_name in zip(class_distribution, classes):
+        distribution[class_name] = float(occurence)
 
     if plot:
         import pandas as pd
@@ -378,17 +385,19 @@ def compute_classes_weights(dataset, batches=1, plot=True, figsize=(20, 10), out
         output_path = Path(output)
         output_path.mkdir(exist_ok=True, parents=True)
 
-        df = pd.DataFrame(class_occurence.numpy(), columns=["Background", "Nucleus", "NOR"])
+        class_occurence = class_occurence.numpy()
+        df = pd.DataFrame(class_occurence, columns=classes)
         class_weights_figure = df.plot.bar(stacked=True, figsize=figsize)
-        class_weights_figure.set(xlabel="Image instance", ylabel="Number of pixels", title="Pixel class distribution (dataset)")
+        class_weights_figure.set(xlabel="Image instance", ylabel="Number of pixels per class", title="Image class distribution")
+        class_weights_figure.axes.set_xticks([])
         class_weights_figure = class_weights_figure.get_figure()
         class_weights_figure.savefig(output_path.joinpath("classes_distribution.png"))
 
-        df = pd.DataFrame(class_weights.values()).transpose()
-        df.columns = ["Background", "Nucleus", "NOR"]
+        df = pd.DataFrame(distribution.values()).transpose()
+        df.columns = classes
         class_weights_figure = df.plot.bar(stacked=True, figsize=(10, 10))
-        class_weights_figure.set(ylabel="Number of pixels", title="Pixel class distribution (dataset mean)")
+        class_weights_figure.set(ylabel="Number of pixels per class", title="Dataset class distribution")
         class_weights_figure = class_weights_figure.get_figure()
-        class_weights_figure.savefig(output_path.joinpath("classes_distribution_dataset_mean.png"))
+        class_weights_figure.savefig(output_path.joinpath("classes_distribution_dataset.png"))
 
-    return class_weights
+    return distribution
