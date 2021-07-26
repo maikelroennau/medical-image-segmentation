@@ -45,7 +45,7 @@ train_dataset_path = "dataset/augmented_v7/train/"
 validation_dataset_path = "dataset/augmented_v7/validation/"
 test_dataset_path = "dataset/augmented_v7/test/"
 
-loss_function = losses.weighted_categorical_crossentropy
+loss_function = losses.categorical_focal_loss
 metrics = [losses.dice_coef]
 
 ########
