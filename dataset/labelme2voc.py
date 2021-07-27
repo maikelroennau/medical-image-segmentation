@@ -141,7 +141,7 @@ def main():
     parser.add_argument(
         "-f",
         "--filter-labels",
-        help="List of labels to keep, separated by comma. Example: `-f nucleus,nor`.",
+        help="List of labels to remove, separated by comma. Example: `-f nucleus,nor`.",
         default=None,
         type=str)
 
