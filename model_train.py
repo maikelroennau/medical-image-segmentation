@@ -168,7 +168,7 @@ train_config = {
 }
 
 with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
-    json.dump(train_config, config_file)
+    json.dump(train_config, config_file, indent=4)
 
 ########
 ########
@@ -247,7 +247,7 @@ if history:
         train_config[k] = v
 
 with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
-    json.dump(train_config, config_file)
+    json.dump(train_config, config_file, indent=4)
 
 ########
 ########
@@ -267,7 +267,7 @@ if best_model is not None or models_metrics is not None:
     model_path = best_model["model"]
 
     with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
-        json.dump(train_config, config_file)
+        json.dump(train_config, config_file, indent=4)
 
     utils.plot_metrics(history.history, output=checkpoint_directory)
 else:
