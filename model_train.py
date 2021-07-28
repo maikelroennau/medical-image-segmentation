@@ -37,15 +37,16 @@ height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
-classes = 3
+classes = 1
 learning_rate = 1e-4
 one_hot_encoded = True if classes > 1 else False
+class_distribution = True
 
-train_dataset_path = "dataset/augmented_v7/train/"
-validation_dataset_path = "dataset/augmented_v7/validation/"
-test_dataset_path = "dataset/augmented_v7/test/"
+train_dataset_path = "dataset/augmented_v9_nucleus/train/"
+validation_dataset_path = "dataset/augmented_v9_nucleus/validation/"
+test_dataset_path = "dataset/augmented_v9_nucleus/test/"
 
-loss_function = losses.categorical_focal_loss
+loss_function = losses.dice_coef_loss
 metrics = [losses.dice_coef]
 
 ########
@@ -110,7 +111,7 @@ def make_model(input_shape, classes, model_name="U-Net"):
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(up9)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv9)
 
-    outputs = Conv2D(classes, (1, 1), activation="softmax")(conv9)
+    outputs = Conv2D(classes, (1, 1), activation="softmax" if classes > 1 else "sigmoid")(conv9)
 
     model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
 
@@ -136,15 +137,6 @@ callbacks = [
 ########
 ########
 
-class_distribution = utils.compute_classes_distribution(
-    train_dataset,
-    batches=steps_per_epoch // batch_size,
-    plot=True,
-    output=checkpoint_directory)
-
-########
-########
-
 train_config = {
     "model_name": model.name,
     "description": description,
@@ -163,19 +155,25 @@ train_config = {
     "test_dataset": test_dataset_path,
     "train_samples": len(utils.list_files(path=train_dataset_path)[0]),
     "validation_samples": len(utils.list_files(path=validation_dataset_path)[0]),
-    "test_samples": len(utils.list_files(path=test_dataset_path)[0]),
-    "class_distribution": class_distribution
+    "test_samples": len(utils.list_files(path=test_dataset_path)[0])
 }
+
+# TODO: Fix 'utils.compute_classes_distribution' function which currently only supports multiclass masks
+if class_distribution and classes > 1:
+    class_distribution = utils.compute_classes_distribution(
+        train_dataset,
+        batches=steps_per_epoch // batch_size,
+        plot=True,
+        output=checkpoint_directory)
+
+    train_config["class_distribution"] = class_distribution
+
+    print("\nClass distribution (pixels):")
+    for class_name, value in class_distribution.items():
+        print(f"  - {str(round(value, 2)).zfill(5)} ==> {class_name}")
 
 with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
     json.dump(train_config, config_file, indent=4)
-
-########
-########
-
-print("\nClass distribution (pixels):")
-for class_name, value in class_distribution.items():
-    print(f"  - {str(round(value, 2)).zfill(5)} ==> {class_name}")
 
 ########
 ########
