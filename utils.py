@@ -52,6 +52,10 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
             image_name = str(images_path.joinpath(f"batch_{i}_{j}.png"))
             mask_name = str(masks_path.joinpath(f"batch_{i}_{j}.png"))
             tf.keras.preprocessing.image.save_img(image_name, image)
+            if mask.shape[-1] == 2:
+                mask_reshaped = np.zeros(tuple(mask.shape[:2]) + (3,))
+                mask_reshaped[:, :, :2] = mask.numpy()
+                mask = tf.convert_to_tensor(mask_reshaped)
             tf.keras.preprocessing.image.save_img(mask_name, mask)
 
         tf.keras.backend.clear_session()
@@ -306,7 +310,13 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
 
         # prediction[:, :, 0] = 0
         prediction[prediction < 0.5] = 0
-        prediction[prediction >= 0.5] = 255
+        prediction[prediction >= 0.5] = 127
+
+        if prediction.shape[-1] == 2:
+            prediction_reshaped = np.zeros(tuple(prediction.shape[:2]) + (3,), dtype=np.uint8)
+            prediction_reshaped[:, :, :2] = prediction
+            prediction = prediction_reshaped
+
         cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
 
         if copy_images:
