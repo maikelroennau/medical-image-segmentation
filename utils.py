@@ -18,7 +18,8 @@ CUSTOM_OBJECTS = {
     "jaccard_index": losses.jaccard_index,
     "jaccard_index_loss": losses.jaccard_index_loss,
     "weighted_categorical_crossentropy": losses.weighted_categorical_crossentropy,
-    "categorical_focal_loss": losses.categorical_focal_loss
+    "categorical_focal_loss": losses.categorical_focal_loss,
+    "unified_focal_loss": losses.unified_focal_loss
 }
 
 METRICS = [
