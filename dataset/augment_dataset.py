@@ -42,18 +42,18 @@ def list_files(path, validate_masks=False):
 
 def get_transformations():
     transformations = [
-        A.RandomBrightness(always_apply=True),
-        A.RandomContrast(always_apply=True),
-        A.VerticalFlip(always_apply=True),
-        A.HorizontalFlip(always_apply=True),
-        A.ElasticTransform(always_apply=True),
-        A.ElasticTransform(always_apply=True)
+        A.RandomBrightness(p=0.5),
+        A.RandomContrast(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.HorizontalFlip(p=0.5),
+        A.ElasticTransform(p=0.5),
+        A.ElasticTransform(p=0.5)
     ]
 
     combinations = [
         list(transformation_step)
         for transformation_step
-        in itertools.combinations(transformations, 3)
+        in itertools.combinations(transformations, 5)
     ]
 
     for combination in combinations:
