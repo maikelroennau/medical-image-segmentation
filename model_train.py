@@ -31,7 +31,7 @@ description = """Experiment description."""
 
 epochs = 20
 batch_size = 1
-steps_per_epoch = 960
+steps_per_epoch = 420
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
@@ -46,7 +46,7 @@ train_dataset_path = "dataset/augmented_v10/train/"
 validation_dataset_path = "dataset/augmented_v10/validation/"
 test_dataset_path = "dataset/augmented_v10/test/"
 
-loss_function = losses.dice_coef_loss
+loss_function = losses.weighted_categorical_crossentropy
 metrics = [losses.dice_coef]
 
 ########
