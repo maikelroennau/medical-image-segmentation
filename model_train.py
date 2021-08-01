@@ -42,9 +42,9 @@ learning_rate = 1e-4
 one_hot_encoded = True if classes > 1 else False
 class_distribution = True
 
-train_dataset_path = "dataset/augmented_v9_nucleus/train/"
-validation_dataset_path = "dataset/augmented_v9_nucleus/validation/"
-test_dataset_path = "dataset/augmented_v9_nucleus/test/"
+train_dataset_path = "dataset/augmented_v10/train/"
+validation_dataset_path = "dataset/augmented_v10/validation/"
+test_dataset_path = "dataset/augmented_v10/test/"
 
 loss_function = losses.dice_coef_loss
 metrics = [losses.dice_coef]
