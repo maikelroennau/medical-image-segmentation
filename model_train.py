@@ -30,14 +30,14 @@ model_name = "AgNOR"
 description = """Experiment description."""
 
 epochs = 20
-batch_size = 3
+batch_size = 1
 steps_per_epoch = 960
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
-classes = 1
+classes = 3
 learning_rate = 1e-4
 one_hot_encoded = True if classes > 1 else False
 class_distribution = True
