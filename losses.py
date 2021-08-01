@@ -22,7 +22,7 @@ def jaccard_index_loss(y_true, y_pred):
 
 
 def weighted_categorical_crossentropy(y_true, y_pred):
-    weights = [.1, 1., 1.]
+    weights = [0.5, 1., 2.]
     y_pred /= tf.keras.backend.sum(y_pred, axis=-1, keepdims=True)
     y_pred = tf.keras.backend.clip(y_pred, tf.keras.backend.epsilon(), 1 - tf.keras.backend.epsilon())
     loss = y_true * tf.keras.backend.log(y_pred) * weights
