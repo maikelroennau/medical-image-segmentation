@@ -30,7 +30,7 @@ model_name = "AgNOR"
 description = """Experiment description."""
 
 epochs = 20
-batch_size = 1
+batch_size = 3
 steps_per_epoch = 960
 
 height = 960 # 240 480 960 1920
