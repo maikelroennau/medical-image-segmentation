@@ -132,7 +132,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
     dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=batch_size * 2, seed=seed)
+        dataset = dataset.shuffle(buffer_size=batch_size * batch_size, seed=seed)
     if repeat:
         dataset = dataset.repeat()
 
