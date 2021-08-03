@@ -27,7 +27,7 @@ np.random.seed(seed)
 tf.random.set_seed(seed)
 
 model_name = "AgNOR"
-description = """E"""
+description = """Experiment description."""
 
 epochs = 50
 batch_size = 1
