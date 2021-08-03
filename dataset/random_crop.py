@@ -98,8 +98,8 @@ def random_crop(input_dir, output_dir, side, gamma, suffix):
                 biggest_area = area
                 side = height if height > width else width
 
-    # Adjust side accordingly to gama to allow some space for randomizing the cut
-    side *= gamma
+        # Adjust side accordingly to gama to allow some space for randomizing the cut
+        side *= gamma
 
     # Round side to the next even number
     side = int(np.ceil(side / 2.) * 2)
