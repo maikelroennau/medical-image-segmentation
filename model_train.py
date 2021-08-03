@@ -27,9 +27,9 @@ np.random.seed(seed)
 tf.random.set_seed(seed)
 
 model_name = "AgNOR"
-description = """Experiment description."""
+description = """E"""
 
-epochs = 20
+epochs = 50
 batch_size = 1
 steps_per_epoch = 420
 
@@ -38,9 +38,9 @@ width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
-learning_rate = 1e-4
+learning_rate = 1e-5
 one_hot_encoded = True if classes > 1 else False
-class_distribution = False
+class_distribution = True
 
 train_dataset_path = "dataset/v10/train/"
 validation_dataset_path = "dataset/v10/validation/"
@@ -239,10 +239,11 @@ print(f"    - Validation: {validation_dataset_path}")
 print(f"    - Test: {test_dataset_path}\n")
 
 if history:
+    train_config["train_metrics"] = {}
     history_data = history.history
     for k, v in history_data.items():
         v = [float(i) for i in v]
-        train_config[k] = v
+        train_config["train_metrics"][k] = v
 
 with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
     json.dump(train_config, config_file, indent=4)
