@@ -250,7 +250,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         return best_model, models_metrics
 
 
-def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None, normalize=False, verbose=1):
+def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None, normalize=False, single_dir=False, verbose=1):
     if isinstance(model, str) or isinstance(model, Path):
         model = Path(model)
         if model.is_file():
@@ -264,9 +264,11 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
                         model_path,
                         images_path,
                         batch_size,
-                        output_path=str(Path(output_path).joinpath(model_path.name)),
+                        output_path=str(Path(output_path)) if single_dir else str(Path(output_path).joinpath(model_path.name)),
                         copy_images=copy_images,
                         new_input_shape=new_input_shape,
+                        normalize=normalize,
+                        single_dir=single_dir,
                         verbose=0)
             return
     elif model != None:
@@ -318,7 +320,12 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
             prediction_reshaped[:, :, :2] = prediction
             prediction = prediction_reshaped
 
-        cv2.imwrite(os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png"), cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
+        if single_dir:
+            output_image_path = os.path.join(output_path, f"{model.stem.split('_l')[0]}_{image_path.stem}_prediction.png")
+        else:
+            output_image_path = os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png")
+
+        cv2.imwrite(output_image_path, cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
 
         if copy_images:
             shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
