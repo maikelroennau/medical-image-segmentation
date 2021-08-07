@@ -55,6 +55,12 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "--single-dir",
+        help="Save all predictions of different models to the same directory.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -91,6 +97,7 @@ def main():
         output_path=output,
         copy_images=args.copy_images,
         normalize=args.normalize,
+        single_dir=args.single_dir,
         new_input_shape=input_shape)
 
 
