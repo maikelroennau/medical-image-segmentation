@@ -31,6 +31,8 @@ def main():
 
     if not args.output:
         output = Path(args.metrics_file).parent
+    else:
+        output = args.output
 
     figsize = args.figsize.lower().split("x")
     figsize = (int(figsize[0]), int(figsize[1]))
