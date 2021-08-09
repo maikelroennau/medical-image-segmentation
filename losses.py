@@ -21,8 +21,7 @@ def jaccard_index_loss(y_true, y_pred):
     return 1. - jaccard_index(y_true, y_pred)
 
 
-def weighted_categorical_crossentropy(y_true, y_pred):
-    weights = [0.5, 1.8, 2.]
+def weighted_categorical_crossentropy(y_true, y_pred, weights=[0.5, 1.8, 2.]):
     y_pred /= tf.keras.backend.sum(y_pred, axis=-1, keepdims=True)
     y_pred = tf.keras.backend.clip(y_pred, tf.keras.backend.epsilon(), 1 - tf.keras.backend.epsilon())
     loss = y_true * tf.keras.backend.log(y_pred) * weights
@@ -30,7 +29,7 @@ def weighted_categorical_crossentropy(y_true, y_pred):
     return loss
 
 
-def categorical_focal_loss(y_true, y_pred, alpha=[0.0136, 98.7, 99.94], gamma=2.):
+def categorical_focal_loss(y_true, y_pred, alpha=[0.5, 1.8, 2.], gamma=0.5):
     """Source: https://github.com/umbertogriffo/focal-loss-keras/blob/master/src/loss_function/losses.py
     Softmax version of focal loss.
     When there is a skew between different categories/labels in your data set, you can try to apply this function as a
