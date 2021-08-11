@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Conv2DTranspose, MaxPooling2D
+from tensorflow.keras.layers import BatchNormalization, Conv2D, Conv2DTranspose, MaxPooling2D
 from tensorflow.keras.optimizers import Adam
 
 import losses
@@ -29,16 +29,17 @@ tf.random.set_seed(seed)
 model_name = "AgNOR"
 description = """Experiment description."""
 
-epochs = 50
-batch_size = 1
-steps_per_epoch = 420
+epochs = 200
+batch_size = 10
+steps_per_epoch = 42
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
-learning_rate = 1e-5
+learning_rate = 1e-4
+learning_rate_change_factor = 0.75
 one_hot_encoded = True if classes > 1 else False
 class_distribution = True
 
@@ -77,39 +78,64 @@ def make_model(input_shape, classes, model_name="U-Net"):
     inputs = tf.keras.Input(shape=input_shape)
 
     conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(inputs)
+    conv1 = BatchNormalization()(conv1)
     conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv1)
+    conv1 = BatchNormalization()(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
+    pool1 = BatchNormalization()(pool1)
 
     conv2 = Conv2D(64, (3, 3), activation="relu", padding="same")(pool1)
+    conv2 = BatchNormalization()(conv2)
     conv2 = Conv2D(64, (3, 3), activation="relu", padding="same")(conv2)
+    conv2 = BatchNormalization()(conv2)
     pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
+    pool2 = BatchNormalization()(pool2)
 
     conv3 = Conv2D(128, (3, 3), activation="relu", padding="same")(pool2)
+    conv3 = BatchNormalization()(conv3)
     conv3 = Conv2D(128, (3, 3), activation="relu", padding="same")(conv3)
+    conv3 = BatchNormalization()(conv3)
     pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
+    pool3 = BatchNormalization()(pool3)
 
     conv4 = Conv2D(256, (3, 3), activation="relu", padding="same")(pool3)
+    conv4 = BatchNormalization()(conv4)
     conv4 = Conv2D(256, (3, 3), activation="relu", padding="same")(conv4)
     pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
+    pool4 = BatchNormalization()(pool4)
 
     conv5 = Conv2D(512, (3, 3), activation="relu", padding="same")(pool4)
+    conv5 = BatchNormalization()(conv5)
     conv5 = Conv2D(512, (3, 3), activation="relu", padding="same")(conv5)
+    conv5 = BatchNormalization()(conv5)
 
     up6 = layers.concatenate([Conv2DTranspose(256, (2, 2), strides=(2, 2), padding="same")(conv5), conv4], axis=3)
+    up6 = BatchNormalization()(up6)
     conv6 = Conv2D(256, (3, 3), activation="relu", padding="same")(up6)
+    conv6 = BatchNormalization()(conv6)
     conv6 = Conv2D(256, (3, 3), activation="relu", padding="same")(conv6)
+    conv6 = BatchNormalization()(conv6)
 
     up7 = layers.concatenate([Conv2DTranspose(128, (2, 2), strides=(2, 2), padding="same")(conv6), conv3], axis=3)
+    up7 = BatchNormalization()(up7)
     conv7 = Conv2D(128, (3, 3), activation="relu", padding="same")(up7)
+    conv7 = BatchNormalization()(conv7)
     conv7 = Conv2D(128, (3, 3), activation="relu", padding="same")(conv7)
+    conv7 = BatchNormalization()(conv7)
 
     up8 = layers.concatenate([Conv2DTranspose(64, (2, 2), strides=(2, 2), padding="same")(conv7), conv2], axis=3)
+    up8 = BatchNormalization()(up8)
     conv8 = Conv2D(64, (3, 3), activation="relu", padding="same")(up8)
+    conv8 = BatchNormalization()(conv8)
     conv8 = Conv2D(64, (3, 3), activation="relu", padding="same")(conv8)
+    conv8 = BatchNormalization()(conv8)
 
     up9 = layers.concatenate([Conv2DTranspose(32, (2, 2), strides=(2, 2), padding="same")(conv8), conv1], axis=3)
+    up9 = BatchNormalization()(up9)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(up9)
+    conv9 = BatchNormalization()(conv9)
     conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv9)
+    conv9 = BatchNormalization()(conv9)
 
     outputs = Conv2D(classes, (1, 1), activation="softmax" if classes > 1 else "sigmoid")(conv9)
 
@@ -129,7 +155,7 @@ checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%
 os.makedirs(checkpoint_directory, exist_ok=True)
 
 callbacks = [
-    tf.keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=0.25, patience=10, verbose=1, mode="auto", cooldown=1),
+    tf.keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=learning_rate_change_factor, patience=10, verbose=1, mode="auto", cooldown=1),
     tf.keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="loss", save_best_only=True),
     # tf.keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
 ]
@@ -150,6 +176,8 @@ train_config = {
     "loss_fuction": loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name,
     "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
     "initial_learning_rate": model.optimizer.get_config()['learning_rate'],
+    "learning_rate_change_factor": learning_rate_change_factor,
+    "directory": checkpoint_directory,
     "train_dataset": train_dataset_path,
     "validation_dataset": validation_dataset_path,
     "test_dataset": test_dataset_path,
@@ -282,4 +310,5 @@ utils.predict(
     batch_size=batch_size,
     output_path=Path(test_dataset_path).joinpath("images"),
     copy_images=False,
-    new_input_shape=None)
+    new_input_shape=None,
+    normalize=True)
