@@ -2,7 +2,6 @@ import json
 import os
 import shutil
 from pathlib import Path
-from threading import Condition
 
 import cv2
 import numpy as np
