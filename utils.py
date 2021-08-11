@@ -312,6 +312,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=verbose)
         prediction = tf.image.resize(prediction[0], original_shape, method="nearest").numpy()
 
+        # prediction[:, :, 0] = 0
         prediction[prediction < 0.5] = 0
         prediction[prediction >= 0.5] = 127
 
