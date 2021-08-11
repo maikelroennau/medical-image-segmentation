@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from threading import Condition
 
 import cv2
 import numpy as np
@@ -311,7 +312,6 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=verbose)
         prediction = tf.image.resize(prediction[0], original_shape, method="nearest").numpy()
 
-        # prediction[:, :, 0] = 0
         prediction[prediction < 0.5] = 0
         prediction[prediction >= 0.5] = 127
 
@@ -344,11 +344,11 @@ def plot_metrics(history, output=".", figsize=(15, 15)):
                 with open(str(history)) as json_file:
                     history = json.load(json_file)
 
-    validation_metrics = [key for key in history.keys() if key.startswith("val_")]
+    validation_metrics = [key for key in history["train_metrics"].keys() if key.startswith("val_")]
     train_metrics = [key.replace("val_", "") for key in validation_metrics]
     history_keys = train_metrics + validation_metrics + ["lr"]
 
-    df_data = { key: history[key] for key in history_keys }
+    df_data = { key: history["train_metrics"][key] for key in history_keys }
     df = pd.DataFrame(df_data)
     df.index = range(1, len(df.index) + 1)
 
@@ -357,11 +357,27 @@ def plot_metrics(history, output=".", figsize=(15, 15)):
 
     train_image = df[train_metrics].plot(grid=True, figsize=figsize)
     train_image.set(xlabel="Epoch", title="Train metrics")
+    train_image.annotate(
+        f"e{np.argmin(list(df['loss']))}",
+        (np.argmin(list(df["loss"])) + 1, df["loss"].min()),
+        arrowprops=dict(facecolor='black', shrink=0.05))
+    train_image.annotate(
+        f"e{np.argmax(list(df['dice_coef']))}",
+        (np.argmax(list(df["dice_coef"])) + 1, df["dice_coef"].max()),
+        arrowprops=dict(facecolor='black', shrink=0.05))
     train_image = train_image.get_figure()
     train_image.savefig(output_path.joinpath("01_train_metrics.png"))
 
     validation_image = df[validation_metrics].plot(grid=True, figsize=figsize)
     validation_image.set(xlabel="Epoch", title="Validation metrics")
+    validation_image.annotate(
+        f"e{np.argmin(list(df['val_loss']))}",
+        (np.argmin(list(df["val_loss"])) + 1, df["val_loss"].min()),
+        arrowprops=dict(facecolor='black', shrink=0.05))
+    validation_image.annotate(
+        f"e{np.argmax(list(df['val_dice_coef']))}",
+        (np.argmax(list(df["val_dice_coef"])) + 1, df["val_dice_coef"].max()),
+        arrowprops=dict(facecolor='black', shrink=0.05))
     validation_image = validation_image.get_figure()
     validation_image.savefig(output_path.joinpath("02_validation_metrics.png"))
 
