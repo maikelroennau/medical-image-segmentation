@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
@@ -19,7 +20,9 @@ CUSTOM_OBJECTS = {
     "jaccard_index_loss": losses.jaccard_index_loss,
     "weighted_categorical_crossentropy": losses.weighted_categorical_crossentropy,
     "categorical_focal_loss": losses.categorical_focal_loss,
-    "unified_focal_loss": losses.unified_focal_loss
+    "unified_focal_loss": losses.unified_focal_loss,
+    "categorical_crossentropy_plus_dice_loss": sm.metrics.iou_score,
+    "iou_score": sm.metrics.iou_score
 }
 
 METRICS = [
@@ -344,11 +347,17 @@ def plot_metrics(history, output=".", figsize=(15, 15)):
                 with open(str(history)) as json_file:
                     history = json.load(json_file)
 
-    validation_metrics = [key for key in history["train_metrics"].keys() if key.startswith("val_")]
+    if "train_metrics" in history.keys():
+        validation_metrics = [key for key in history["train_metrics"].keys() if key.startswith("val_")]
+    else:
+        validation_metrics = [key for key in history.keys() if key.startswith("val_")]
     train_metrics = [key.replace("val_", "") for key in validation_metrics]
     history_keys = train_metrics + validation_metrics + ["lr"]
 
-    df_data = { key: history["train_metrics"][key] for key in history_keys }
+    if "train_metrics" in history.keys():
+        df_data = { key: history["train_metrics"][key] for key in history_keys }
+    else:
+        df_data = { key: history[key] for key in history_keys }
     df = pd.DataFrame(df_data)
     df.index = range(1, len(df.index) + 1)
 

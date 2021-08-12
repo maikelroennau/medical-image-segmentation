@@ -5,9 +5,8 @@ import types
 from pathlib import Path
 
 import numpy as np
+import segmentation_models as sm
 import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras.layers import BatchNormalization, Conv2D, Conv2DTranspose, MaxPooling2D
 from tensorflow.keras.optimizers import Adam
 
 import losses
@@ -29,9 +28,9 @@ tf.random.set_seed(seed)
 model_name = "AgNOR"
 description = """Experiment description."""
 
-epochs = 200
-batch_size = 10
-steps_per_epoch = 42
+epochs = 20
+batch_size = 1
+steps_per_epoch = 420
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
@@ -47,8 +46,10 @@ train_dataset_path = "dataset/v10/train/"
 validation_dataset_path = "dataset/v10/validation/"
 test_dataset_path = "dataset/v10/test/"
 
-loss_function = losses.weighted_categorical_crossentropy
-metrics = [losses.dice_coef]
+BACKBONE = "resnet34"
+
+loss_function = sm.losses.cce_dice_loss
+metrics = [sm.metrics.iou_score, losses.dice_coef]
 
 ########
 ########
@@ -75,74 +76,18 @@ validation_dataset = utils.load_dataset(
 ########
 
 def make_model(input_shape, classes, model_name="U-Net"):
-    inputs = tf.keras.Input(shape=input_shape)
+    model = sm.Unet(
+        backbone_name=BACKBONE,
+        input_shape=input_shape,
+        classes=classes,
+        activation="softmax" if classes > 1 else "sigmoid",
+        encoder_weights="imagenet",
+        decoder_block_type="upsampling",
+        decoder_filters=(512, 256, 128, 64, 32),
+        decoder_use_batchnorm=True)
 
-    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(inputs)
-    conv1 = BatchNormalization()(conv1)
-    conv1 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv1)
-    conv1 = BatchNormalization()(conv1)
-    pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
-    pool1 = BatchNormalization()(pool1)
-
-    conv2 = Conv2D(64, (3, 3), activation="relu", padding="same")(pool1)
-    conv2 = BatchNormalization()(conv2)
-    conv2 = Conv2D(64, (3, 3), activation="relu", padding="same")(conv2)
-    conv2 = BatchNormalization()(conv2)
-    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
-    pool2 = BatchNormalization()(pool2)
-
-    conv3 = Conv2D(128, (3, 3), activation="relu", padding="same")(pool2)
-    conv3 = BatchNormalization()(conv3)
-    conv3 = Conv2D(128, (3, 3), activation="relu", padding="same")(conv3)
-    conv3 = BatchNormalization()(conv3)
-    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
-    pool3 = BatchNormalization()(pool3)
-
-    conv4 = Conv2D(256, (3, 3), activation="relu", padding="same")(pool3)
-    conv4 = BatchNormalization()(conv4)
-    conv4 = Conv2D(256, (3, 3), activation="relu", padding="same")(conv4)
-    pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
-    pool4 = BatchNormalization()(pool4)
-
-    conv5 = Conv2D(512, (3, 3), activation="relu", padding="same")(pool4)
-    conv5 = BatchNormalization()(conv5)
-    conv5 = Conv2D(512, (3, 3), activation="relu", padding="same")(conv5)
-    conv5 = BatchNormalization()(conv5)
-
-    up6 = layers.concatenate([Conv2DTranspose(256, (2, 2), strides=(2, 2), padding="same")(conv5), conv4], axis=3)
-    up6 = BatchNormalization()(up6)
-    conv6 = Conv2D(256, (3, 3), activation="relu", padding="same")(up6)
-    conv6 = BatchNormalization()(conv6)
-    conv6 = Conv2D(256, (3, 3), activation="relu", padding="same")(conv6)
-    conv6 = BatchNormalization()(conv6)
-
-    up7 = layers.concatenate([Conv2DTranspose(128, (2, 2), strides=(2, 2), padding="same")(conv6), conv3], axis=3)
-    up7 = BatchNormalization()(up7)
-    conv7 = Conv2D(128, (3, 3), activation="relu", padding="same")(up7)
-    conv7 = BatchNormalization()(conv7)
-    conv7 = Conv2D(128, (3, 3), activation="relu", padding="same")(conv7)
-    conv7 = BatchNormalization()(conv7)
-
-    up8 = layers.concatenate([Conv2DTranspose(64, (2, 2), strides=(2, 2), padding="same")(conv7), conv2], axis=3)
-    up8 = BatchNormalization()(up8)
-    conv8 = Conv2D(64, (3, 3), activation="relu", padding="same")(up8)
-    conv8 = BatchNormalization()(conv8)
-    conv8 = Conv2D(64, (3, 3), activation="relu", padding="same")(conv8)
-    conv8 = BatchNormalization()(conv8)
-
-    up9 = layers.concatenate([Conv2DTranspose(32, (2, 2), strides=(2, 2), padding="same")(conv8), conv1], axis=3)
-    up9 = BatchNormalization()(up9)
-    conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(up9)
-    conv9 = BatchNormalization()(conv9)
-    conv9 = Conv2D(32, (3, 3), activation="relu", padding="same")(conv9)
-    conv9 = BatchNormalization()(conv9)
-
-    outputs = Conv2D(classes, (1, 1), activation="softmax" if classes > 1 else "sigmoid")(conv9)
-
-    model = tf.keras.Model(inputs=[inputs], outputs=[outputs], name=model_name)
-
+    model._name = model_name
     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
-
     return model
 
 model = make_model(input_shape=input_shape, classes=classes, model_name=model_name)
@@ -166,6 +111,7 @@ callbacks = [
 train_config = {
     "model_name": model.name,
     "description": description,
+    "backbone": BACKBONE,
     "seed": seed,
     "classes": classes,
     "epochs": epochs,
@@ -209,6 +155,7 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 start = time.time()
 print(f"\nTraining start: {time.strftime('%x %X')}")
 print(f"  - Model name: {model.name}")
+print(f"  - Backbone: {BACKBONE}")
 print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
 print(f"  - Epochs: {epochs}")
