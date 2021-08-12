@@ -117,6 +117,7 @@ dependencies:
     - rsa==4.7.2
     - scikit-image==0.18.2
     - scipy==1.6.2
+    - segmentation-models==1.0.1
     - send2trash==1.7.1
     - six==1.15.0
     - sniffio==1.2.0
