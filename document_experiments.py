@@ -56,6 +56,7 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
 
     output = Path(output)
 
+    files.sort()
     for json_file in tqdm(files):
         try:
             with open(json_file, "r") as experiment:
