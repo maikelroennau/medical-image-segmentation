@@ -28,25 +28,26 @@ tf.random.set_seed(seed)
 model_name = "AgNOR"
 description = """Experiment description."""
 
-epochs = 20
+epochs = 3
 batch_size = 1
 steps_per_epoch = 420
 
-height = 960 # 240 480 960 1920
-width = 1280 # 320 640 1280 2560
+height = 480 # 240 480 960 1920
+width = 640 # 320 640 1280 2560
 input_shape = (height, width, 3)
 
 classes = 3
 learning_rate = 1e-4
 learning_rate_change_factor = 0.75
 one_hot_encoded = True if classes > 1 else False
-class_distribution = True
+class_distribution = False
 
 train_dataset_path = "dataset/v10/train/"
 validation_dataset_path = "dataset/v10/validation/"
 test_dataset_path = "dataset/v10/test/"
 
-BACKBONE = "resnet34"
+DECODER = "Linknet" # U-Net FPN Linknet PSPNet
+BACKBONE = "vgg19"
 
 loss_function = sm.losses.cce_dice_loss
 metrics = [sm.metrics.iou_score, losses.dice_coef]
@@ -75,22 +76,65 @@ validation_dataset = utils.load_dataset(
 ########
 ########
 
-def make_model(input_shape, classes, model_name="U-Net"):
-    model = sm.Unet(
-        backbone_name=BACKBONE,
-        input_shape=input_shape,
-        classes=classes,
-        activation="softmax" if classes > 1 else "sigmoid",
-        encoder_weights="imagenet",
-        decoder_block_type="upsampling",
-        decoder_filters=(512, 256, 128, 64, 32),
-        decoder_use_batchnorm=True)
+def make_model(decoder, backbone, input_shape, classes, model_name="AgNOR"):
+    if decoder == "U-Net":
+        model = sm.Unet(
+            backbone_name=backbone,
+            input_shape=input_shape,
+            classes=classes,
+            activation="softmax" if classes > 1 else "sigmoid",
+            encoder_weights="imagenet",
+            encoder_freeze=False,
+            decoder_block_type="transpose",
+            decoder_filters=(512, 256, 128, 64, 32),
+            decoder_use_batchnorm=True
+        )
+    elif decoder == "FPN":
+        model = sm.FPN(
+            backbone_name=backbone,
+            input_shape=input_shape,
+            classes=classes,
+            activation="softmax" if classes > 1 else "sigmoid",
+            encoder_weights="imagenet",
+            encoder_freeze=False,
+            pyramid_block_filters=256,
+            pyramid_use_batchnorm=True,
+            pyramid_aggregation="concat",
+            pyramid_dropout=None
+        )
+    elif decoder == "Linknet":
+        model = sm.Linknet(
+            backbone_name=backbone,
+            input_shape=input_shape,
+            classes=classes,
+            activation="softmax" if classes > 1 else "sigmoid",
+            encoder_weights="imagenet",
+            encoder_freeze=False,
+            decoder_filters=(None, None, None, None, 16),
+            decoder_use_batchnorm=True,
+            decoder_block_type="transpose"
+        )
+    elif decoder == "PSPNet":
+        model = sm.PSPNet(
+            backbone_name=backbone,
+            input_shape=input_shape,
+            classes=classes,
+            activation="softmax" if classes > 1 else "sigmoid",
+            encoder_weights="imagenet",
+            encoder_freeze=False,
+            downsample_factor=8,
+            psp_conv_filters=512,
+            psp_pooling_type="avg",
+            psp_use_batchnorm=True,
+            psp_dropout=None,
+        )
 
     model._name = model_name
     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
     return model
 
-model = make_model(input_shape=input_shape, classes=classes, model_name=model_name)
+
+model = make_model(DECODER, BACKBONE, input_shape, classes, model_name)
 model.summary()
 
 ########
@@ -100,7 +144,7 @@ checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%
 os.makedirs(checkpoint_directory, exist_ok=True)
 
 callbacks = [
-    tf.keras.callbacks.ReduceLROnPlateau(monitor="loss", factor=learning_rate_change_factor, patience=10, verbose=1, mode="auto", cooldown=1),
+    tf.keras.callbacks.ReduceLROnPlateau(monitor="iou_score", factor=learning_rate_change_factor, min_delta=0.5, patience=10, verbose=1, mode="auto", cooldown=1),
     tf.keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="loss", save_best_only=True),
     # tf.keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
 ]
@@ -155,6 +199,7 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 start = time.time()
 print(f"\nTraining start: {time.strftime('%x %X')}")
 print(f"  - Model name: {model.name}")
+print(f"  - Decoder: {DECODER}")
 print(f"  - Backbone: {BACKBONE}")
 print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
@@ -196,6 +241,8 @@ print(f"Training start: {time.strftime('%x %X')}")
 print(f"Training end: {time.strftime('%x %X')}")
 print(f"Duration: {duration}")
 print(f"  - Model name: {model.name}")
+print(f"  - Decoder: {DECODER}")
+print(f"  - Backbone: {BACKBONE}")
 print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
 print(f"  - Epochs: {epochs}")
