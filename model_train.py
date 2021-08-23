@@ -46,8 +46,8 @@ train_dataset_path = "dataset/v10/train/"
 validation_dataset_path = "dataset/v10/validation/"
 test_dataset_path = "dataset/v10/test/"
 
-DECODER = "Linknet" # U-Net FPN Linknet PSPNet
-BACKBONE = "vgg19"
+DECODER = "U-Net" # U-Net FPN Linknet PSPNet
+BACKBONE = "resnet34"
 
 loss_function = sm.losses.cce_dice_loss
 metrics = [sm.metrics.iou_score, losses.dice_coef]
