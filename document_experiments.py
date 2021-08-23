@@ -62,13 +62,18 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
             with open(json_file, "r") as experiment:
                 experiment = json.load(experiment)
 
-                for key in model_metric_keys:
-                    if "loss" in key:
-                        experiment[key] = np.min(experiment["train_metrics"][key])
-                        experiment[f"min_{key}_epoch"] = np.argmin(experiment["train_metrics"][key])
-                    else:
-                        experiment[key] = np.max(experiment["train_metrics"][key])
-                        experiment[f"max_{key}_epoch"] = np.argmax(experiment["train_metrics"][key])
+                if "train_metrics" in experiment.keys():
+                    for key in experiment["train_metrics"].keys():
+                        experiment[key] = experiment["train_metrics"][key]
+
+                if "loss" in experiment.keys():
+                    for key in model_metric_keys:
+                        if "loss" in key:
+                            experiment[key] = np.min(experiment[key])
+                            experiment[f"min_{key}_epoch"] = np.argmin(experiment[key])
+                        else:
+                            experiment[key] = np.max(experiment[key])
+                            experiment[f"max_{key}_epoch"] = np.argmax(experiment[key])
 
                 experiment["directory"] = Path(experiment["directory"]).name
                 experiment["input_shape"] = "x".join([str(value) for value in experiment["input_shape"]])
@@ -115,7 +120,7 @@ def main():
             "-o",
             "--output",
             help="Path where to save the converted experiment data.",
-            default=".",
+            default="experiments.csv",
             type=str)
 
     args = parser.parse_args()
