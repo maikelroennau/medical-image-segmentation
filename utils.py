@@ -21,14 +21,16 @@ CUSTOM_OBJECTS = {
     "weighted_categorical_crossentropy": losses.weighted_categorical_crossentropy,
     "categorical_focal_loss": losses.categorical_focal_loss,
     "unified_focal_loss": losses.unified_focal_loss,
-    "iou_score": sm.metrics.iou_score,
     "categorical_crossentropy_plus_dice_loss": sm.losses.cce_dice_loss,
-    "focal_loss_plus_dice_loss": sm.losses.categorical_focal_dice_loss
+    "focal_loss_plus_dice_loss": sm.losses.categorical_focal_dice_loss,
+    "f1-score": sm.metrics.f1_score,
+    "iou_score": sm.metrics.iou_score,
 }
 
 METRICS = [
     "accuracy",
     losses.dice_coef,
+    sm.metrics.f1_score,
     sm.metrics.iou_score
 ]
 
