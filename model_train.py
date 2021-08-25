@@ -28,9 +28,9 @@ tf.random.set_seed(seed)
 model_name = "AgNOR"
 description = """Experiment description."""
 
-epochs = 3
-batch_size = 1
-steps_per_epoch = 420
+epochs = 10
+batch_size = 10
+steps_per_epoch = 42
 
 height = 960 # 240 480 960 1920
 width = 1280 # 320 640 1280 2560
@@ -50,7 +50,7 @@ DECODER = "U-Net" # U-Net FPN Linknet PSPNet
 BACKBONE = "resnet34"
 
 loss_function = sm.losses.cce_dice_loss
-metrics = [sm.metrics.iou_score, losses.dice_coef]
+metrics = [sm.metrics.iou_score, sm.metrics.f1_score, losses.dice_coef]
 
 ########
 ########
