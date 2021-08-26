@@ -10,8 +10,8 @@ from tqdm import tqdm
 experiment_data = {
     "directory": None,
     "model_name": None,
-    "decoder": None,
     "backbone": None,
+    "decoder": None,
     "epochs": None,
     "batch_size": None,
     "steps_per_epoch": None,
@@ -27,20 +27,20 @@ experiment_data = {
     "min_loss_epoch": None,
     "val_loss": None,
     "min_val_loss_epoch": None,
+    "val_f1-score": None,
+    "max_val_f1-score_epoch": None,
     "val_iou_score": None,
     "max_val_iou_score_epoch": None,
-    "val_dice_coef": None,
-    "max_val_dice_coef_epoch": None,
     "description": None
 }
 
 model_metric_keys = [
     "loss",
+    "f1-score",
     "iou_score",
-    "dice_coef",
     "val_loss",
+    "val_f1-score",
     "val_iou_score",
-    "val_dice_coef"
 ]
 
 
@@ -69,11 +69,11 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                 if "loss" in experiment.keys():
                     for key in model_metric_keys:
                         if "loss" in key:
+                            experiment[f"min_{key}_epoch"] = np.argmin(experiment[key]) + 1
                             experiment[key] = np.min(experiment[key])
-                            experiment[f"min_{key}_epoch"] = np.argmin(experiment[key])
                         else:
+                            experiment[f"max_{key}_epoch"] = np.argmax(experiment[key]) + 1
                             experiment[key] = np.max(experiment[key])
-                            experiment[f"max_{key}_epoch"] = np.argmax(experiment[key])
 
                 experiment["directory"] = Path(experiment["directory"]).name
                 experiment["input_shape"] = "x".join([str(value) for value in experiment["input_shape"]])
