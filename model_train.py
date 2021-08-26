@@ -32,8 +32,8 @@ epochs = 10
 batch_size = 10
 steps_per_epoch = 42
 
-height = 960 # 240 480 960 1920
-width = 1280 # 320 640 1280 2560
+height = 960 # 240 480 960  1440 1920
+width = 1280 # 320 640 1280 1920 2560
 input_shape = (height, width, 3)
 
 classes = 3
@@ -156,6 +156,7 @@ train_config = {
     "model_name": model.name,
     "description": description,
     "backbone": BACKBONE,
+    "decoder": DECODER,
     "seed": seed,
     "classes": classes,
     "epochs": epochs,
@@ -199,8 +200,8 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 start = time.time()
 print(f"\nTraining start: {time.strftime('%x %X')}")
 print(f"  - Model name: {model.name}")
-print(f"  - Decoder: {DECODER}")
 print(f"  - Backbone: {BACKBONE}")
+print(f"  - Decoder: {DECODER}")
 print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
 print(f"  - Epochs: {epochs}")
@@ -241,8 +242,8 @@ print(f"Training start: {time.strftime('%x %X')}")
 print(f"Training end: {time.strftime('%x %X')}")
 print(f"Duration: {duration}")
 print(f"  - Model name: {model.name}")
-print(f"  - Decoder: {DECODER}")
 print(f"  - Backbone: {BACKBONE}")
+print(f"  - Decoder: {DECODER}")
 print(f"  - Seed: {seed}")
 print(f"  - Classes: {classes}")
 print(f"  - Epochs: {epochs}")
