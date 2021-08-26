@@ -29,7 +29,6 @@ CUSTOM_OBJECTS = {
 
 METRICS = [
     "accuracy",
-    losses.dice_coef,
     sm.metrics.f1_score,
     sm.metrics.iou_score
 ]
@@ -233,7 +232,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
 
             # Check for the best model
             if "model" in best_model:
-                if evaluation_metrics[0] < best_model["loss"]:
+                if evaluation_metrics[2] > best_model["f1-score"]:
                     best_model["model"] = str(model_path)
                     best_model["loss"] = evaluation_metrics[0]
                     for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
@@ -370,12 +369,12 @@ def plot_metrics(history, output=".", figsize=(15, 15)):
     train_image = df[train_metrics].plot(grid=True, figsize=figsize)
     train_image.set(xlabel="Epoch", title="Train metrics")
     train_image.annotate(
-        f"e{np.argmin(list(df['loss']))}",
+        f"e{np.argmin(list(df['loss'])) + 1}",
         (np.argmin(list(df["loss"])) + 1, df["loss"].min()),
         arrowprops=dict(facecolor='black', shrink=0.05))
     train_image.annotate(
-        f"e{np.argmax(list(df['dice_coef']))}",
-        (np.argmax(list(df["dice_coef"])) + 1, df["dice_coef"].max()),
+        f"e{np.argmax(list(df['f1-score'])) + 1}",
+        (np.argmax(list(df["f1-score"])) + 1, df["f1-score"].max()),
         arrowprops=dict(facecolor='black', shrink=0.05))
     train_image = train_image.get_figure()
     train_image.savefig(output_path.joinpath("01_train_metrics.png"))
@@ -383,12 +382,12 @@ def plot_metrics(history, output=".", figsize=(15, 15)):
     validation_image = df[validation_metrics].plot(grid=True, figsize=figsize)
     validation_image.set(xlabel="Epoch", title="Validation metrics")
     validation_image.annotate(
-        f"e{np.argmin(list(df['val_loss']))}",
+        f"e{np.argmin(list(df['val_loss'])) + 1}",
         (np.argmin(list(df["val_loss"])) + 1, df["val_loss"].min()),
         arrowprops=dict(facecolor='black', shrink=0.05))
     validation_image.annotate(
-        f"e{np.argmax(list(df['val_dice_coef']))}",
-        (np.argmax(list(df["val_dice_coef"])) + 1, df["val_dice_coef"].max()),
+        f"e{np.argmax(list(df['val_f1-score'])) + 1}",
+        (np.argmax(list(df["val_f1-score"])) + 1, df["val_f1-score"].max()),
         arrowprops=dict(facecolor='black', shrink=0.05))
     validation_image = validation_image.get_figure()
     validation_image.savefig(output_path.joinpath("02_validation_metrics.png"))
