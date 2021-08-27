@@ -32,8 +32,8 @@ epochs = 10
 batch_size = 10
 steps_per_epoch = 42
 
-height = 960 # 240 480 960  1440 1920
-width = 1280 # 320 640 1280 1920 2560
+height = 960 # 240 480 960 1152 1440 1920
+width = 1280 # 320 640 1280 1536 1920 2560
 input_shape = (height, width, 3)
 
 classes = 3
