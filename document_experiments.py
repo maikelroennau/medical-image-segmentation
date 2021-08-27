@@ -79,6 +79,7 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                 experiment["input_shape"] = "x".join([str(value) for value in experiment["input_shape"]])
 
                 for key in experiment_data.keys():
+                    experiment_data[key] = None
                     if key in experiment.keys():
                         experiment_data[key] = [experiment[key]]
 
@@ -125,6 +126,7 @@ def main():
 
     args = parser.parse_args()
     document(args.experiment_file, args.pattern, args.output)
+
 
 if __name__ == "__main__":
     main()
