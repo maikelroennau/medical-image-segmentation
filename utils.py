@@ -205,8 +205,12 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         height, width, channels = input_shape
 
         evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
-        models_metrics = {}
         best_model = {}
+        models_metrics = {}
+        models_metrics["test_loss"] = []
+        for i in range(len(METRICS)):
+            metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
+            models_metrics[f"test_{metric}"] = []
 
         for i, model_path in enumerate(models):
             loaded_model = tf.keras.models.load_model(str(model_path), custom_objects=CUSTOM_OBJECTS)
@@ -223,12 +227,10 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
                 print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
 
             # Add model metrics to dict
-            models_metrics[model_path.name] = {}
-            models_metrics[model_path.name]["model"] = str(model_path)
-            models_metrics[model_path.name]["loss"] = evaluation_metrics[0]
+            models_metrics["test_loss"].append(evaluation_metrics[0])
             for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
                 metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                models_metrics[model_path.name][metric] = evaluation_metric
+                models_metrics[f"test_{metric}"].append(evaluation_metric)
 
             # Check for the best model
             if "model" in best_model:
