@@ -205,12 +205,19 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         height, width, channels = input_shape
 
         evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
+        
+        if models[0].parent.joinpath("train_config.json").is_file():
+            with open(str(models[0].parent.joinpath("train_config.json")), "r") as config_file:
+                epochs = json.load(config_file)["epochs"]
+        else:
+            epochs = int(str(models[-1]).split("_")[1][1:])
+        
         best_model = {}
         models_metrics = {}
-        models_metrics["test_loss"] = []
+        models_metrics["test_loss"] = [0] * epochs
         for i in range(len(METRICS)):
             metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-            models_metrics[f"test_{metric}"] = []
+            models_metrics[f"test_{metric}"] = [0] * len(models_metrics["test_loss"])
 
         for i, model_path in enumerate(models):
             loaded_model = tf.keras.models.load_model(str(model_path), custom_objects=CUSTOM_OBJECTS)
@@ -227,10 +234,10 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
                 print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
 
             # Add model metrics to dict
-            models_metrics["test_loss"].append(evaluation_metrics[0])
+            models_metrics["test_loss"][int(str(model_path).split("_")[1][1:])-1] = evaluation_metrics[0]
             for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
                 metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                models_metrics[f"test_{metric}"].append(evaluation_metric)
+                models_metrics[f"test_{metric}"][int(str(model_path).split("_")[1][1:])-1] = evaluation_metric
 
             # Check for the best model
             if "model" in best_model:
@@ -347,8 +354,9 @@ def plot_metrics(data, title="", output=".", figsize=(15, 15)):
     df.index = range(1, len(df.index) + 1)
 
     image = df.plot(grid=True, figsize=figsize)
-    image.set_ylim(ymin=0)
     image.set(xlabel="Epoch", title=title)
+    image.set_ylim(ymin=0)
+
     for column in df.columns:
         if "loss" in column:
             text = f"e{np.argmin(list(df[column])) + 1}"
