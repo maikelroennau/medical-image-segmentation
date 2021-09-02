@@ -47,7 +47,7 @@ validation_dataset_path = "dataset/v10/validation/"
 test_dataset_path = "dataset/v10/test/"
 
 DECODER = "U-Net" # U-Net FPN Linknet PSPNet
-BACKBONE = "resnet34"
+BACKBONE = "vgg16"
 
 loss_function = sm.losses.cce_dice_loss
 metrics = [sm.metrics.iou_score, sm.metrics.f1_score]
@@ -140,13 +140,13 @@ model.summary()
 ########
 ########
 
-checkpoint_directory = os.path.join("checkpoints", f"{time.strftime('%Y%m%d%H%M%S')}")
-os.makedirs(checkpoint_directory, exist_ok=True)
+checkpoint_directory = Path("checkpoints").joinpath(f"{time.strftime('%Y%m%d%H%M%S')}")
+checkpoint_directory.mkdir(exist_ok=True, parents=True)
 
 callbacks = [
     tf.keras.callbacks.ReduceLROnPlateau(monitor="iou_score", factor=learning_rate_change_factor, min_delta=0.5, patience=10, verbose=1, mode="auto", cooldown=1),
-    tf.keras.callbacks.ModelCheckpoint(os.path.join(checkpoint_directory, model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"), monitor="loss", save_best_only=True),
-    # tf.keras.callbacks.TensorBoard(log_dir=os.path.join(checkpoint_directory, "logs"), histogram_freq=1, update_freq="batch", write_images=False)
+    tf.keras.callbacks.ModelCheckpoint(str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5")), monitor="loss", save_best_only=True),
+    # tf.keras.callbacks.TensorBoard(log_dir=str(checkpoint_directory.joinpath("logs")), histogram_freq=1, update_freq="batch", write_images=False)
 ]
 
 ########
@@ -168,7 +168,7 @@ train_config = {
     "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
     "initial_learning_rate": model.optimizer.get_config()['learning_rate'],
     "learning_rate_change_factor": learning_rate_change_factor,
-    "directory": checkpoint_directory,
+    "directory": checkpoint_directory.name,
     "train_dataset": train_dataset_path,
     "validation_dataset": validation_dataset_path,
     "test_dataset": test_dataset_path,
@@ -183,7 +183,7 @@ if class_distribution and classes > 1:
         train_dataset,
         batches=steps_per_epoch // batch_size,
         plot=True,
-        output=checkpoint_directory)
+        output=str(checkpoint_directory))
 
     train_config["class_distribution"] = class_distribution
 
@@ -191,7 +191,7 @@ if class_distribution and classes > 1:
     for class_name, value in class_distribution.items():
         print(f"  - {str(round(value, 2)).zfill(5)} ==> {class_name}")
 
-with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
+with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
     json.dump(train_config, config_file, indent=4)
 
 ########
@@ -212,7 +212,7 @@ print(f"  - One hot encoded: {one_hot_encoded}")
 print(f"  - Loss function: {loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name}")
 print(f"  - Metrics: {[metric if isinstance(metric, str) else metric.__name__ for metric in metrics]}")
 print(f"  - Initial Learning rate: {model.optimizer.get_config()['learning_rate']}")
-print(f"  - Checkpoints saved at: {checkpoint_directory}")
+print(f"  - Checkpoints saved at: {str(checkpoint_directory)}")
 print(f"  - Dataset:")
 print(f"    - Train: {train_dataset_path}")
 print(f"    - Validation: {validation_dataset_path}")
@@ -255,7 +255,7 @@ print(f"  - Loss function: {loss_function.__name__ if isinstance(loss_function, 
 print(f"  - Metrics: {[metric if isinstance(metric, str) else metric.__name__ for metric in metrics]}")
 print(f"  - Initial Learning rate: {model.optimizer.get_config()['learning_rate']}")
 print(f"  - Final learning rate: {model.optimizer.get_config()['learning_rate']}")
-print(f"  - Checkpoints saved at: {checkpoint_directory}")
+print(f"  - Checkpoints saved at: {str(checkpoint_directory)}")
 print(f"  - Dataset:")
 print(f"    - Train: {train_dataset_path}")
 print(f"    - Validation: {validation_dataset_path}")
@@ -268,7 +268,7 @@ if history:
         v = [float(i) for i in v]
         train_config["train_metrics"][k] = v
 
-with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
+with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
     json.dump(train_config, config_file, indent=4)
 
 ########
@@ -276,7 +276,7 @@ with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as confi
 
 print(f"\nEvaluate all saved models on test data '{test_dataset_path}'")
 best_model, models_metrics = utils.evaluate(
-    checkpoint_directory,
+    str(checkpoint_directory),
     test_dataset_path,
     batch_size,
     input_shape=None,
@@ -285,13 +285,29 @@ best_model, models_metrics = utils.evaluate(
 
 if best_model is not None or models_metrics is not None:
     train_config["best_model"] = best_model
-    train_config["models_metrics"] = models_metrics
+    train_config["test_metrics"] = models_metrics
     model_path = best_model["model"]
 
-    with open(os.path.join(checkpoint_directory, "train_config.json"), "w") as config_file:
+    with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
         json.dump(train_config, config_file, indent=4)
 
-    utils.plot_metrics(history.history, output=checkpoint_directory)
+    utils.plot_metrics(
+        { key: value for key, value in train_config["train_metrics"].items()
+            if not key.startswith("val_") and not key.startswith("lr") },
+        title="Training metrics",
+        output=str(checkpoint_directory.joinpath("01_train.png")))
+    utils.plot_metrics(
+        { key: value for key, value in train_config["train_metrics"].items() if key.startswith("val_") },
+        title="Validation metrics",
+        output=str(checkpoint_directory.joinpath("02_validation.png")))
+    utils.plot_metrics(
+        { key: value for key, value in train_config["test_metrics"].items() },
+        title="Test metrics",
+        output=str(checkpoint_directory.joinpath("03_test.png")))
+    utils.plot_metrics(
+        { key: value for key, value in train_config["train_metrics"].items() if key == "lr" },
+        title="Learning rate",
+        output=str(checkpoint_directory.joinpath("04_learning_rate.png")))
 else:
     model_path = None
 
@@ -300,7 +316,7 @@ else:
 
 print(f"\n\nPredict with best model on test data '{test_dataset_path}'")
 utils.predict(
-    model_path,
+    str(Path(checkpoint_directory).joinpath(model_path)),
     images_path=Path(test_dataset_path).joinpath("images"),
     batch_size=batch_size,
     output_path=Path(test_dataset_path).joinpath("images"),

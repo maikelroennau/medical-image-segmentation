@@ -29,7 +29,6 @@ CUSTOM_OBJECTS = {
 }
 
 METRICS = [
-    "accuracy",
     sm.metrics.f1_score,
     sm.metrics.iou_score
 ]
@@ -235,14 +234,14 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
 
             # Check for the best model
             if "model" in best_model:
-                if evaluation_metrics[2] > best_model["f1-score"]:
-                    best_model["model"] = str(model_path)
+                if evaluation_metrics[1] > best_model["f1-score"]:
+                    best_model["model"] = model_path.name
                     best_model["loss"] = evaluation_metrics[0]
                     for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
                         metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
                         best_model[metric] = evaluation_metric
             else:
-                best_model["model"] = str(model_path)
+                best_model["model"] = model_path.name
                 best_model["loss"] = evaluation_metrics[0]
                 for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
                     metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
