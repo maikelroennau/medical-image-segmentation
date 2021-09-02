@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pandas as pd
 import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
@@ -339,65 +340,29 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         tf.keras.backend.clear_session()
 
 
-def plot_metrics(history, output=".", figsize=(15, 15)):
-    import pandas as pd
+def plot_metrics(data, title="", output=".", figsize=(15, 15)):
+    output_path = Path(output)
+    output_path.parent.mkdir(exist_ok=True, parents=True)
 
-    if not isinstance(history, dict):
-        if not isinstance(history, str):
-            print("\nOject type not suported for plotting training history.")
-            return
-        else:
-            if Path(history).is_file():
-                with open(str(history)) as json_file:
-                    history = json.load(json_file)
-
-    if "train_metrics" in history.keys():
-        validation_metrics = [key for key in history["train_metrics"].keys() if key.startswith("val_")]
-    else:
-        validation_metrics = [key for key in history.keys() if key.startswith("val_")]
-    train_metrics = [key.replace("val_", "") for key in validation_metrics]
-    history_keys = train_metrics + validation_metrics + ["lr"]
-
-    if "train_metrics" in history.keys():
-        df_data = { key: history["train_metrics"][key] for key in history_keys }
-    else:
-        df_data = { key: history[key] for key in history_keys }
-    df = pd.DataFrame(df_data)
+    df = pd.DataFrame(data)
     df.index = range(1, len(df.index) + 1)
 
-    output_path = Path(output)
-    output_path.mkdir(exist_ok=True, parents=True)
+    image = df.plot(grid=True, figsize=figsize)
+    image.set_ylim(ymin=0)
+    image.set(xlabel="Epoch", title=title)
+    for column in df.columns:
+        if "loss" in column:
+            text = f"e{np.argmin(list(df[column])) + 1}"
+            value = (np.argmin(list(df[column])) + 1, df[column].min())
+        else:
+            text = f"e{np.argmax(list(df[column])) + 1}"
+            value = (np.argmax(list(df[column])) + 1, df[column].max())
 
-    train_image = df[train_metrics].plot(grid=True, figsize=figsize)
-    train_image.set(xlabel="Epoch", title="Train metrics")
-    train_image.annotate(
-        f"e{np.argmin(list(df['loss'])) + 1}",
-        (np.argmin(list(df["loss"])) + 1, df["loss"].min()),
-        arrowprops=dict(facecolor='black', shrink=0.05))
-    train_image.annotate(
-        f"e{np.argmax(list(df['f1-score'])) + 1}",
-        (np.argmax(list(df["f1-score"])) + 1, df["f1-score"].max()),
-        arrowprops=dict(facecolor='black', shrink=0.05))
-    train_image = train_image.get_figure()
-    train_image.savefig(output_path.joinpath("01_train_metrics.png"))
+        if column != "lr":
+            image.annotate(text, value, arrowprops=dict(facecolor='black', shrink=0.05))
 
-    validation_image = df[validation_metrics].plot(grid=True, figsize=figsize)
-    validation_image.set(xlabel="Epoch", title="Validation metrics")
-    validation_image.annotate(
-        f"e{np.argmin(list(df['val_loss'])) + 1}",
-        (np.argmin(list(df["val_loss"])) + 1, df["val_loss"].min()),
-        arrowprops=dict(facecolor='black', shrink=0.05))
-    validation_image.annotate(
-        f"e{np.argmax(list(df['val_f1-score'])) + 1}",
-        (np.argmax(list(df["val_f1-score"])) + 1, df["val_f1-score"].max()),
-        arrowprops=dict(facecolor='black', shrink=0.05))
-    validation_image = validation_image.get_figure()
-    validation_image.savefig(output_path.joinpath("02_validation_metrics.png"))
-
-    lr_image = df[["lr"]].plot(grid=True, figsize=figsize)
-    lr_image.set(xlabel="Epoch", title="Learning rate")
-    lr_image = lr_image.get_figure()
-    lr_image.savefig(output_path.joinpath("03_learning_rate.png"))
+    image = image.get_figure()
+    image.savefig(str(output_path))
 
 
 def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10), output=".", get_as_weights=False, classes=["Background", "Nucleus", "NOR"]):
