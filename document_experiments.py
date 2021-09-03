@@ -31,6 +31,12 @@ experiment_data = {
     "max_val_f1-score_epoch": None,
     "val_iou_score": None,
     "max_val_iou_score_epoch": None,
+    "test_loss": None,
+    "min_test_loss_epoch": None,
+    "test_f1-score": None,
+    "max_test_f1-score_epoch": None,
+    "test_iou_score": None,
+    "max_test_iou_score_epoch": None,
     "description": None
 }
 
@@ -41,6 +47,9 @@ model_metric_keys = [
     "val_loss",
     "val_f1-score",
     "val_iou_score",
+    "test_loss",
+    "test_f1-score",
+    "test_iou_score"
 ]
 
 
@@ -66,11 +75,21 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                     for key in experiment["train_metrics"].keys():
                         experiment[key] = experiment["train_metrics"][key]
 
+                if "test_metrics" in experiment.keys():
+                    for key in experiment["test_metrics"].keys():
+                        experiment[key] = experiment["test_metrics"][key]
+
                 if "loss" in experiment.keys():
                     for key in model_metric_keys:
                         if "loss" in key:
-                            experiment[f"min_{key}_epoch"] = np.argmin(experiment[key]) + 1
-                            experiment[key] = np.min(experiment[key])
+                            if key == "test_loss":
+                                test_loss = np.array(experiment[key])
+                                test_loss = test_loss[test_loss > 0]
+                                experiment[f"min_{key}_epoch"] = np.argwhere(experiment[key] == np.min(test_loss))[0][0] + 1
+                                experiment[key] = np.min(test_loss)
+                            else:
+                                experiment[f"min_{key}_epoch"] = np.argmin(experiment[key]) + 1
+                                experiment[key] = np.min(experiment[key])
                         else:
                             experiment[f"max_{key}_epoch"] = np.argmax(experiment[key]) + 1
                             experiment[key] = np.max(experiment[key])
@@ -89,7 +108,7 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                     if output.is_file():
                         existing_data = pd.read_csv(str(output))
                         if int(experiment_data["directory"][0]) not in existing_data["directory"].values:
-                            df.to_csv(str(output), mode="a", header=False, index=False)        
+                            df.to_csv(str(output), mode="a", header=False, index=False)
                     else:
                         df.to_csv(str(output), mode="w", header=True, index=False)
                 else:
