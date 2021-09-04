@@ -205,13 +205,13 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         height, width, channels = input_shape
 
         evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
-        
+
         if models[0].parent.joinpath("train_config.json").is_file():
             with open(str(models[0].parent.joinpath("train_config.json")), "r") as config_file:
                 epochs = json.load(config_file)["epochs"]
         else:
-            epochs = int(str(models[-1]).split("_")[1][1:])
-        
+            epochs = int(str(models[-1]).split("AgNOR")[1].split("_")[1][1:])
+
         best_model = {}
         models_metrics = {}
         models_metrics["test_loss"] = [0] * epochs
@@ -234,10 +234,10 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
                 print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
 
             # Add model metrics to dict
-            models_metrics["test_loss"][int(str(model_path).split("_")[1][1:])-1] = evaluation_metrics[0]
+            models_metrics["test_loss"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])] = evaluation_metrics[0]
             for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
                 metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                models_metrics[f"test_{metric}"][int(str(model_path).split("_")[1][1:])-1] = evaluation_metric
+                models_metrics[f"test_{metric}"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])] = evaluation_metric
 
             # Check for the best model
             if "model" in best_model:
