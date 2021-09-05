@@ -55,12 +55,6 @@ def main():
         default=0)
 
     parser.add_argument(
-        "--memory-growth",
-        help="Whether or not to allow GPU memory growth.",
-        default=False,
-        action="store_true")
-
-    parser.add_argument(
         "--seed",
         help="Seed for reproducibility.",
         default=1145,
@@ -69,7 +63,6 @@ def main():
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = str(args.memory_growth).lower()
     tf.random.set_seed(args.seed)
 
     if args.input_shape:

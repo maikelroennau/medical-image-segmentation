@@ -24,6 +24,7 @@ CUSTOM_OBJECTS = {
     "unified_focal_loss": losses.unified_focal_loss,
     "categorical_crossentropy_plus_dice_loss": sm.losses.cce_dice_loss,
     "focal_loss_plus_dice_loss": sm.losses.categorical_focal_dice_loss,
+    "focal_loss": sm.losses.categorical_focal_loss,
     "f1-score": sm.metrics.f1_score,
     "iou_score": sm.metrics.iou_score,
 }
@@ -234,10 +235,10 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
                 print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
 
             # Add model metrics to dict
-            models_metrics["test_loss"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])] = evaluation_metrics[0]
+            models_metrics["test_loss"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metrics[0]
             for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
                 metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                models_metrics[f"test_{metric}"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])] = evaluation_metric
+                models_metrics[f"test_{metric}"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metric
 
             # Check for the best model
             if "model" in best_model:
