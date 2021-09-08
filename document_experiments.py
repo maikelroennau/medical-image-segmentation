@@ -66,7 +66,9 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
     output = Path(output)
 
     files.sort()
-    for json_file in tqdm(files):
+    pbar = tqdm(files)
+    for json_file in pbar:
+        pbar.set_description(json_file)
         try:
             with open(json_file, "r") as experiment:
                 experiment = json.load(experiment)
@@ -79,17 +81,19 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                     for key in experiment["test_metrics"].keys():
                         experiment[key] = experiment["test_metrics"][key]
 
-                if "loss" in experiment.keys():
+                if "loss" in experiment.keys() or "test_loss" in experiment.keys():
                     for key in model_metric_keys:
+                        if key not in experiment.keys():
+                            continue
                         if "loss" in key:
-                            if key == "test_loss":
+                            if key == "loss" or key == "val_loss":
+                                experiment[f"min_{key}_epoch"] = np.argmin(experiment[key]) + 1
+                                experiment[key] = np.min(experiment[key])
+                            elif key == "test_loss":
                                 test_loss = np.array(experiment[key])
                                 test_loss = test_loss[test_loss > 0]
                                 experiment[f"min_{key}_epoch"] = np.argwhere(experiment[key] == np.min(test_loss))[0][0] + 1
                                 experiment[key] = np.min(test_loss)
-                            else:
-                                experiment[f"min_{key}_epoch"] = np.argmin(experiment[key]) + 1
-                                experiment[key] = np.min(experiment[key])
                         else:
                             experiment[f"max_{key}_epoch"] = np.argmax(experiment[key]) + 1
                             experiment[key] = np.max(experiment[key])
