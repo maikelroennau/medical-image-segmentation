@@ -325,9 +325,12 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=verbose)
         prediction = tf.image.resize(prediction[0], original_shape, method="nearest").numpy()
 
-        # prediction[:, :, 0] = 0
-        prediction[prediction < 0.5] = 0
-        prediction[prediction >= 0.5] = 127
+        prediction[:, :, 0] = np.where(
+            np.logical_and(prediction[:, :, 0] > prediction[:, :, 1], prediction[:, :, 0] > prediction[:, :, 2]), 127, 0)
+        prediction[:, :, 1] = np.where(
+            np.logical_and(prediction[:, :, 1] > prediction[:, :, 0], prediction[:, :, 1] > prediction[:, :, 2]), 127, 0)
+        prediction[:, :, 2] = np.where(
+            np.logical_and(prediction[:, :, 2] > prediction[:, :, 0], prediction[:, :, 2] > prediction[:, :, 1]), 127, 0)
 
         if prediction.shape[-1] == 2:
             prediction_reshaped = np.zeros(tuple(prediction.shape[:2]) + (3,), dtype=np.uint8)
