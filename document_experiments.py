@@ -23,27 +23,22 @@ experiment_data = {
     "validation_samples": None,
     "test_samples": None,
     "duration": None,
-    "loss": None,
-    "min_loss_epoch": None,
+    "train_loss": None,
+    "train_f1-score": None,
+    "train_iou_score": None,
     "val_loss": None,
-    "min_val_loss_epoch": None,
     "val_f1-score": None,
-    "max_val_f1-score_epoch": None,
     "val_iou_score": None,
-    "max_val_iou_score_epoch": None,
     "test_loss": None,
-    "min_test_loss_epoch": None,
     "test_f1-score": None,
-    "max_test_f1-score_epoch": None,
     "test_iou_score": None,
-    "max_test_iou_score_epoch": None,
     "description": None
 }
 
 model_metric_keys = [
-    "loss",
-    "f1-score",
-    "iou_score",
+    "train_loss",
+    "train_f1-score",
+    "train_iou_score",
     "val_loss",
     "val_f1-score",
     "val_iou_score",
@@ -51,6 +46,12 @@ model_metric_keys = [
     "test_f1-score",
     "test_iou_score"
 ]
+
+rename_keys = {
+    "loss": "train_loss",
+    "f1-score": "train_f1-score",
+    "iou_score": "train_iou_score"
+}
 
 
 def document(experiment_file, file_pattern="*train_config.json", output="."):
@@ -77,25 +78,26 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                     for key in experiment["train_metrics"].keys():
                         experiment[key] = experiment["train_metrics"][key]
 
+                for key, value in rename_keys.items():
+                    if key in experiment.keys():
+                        experiment[value] = experiment[key]
+
                 if "test_metrics" in experiment.keys():
                     for key in experiment["test_metrics"].keys():
                         experiment[key] = experiment["test_metrics"][key]
 
-                if "loss" in experiment.keys() or "test_loss" in experiment.keys():
+                if "train_loss" in experiment.keys() or "test_loss" in experiment.keys():
                     for key in model_metric_keys:
                         if key not in experiment.keys():
                             continue
                         if "loss" in key:
-                            if key == "loss" or key == "val_loss":
-                                experiment[f"min_{key}_epoch"] = np.argmin(experiment[key]) + 1
+                            if key == "train_loss" or key == "val_loss":
                                 experiment[key] = np.min(experiment[key])
                             elif key == "test_loss":
                                 test_loss = np.array(experiment[key])
                                 test_loss = test_loss[test_loss > 0]
-                                experiment[f"min_{key}_epoch"] = np.argwhere(experiment[key] == np.min(test_loss))[0][0] + 1
                                 experiment[key] = np.min(test_loss)
                         else:
-                            experiment[f"max_{key}_epoch"] = np.argmax(experiment[key]) + 1
                             experiment[key] = np.max(experiment[key])
 
                 experiment["directory"] = Path(experiment["directory"]).name
