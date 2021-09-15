@@ -355,17 +355,14 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--backbone",
-        default="vgg19",
         type=str)
 
     parser.add_argument(
         "--decoder",
-        default="U-Net",
         type=str)
 
     parser.add_argument(
         "--dataset",
-        default="dataset/v10/",
         help="""Path to a directory containing 'train', 'validation' and 'test' as sub-directories, each containing an 'images'
                 and 'masks' sub-directories.""",
         type=str)
@@ -393,27 +390,22 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--epochs",
-        default=100,
         type=int)
 
     parser.add_argument(
         "--batch-size",
-        default=10,
         type=int)
 
     parser.add_argument(
         "--steps",
-        default=42,
         type=int)
 
     parser.add_argument(
         "--height",
-        default=960,
         type=int)
 
     parser.add_argument(
         "--width",
-        default=1280,
         type=int)
 
     parser.add_argument(
@@ -436,24 +428,33 @@ if __name__ == "__main__":
         default=7613,
         type=int)
 
+    parser.add_argument(
+        "--default",
+        default=False,
+        help="Ignores arguments and use the default values.",
+        action="store_true")
+
     args = parser.parse_args()
 
-    train(
-        args.name,
-        args.description,
-        args.backbone,
-        args.decoder,
-        args.dataset,
-        args.loss,
-        args.lr,
-        args.lr_factor,
-        args.classes,
-        args.epochs,
-        args.batch_size,
-        args.steps,
-        args.height,
-        args.width,
-        args.rgb,
-        args.predict,
-        args.gpu,
-        args.seed)
+    if args.default:
+        train()
+    else:
+        train(
+            model_name=args.name,
+            description=args.description,
+            backbone=args.backbone,
+            decoder=args.decoder,
+            dataset=args.dataset,
+            loss=args.loss,
+            learning_rate=args.lr,
+            learning_rate_change_factor=args.lr_factor,
+            classes=args.classes,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            steps_per_epoch=args.steps,
+            height=args.height,
+            width=args.width,
+            rgb=args.rgb,
+            predict=args.predict,
+            gpu=args.gpu,
+            seed=args.seed)
