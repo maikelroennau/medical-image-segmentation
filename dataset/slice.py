@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-def slice_images(input_dir, height, width, filter, output):
+def slice_images(input_dir, height, width, filter, overlap, output):
     input_path = Path(input_dir)
     supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
     images_paths = [image_path for image_path in input_path.joinpath("images").glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
@@ -30,11 +30,19 @@ def slice_images(input_dir, height, width, filter, output):
         image = cv2.imread(str(image_path))
         mask = cv2.imread(str(mask_path))
 
-        half_height = height // 2
-        half_width = width // 2
+        if overlap:
+            half_height = height // 2
+            half_width = width // 2
+            x_range = range(0, image.shape[0]-half_height, half_height)
+            y_range = range(0, mask.shape[1]-half_width, half_width)
+        else:
+            half_height = height // 1
+            half_width = width // 1
+            x_range = range(0, image.shape[0], half_height)
+            y_range = range(0, mask.shape[1], half_width)
 
-        for x in range(0, image.shape[0]-half_height, half_height):
-            for y in range(0, mask.shape[1]-half_width, half_width):
+        for x in x_range:
+            for y in y_range:
                 sliced_image = image[x:x+height, y:y+width]
                 sliced_mask = mask[x:x+height, y:y+width]
 
@@ -79,6 +87,12 @@ def main():
         help="Filter out empty masks.",
         default=False,
         action="store_true")
+    
+    parser.add_argument(
+        "--overlap",
+        help="Allow overlaping crops.",
+        default=False,
+        action="store_true")
 
     parser.add_argument(
         "-o",
@@ -88,7 +102,7 @@ def main():
         type=str)
 
     args = parser.parse_args()
-    slice_images(args.input_dir, args.height, args.width, args.filter_empty, args.output)
+    slice_images(args.input_dir, args.height, args.width, args.filter_empty, args.overlap, args.output)
 
 
 if __name__ == "__main__":
