@@ -31,7 +31,9 @@ def train(
         rgb=True,
         predict=False,
         gpu=0,
-        seed=None # 7613
+        seed=None, # 7613
+        resume=None,
+        resume_epoch=None
     ):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
@@ -157,8 +159,11 @@ def train(
     ########
     ########
 
-    checkpoint_directory = Path("checkpoints").joinpath(f"{time.strftime('%Y%m%d%H%M%S')}")
-    checkpoint_directory.mkdir(exist_ok=True, parents=True)
+    if resume:
+        checkpoint_directory = Path(resume).parent
+    else:
+        checkpoint_directory = Path("checkpoints").joinpath(f"{time.strftime('%Y%m%d%H%M%S')}")
+        checkpoint_directory.mkdir(exist_ok=True, parents=True)
 
     callbacks = [
         tf.keras.callbacks.ReduceLROnPlateau(monitor="val_f1-score", factor=learning_rate_change_factor, min_delta=1e-3, patience=10, verbose=1, mode="max", cooldown=1),
@@ -208,8 +213,9 @@ def train(
         for class_name, value in class_distribution.items():
             print(f"  - {str(round(value, 2)).zfill(5)} ==> {class_name}")
 
-    with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
-        json.dump(train_config, config_file, indent=4)
+    if not resume:
+        with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
+            json.dump(train_config, config_file, indent=4)
 
     ########
     ########
@@ -238,12 +244,24 @@ def train(
     tf.keras.backend.clear_session()
 
     try:
-        history = model.fit(
-            train_dataset,
-            epochs=epochs,
-            steps_per_epoch=steps_per_epoch,
-            validation_data=validation_dataset,
-            callbacks=callbacks)
+        if not resume:
+            history = model.fit(
+                train_dataset,
+                epochs=epochs,
+                steps_per_epoch=steps_per_epoch,
+                validation_data=validation_dataset,
+                callbacks=callbacks)
+        else:
+            model = tf.keras.models.load_model(str(Path(resume)), custom_objects=utils.CUSTOM_OBJECTS)
+            model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
+            
+            history = model.fit(
+                train_dataset,
+                epochs=epochs,
+                steps_per_epoch=steps_per_epoch,
+                validation_data=validation_dataset,
+                initial_epoch=int(resume_epoch),
+                callbacks=callbacks)
     except Exception as e:
         print(f"\nThere was an error during training that caused it to stop: \n{e}")
         train_config["error"] = str(e)
@@ -433,6 +451,18 @@ if __name__ == "__main__":
         "--seed",
         default=7613,
         type=int)
+    
+    parser.add_argument(
+        "--resume",
+        default=None,
+        help="Path to the model to be loaded and trained.",
+        type=str)
+
+    parser.add_argument(
+        "--resume-epoch",
+        default=None,
+        help="The last epoch the model trained.",
+        type=int)
 
     parser.add_argument(
         "--default",
@@ -463,4 +493,6 @@ if __name__ == "__main__":
             rgb=args.rgb,
             predict=args.predict,
             gpu=args.gpu,
-            seed=args.seed)
+            seed=args.seed,
+            resume=args.resume,
+            resume_epoch=args.resume_epoch)
