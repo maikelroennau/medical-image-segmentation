@@ -236,10 +236,16 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
                 print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
 
             # Add model metrics to dict
-            models_metrics["test_loss"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metrics[0]
+            if len(str(model_path).split("AgNOR")[1].split("_")[1:]) > 0:
+                models_metrics["test_loss"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metrics[0]
+            else:
+                models_metrics["test_loss"][-1] = evaluation_metrics[0]
             for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
                 metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                models_metrics[f"test_{metric}"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metric
+                if len(str(model_path).split("AgNOR")[1].split("_")[1:]) > 0:
+                    models_metrics[f"test_{metric}"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metric
+                else:
+                    models_metrics[f"test_{metric}"][-1] = evaluation_metric
 
             # Check for the best model
             if "model" in best_model:
