@@ -145,7 +145,13 @@ def train(
         return model
 
 
-    model = make_model(decoder, backbone, input_shape, classes, model_name)
+    if "," in str(gpu):
+        strategy = tf.distribute.MirroredStrategy()
+        with strategy.scope():
+            model = make_model(decoder, backbone, input_shape, classes, model_name)
+    else:
+        model = make_model(decoder, backbone, input_shape, classes, model_name)
+
     model.summary()
 
     ########
