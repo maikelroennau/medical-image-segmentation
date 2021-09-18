@@ -31,6 +31,7 @@ def train(
         rgb=True,
         predict=False,
         gpu=0,
+        save_all=False,
         seed=None, # 7613
         resume=None,
         resume_epoch=None
@@ -165,9 +166,14 @@ def train(
         checkpoint_directory = Path("checkpoints").joinpath(f"{time.strftime('%Y%m%d%H%M%S')}")
         checkpoint_directory.mkdir(exist_ok=True, parents=True)
 
+    if save_all:
+        checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"))
+    else:
+        checkpoint_model = str(checkpoint_directory.joinpath(model_name + ".h5"))
+
     callbacks = [
         tf.keras.callbacks.ReduceLROnPlateau(monitor="val_f1-score", factor=learning_rate_change_factor, min_delta=1e-3, patience=10, verbose=1, mode="max", cooldown=1),
-        tf.keras.callbacks.ModelCheckpoint(str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5")), monitor="val_f1-score", mode="max", save_best_only=True),
+        tf.keras.callbacks.ModelCheckpoint(checkpoint_model, monitor="val_f1-score", mode="max", save_best_only=True),
         # tf.keras.callbacks.TensorBoard(log_dir=str(checkpoint_directory.joinpath("logs")), histogram_freq=1, update_freq="batch", write_images=False)
     ]
 
@@ -213,7 +219,11 @@ def train(
         for class_name, value in class_distribution.items():
             print(f"  - {str(round(value, 2)).zfill(5)} ==> {class_name}")
 
-    if not resume:
+    if resume:
+         with open(str(checkpoint_directory.joinpath("train_config.json")), "r") as config_file:
+            previous_train_config = json.load(config_file)
+            train_config = { **previous_train_config, **train_config }
+    else:
         with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
             json.dump(train_config, config_file, indent=4)
 
@@ -270,8 +280,17 @@ def train(
     end = time.time()
     hours, rem = divmod(end-start, 3600)
     minutes, seconds = divmod(rem, 60)
-    duration = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds)
-    train_config["duration"] = duration
+    duration = "{:0>2}:{:0>2}:{:02.0f}".format(int(hours), int(minutes), seconds)
+    
+    if "duration" in train_config.keys():
+        import datetime
+        old_duration = datetime.datetime.strptime(train_config["duration"], "%H:%M:%S")
+        new_duration = datetime.datetime.strptime(duration, "%H:%M:%S")
+        new_duration = datetime.timedelta(
+            minutes=new_duration.minute, seconds=new_duration.second, microseconds=new_duration.microsecond)
+        train_config["duration"] = (old_duration + new_duration).strftime("%H:%M:%S")
+    else:
+        train_config["duration"] = duration
 
     print(f"Training start: {time.strftime('%x %X')}")
     print(f"Training end: {time.strftime('%x %X')}")
@@ -297,12 +316,18 @@ def train(
     print(f"    - Test: {test_dataset_path}\n")
 
     if history:
-        train_config["train_metrics"] = {}
         history_data = history.history
-        for k, v in history_data.items():
-            v = [float(i) for i in v]
-            train_config["train_metrics"][k] = v
-
+        
+        if "train_metrics" in train_config.keys():
+            for k, v in history_data.items():
+                v = [float(i) for i in v]
+                train_config["train_metrics"][k].extend(v)
+        else:
+            train_config["train_metrics"] = {}
+            for k, v in history_data.items():
+                v = [float(i) for i in v]
+                train_config["train_metrics"][k] = v
+            
     with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
         json.dump(train_config, config_file, indent=4)
 
@@ -319,9 +344,20 @@ def train(
         one_hot_encoded=one_hot_encoded)
 
     if best_model is not None or models_metrics is not None:
-        train_config["best_model"] = best_model
-        train_config["test_metrics"] = models_metrics
         model_path = best_model["model"]
+        
+        if "best_model" in train_config.keys():
+            if best_model["f1-score"] > train_config["best_model"]["f1-score"]:
+                train_config["best_model"] = best_model
+        else:
+            train_config["best_model"] = best_model
+        
+        if "test_metrics" in train_config.keys():
+            for k in train_config["test_metrics"].keys():
+                train_config["test_metrics"][k].extend(models_metrics[k][len(train_config["test_metrics"][k]):])
+        else:
+            train_config["test_metrics"] = models_metrics
+        
 
         with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
             json.dump(train_config, config_file, indent=4)
@@ -441,6 +477,11 @@ if __name__ == "__main__":
         "--predict",
         default=False,
         action="store_true")
+    
+    parser.add_argument(
+        "--save-all",
+        default=False,
+        action="store_true")
 
     parser.add_argument(
         "--gpu",
@@ -492,6 +533,7 @@ if __name__ == "__main__":
             width=args.width,
             rgb=args.rgb,
             predict=args.predict,
+            save_all=args.save_all,
             gpu=args.gpu,
             seed=args.seed,
             resume=args.resume,
