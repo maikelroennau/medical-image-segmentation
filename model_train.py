@@ -172,7 +172,7 @@ def train(
         checkpoint_model = str(checkpoint_directory.joinpath(model_name + ".h5"))
 
     callbacks = [
-        tf.keras.callbacks.ReduceLROnPlateau(monitor="val_f1-score", factor=learning_rate_change_factor, min_delta=1e-3, patience=10, verbose=1, mode="max", cooldown=1),
+        tf.keras.callbacks.ReduceLROnPlateau(monitor="val_f1-score", factor=learning_rate_change_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
         tf.keras.callbacks.ModelCheckpoint(checkpoint_model, monitor="val_f1-score", mode="max", save_best_only=True),
         # tf.keras.callbacks.TensorBoard(log_dir=str(checkpoint_directory.joinpath("logs")), histogram_freq=1, update_freq="batch", write_images=False)
     ]
@@ -262,9 +262,19 @@ def train(
                 validation_data=validation_dataset,
                 callbacks=callbacks)
         else:
-            model = tf.keras.models.load_model(str(Path(resume)), custom_objects=utils.CUSTOM_OBJECTS)
-            model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
-            
+            if "," in str(gpu):
+                strategy = tf.distribute.MirroredStrategy()
+                with strategy.scope():
+                    model = tf.keras.models.load_model(str(Path(resume)), custom_objects=utils.CUSTOM_OBJECTS)
+                    if previous_train_config["input_shape"] != input_shape:
+                        model = utils.update_model(model, input_shape)
+                    model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
+            else:
+                model = tf.keras.models.load_model(str(Path(resume)), custom_objects=utils.CUSTOM_OBJECTS)
+                if previous_train_config["input_shape"] != input_shape:
+                    model = utils.update_model(model, input_shape)
+                model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
+
             history = model.fit(
                 train_dataset,
                 epochs=epochs,
@@ -281,7 +291,7 @@ def train(
     hours, rem = divmod(end-start, 3600)
     minutes, seconds = divmod(rem, 60)
     duration = "{:0>2}:{:0>2}:{:02.0f}".format(int(hours), int(minutes), seconds)
-    
+
     if "duration" in train_config.keys():
         import datetime
         old_duration = datetime.datetime.strptime(train_config["duration"], "%H:%M:%S")
@@ -317,7 +327,7 @@ def train(
 
     if history:
         history_data = history.history
-        
+
         if "train_metrics" in train_config.keys():
             for k, v in history_data.items():
                 v = [float(i) for i in v]
@@ -327,7 +337,7 @@ def train(
             for k, v in history_data.items():
                 v = [float(i) for i in v]
                 train_config["train_metrics"][k] = v
-            
+
     with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
         json.dump(train_config, config_file, indent=4)
 
@@ -345,19 +355,18 @@ def train(
 
     if best_model is not None or models_metrics is not None:
         model_path = best_model["model"]
-        
+
         if "best_model" in train_config.keys():
             if best_model["f1-score"] > train_config["best_model"]["f1-score"]:
                 train_config["best_model"] = best_model
         else:
             train_config["best_model"] = best_model
-        
+
         if "test_metrics" in train_config.keys():
             for k in train_config["test_metrics"].keys():
                 train_config["test_metrics"][k].extend(models_metrics[k][len(train_config["test_metrics"][k]):])
         else:
             train_config["test_metrics"] = models_metrics
-        
 
         with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
             json.dump(train_config, config_file, indent=4)
@@ -477,7 +486,7 @@ if __name__ == "__main__":
         "--predict",
         default=False,
         action="store_true")
-    
+
     parser.add_argument(
         "--save-all",
         default=False,
@@ -485,14 +494,14 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--gpu",
-        default=0,
-        type=int)
+        default="0",
+        type=str)
 
     parser.add_argument(
         "--seed",
         default=7613,
         type=int)
-    
+
     parser.add_argument(
         "--resume",
         default=None,
