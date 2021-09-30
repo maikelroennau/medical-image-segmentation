@@ -68,50 +68,53 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
             viz_dir.mkdir(exist_ok=True, parents=True)
 
         for filename in tqdm(glob.glob(os.path.join(input_dir, "*.json")), desc=res_name):
-            label_file = labelme.LabelFile(filename=filename)
-            if filter_labels:
-                label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in filter_labels]
+            try:
+                label_file = labelme.LabelFile(filename=filename)
+                if filter_labels:
+                    label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in filter_labels]
 
-            base = os.path.splitext(os.path.basename(filename))[0]
-            image_type = ".tif" if tif else ".png"
-            out_img_file = str(images_dir.joinpath(base + image_type))
-            out_png_file = str(segmentation_dir.joinpath(base + ".png"))
+                base = os.path.splitext(os.path.basename(filename))[0]
+                image_type = ".tif" if tif else ".png"
+                out_img_file = str(images_dir.joinpath(base + image_type))
+                out_png_file = str(segmentation_dir.joinpath(base + ".png"))
 
-            if not noviz:
-                out_viz_file = str(viz_dir.joinpath(base + ".png"))
+                if not noviz:
+                    out_viz_file = str(viz_dir.joinpath(base + ".png"))
 
-            # Save image to dir
-            img = labelme.utils.img_data_to_arr(label_file.imageData)
-            img = cv2.resize(img, dsize=resolution[::-1], interpolation=cv2.INTER_NEAREST)
-            if tif:
-                tifffile.imwrite(out_img_file, img, photometric="rgb")
-            else:
-                cv2.imwrite(out_img_file, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                # Save image to dir
+                img = labelme.utils.img_data_to_arr(label_file.imageData)
+                img = cv2.resize(img, dsize=resolution[::-1], interpolation=cv2.INTER_NEAREST)
+                if tif:
+                    tifffile.imwrite(out_img_file, img, photometric="rgb")
+                else:
+                    cv2.imwrite(out_img_file, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
-            # Rescale points accordingly to resolution factor
-            for i in range(len(label_file.shapes)):
-                label_file.shapes[i]["points"] = list(np.asarray(label_file.shapes[i]["points"]) * factor)
+                # Rescale points accordingly to resolution factor
+                for i in range(len(label_file.shapes)):
+                    label_file.shapes[i]["points"] = list(np.asarray(label_file.shapes[i]["points"]) * factor)
 
-            lbl, _ = labelme.utils.shapes_to_label(
-                img_shape=resolution + (3,),
-                shapes=label_file.shapes,
-                label_name_to_value=class_name_to_id,
-            )
-
-            if not color:
-                cv2.imwrite(out_png_file, lbl)
-            else:
-                labelme.utils.lblsave(out_png_file, lbl)
-
-            if not noviz:
-                viz = imgviz.label2rgb(
-                    label=lbl,
-                    img=imgviz.rgb2gray(img),
-                    font_size=15,
-                    label_names=class_names,
-                    loc="rb",
+                lbl, _ = labelme.utils.shapes_to_label(
+                    img_shape=resolution + (3,),
+                    shapes=label_file.shapes,
+                    label_name_to_value=class_name_to_id,
                 )
-                imgviz.io.imsave(out_viz_file, viz)
+
+                if not color:
+                    cv2.imwrite(out_png_file, lbl)
+                else:
+                    labelme.utils.lblsave(out_png_file, lbl)
+
+                if not noviz:
+                    viz = imgviz.label2rgb(
+                        label=lbl,
+                        img=imgviz.rgb2gray(img),
+                        font_size=15,
+                        label_names=class_names,
+                        loc="rb",
+                    )
+                    imgviz.io.imsave(out_viz_file, viz)
+            except Exception as e:
+                print(e)
 
 
 def main():
