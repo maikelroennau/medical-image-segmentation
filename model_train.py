@@ -10,32 +10,35 @@ import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
-from utils import utils
+from utils.data_io import list_files, load_dataset
+from utils.postprocess import plot_metrics
+from utils.utils import (CUSTOM_OBJECTS, compute_classes_distribution,
+                         evaluate, update_model)
 
 
 def train(
-        model_name="AgNOR",
-        description="",
-        backbone="vgg16",
-        decoder="U-Net",
-        dataset="dataset/v10/",
-        loss="dice",
-        learning_rate=1e-4,
-        learning_rate_change_factor=0.75,
-        classes=3,
-        epochs=100,
-        batch_size=10,
-        steps_per_epoch=42,
-        height=960, # 240 480 960 1152 1440 1920
-        width=1280, # 320 640 1280 1536 1920 2560
-        rgb=True,
-        predict=False,
-        gpu=0,
-        save_all=False,
-        seed=None, # 7613
-        resume=None,
-        resume_epoch=None
-    ):
+    model_name="AgNOR",
+    description="",
+    backbone="vgg16",
+    decoder="U-Net",
+    dataset="dataset/v15/",
+    loss="dice",
+    learning_rate=1e-4,
+    learning_rate_change_factor=0.75,
+    classes=3,
+    epochs=10,
+    batch_size=1,
+    steps_per_epoch=420,
+    height=480,  # 240 480 960 1152 1440 1920
+    width=640,  # 320 640 1280 1536 1920 2560
+    rgb=True,
+    predict=False,
+    gpu=0,
+    save_all=False,
+    seed=None,  # 7613
+    resume=None,
+    resume_epoch=None
+):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
@@ -69,7 +72,7 @@ def train(
     ########
     ########
 
-    train_dataset = utils.load_dataset(
+    train_dataset = load_dataset(
         train_dataset_path,
         batch_size=batch_size,
         target_shape=(height, width),
@@ -79,7 +82,7 @@ def train(
         one_hot_encoded=one_hot_encoded,
         validate_masks=True)
 
-    validation_dataset = utils.load_dataset(
+    validation_dataset = load_dataset(
         validation_dataset_path,
         batch_size=batch_size,
         target_shape=(height, width),
@@ -147,7 +150,6 @@ def train(
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
         return model
 
-
     if "," in str(gpu):
         strategy = tf.distribute.MirroredStrategy()
         with strategy.scope():
@@ -200,14 +202,14 @@ def train(
         "train_dataset": train_dataset_path,
         "validation_dataset": validation_dataset_path,
         "test_dataset": test_dataset_path,
-        "train_samples": len(utils.list_files(path=train_dataset_path)[0]),
-        "validation_samples": len(utils.list_files(path=validation_dataset_path)[0]),
-        "test_samples": len(utils.list_files(path=test_dataset_path)[0])
+        "train_samples": len(list_files(path=train_dataset_path)[0]),
+        "validation_samples": len(list_files(path=validation_dataset_path)[0]),
+        "test_samples": len(list_files(path=test_dataset_path)[0])
     }
 
     # TODO: Fix 'utils.compute_classes_distribution' function which currently only supports multiclass masks
     if class_distribution and classes > 1:
-        class_distribution = utils.compute_classes_distribution(
+        class_distribution = compute_classes_distribution(
             train_dataset,
             batches=steps_per_epoch // batch_size,
             plot=True,
@@ -220,7 +222,7 @@ def train(
             print(f"  - {str(round(value, 2)).zfill(5)} ==> {class_name}")
 
     if resume:
-         with open(str(checkpoint_directory.joinpath("train_config.json")), "r") as config_file:
+        with open(str(checkpoint_directory.joinpath("train_config.json")), "r") as config_file:
             previous_train_config = json.load(config_file)
             train_config = { **previous_train_config, **train_config }
     else:
@@ -265,14 +267,14 @@ def train(
             if "," in str(gpu):
                 strategy = tf.distribute.MirroredStrategy()
                 with strategy.scope():
-                    model = tf.keras.models.load_model(str(Path(resume)), custom_objects=utils.CUSTOM_OBJECTS)
+                    model = tf.keras.models.load_model(str(Path(resume)), custom_objects=CUSTOM_OBJECTS)
                     if previous_train_config["input_shape"] != input_shape:
-                        model = utils.update_model(model, input_shape)
+                        model = update_model(model, input_shape)
                     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
             else:
-                model = tf.keras.models.load_model(str(Path(resume)), custom_objects=utils.CUSTOM_OBJECTS)
+                model = tf.keras.models.load_model(str(Path(resume)), custom_objects=CUSTOM_OBJECTS)
                 if previous_train_config["input_shape"] != input_shape:
-                    model = utils.update_model(model, input_shape)
+                    model = update_model(model, input_shape)
                 model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
 
             history = model.fit(
@@ -296,8 +298,7 @@ def train(
         import datetime
         old_duration = datetime.datetime.strptime(train_config["duration"], "%H:%M:%S")
         new_duration = datetime.datetime.strptime(duration, "%H:%M:%S")
-        new_duration = datetime.timedelta(
-            minutes=new_duration.minute, seconds=new_duration.second, microseconds=new_duration.microsecond)
+        new_duration = datetime.timedelta(minutes=new_duration.minute, seconds=new_duration.second, microseconds=new_duration.microsecond)
         train_config["duration"] = (old_duration + new_duration).strftime("%H:%M:%S")
     else:
         train_config["duration"] = duration
@@ -345,7 +346,7 @@ def train(
     ########
 
     print(f"\nEvaluate all saved models on test data '{test_dataset_path}'")
-    best_model, models_metrics = utils.evaluate(
+    best_model, models_metrics = evaluate(
         str(checkpoint_directory),
         test_dataset_path,
         batch_size,
@@ -371,20 +372,20 @@ def train(
         with open(str(checkpoint_directory.joinpath("train_config.json")), "w") as config_file:
             json.dump(train_config, config_file, indent=4)
 
-        utils.plot_metrics(
-            { key: value for key, value in train_config["train_metrics"].items()
-                if not key.startswith("val_") and not key.startswith("lr") },
+        plot_metrics(
+            { key: value for key, value in train_config["train_metrics"].items() 
+              if not key.startswith("val_") and not key.startswith("lr")},
             title="Training metrics",
             output=str(checkpoint_directory.joinpath("01_train.png")))
-        utils.plot_metrics(
+        plot_metrics(
             { key: value for key, value in train_config["train_metrics"].items() if key.startswith("val_") },
             title="Validation metrics",
             output=str(checkpoint_directory.joinpath("02_validation.png")))
-        utils.plot_metrics(
+        plot_metrics(
             { key: value for key, value in train_config["test_metrics"].items() },
             title="Test metrics",
             output=str(checkpoint_directory.joinpath("03_test.png")))
-        utils.plot_metrics(
+        plot_metrics(
             { key: value for key, value in train_config["train_metrics"].items() if key == "lr" },
             title="Learning rate",
             output=str(checkpoint_directory.joinpath("04_learning_rate.png")))
@@ -396,7 +397,7 @@ def train(
 
     if predict:
         print(f"\n\nPredict with best model on test data '{test_dataset_path}'")
-        utils.predict(
+        predict(
             str(Path(checkpoint_directory).joinpath(model_path)),
             images_path=Path(test_dataset_path).joinpath("images"),
             batch_size=batch_size,
