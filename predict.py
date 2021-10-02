@@ -1,8 +1,7 @@
 import argparse
 import os
 from pathlib import Path
-
-from utils import predict
+from utils.utils import predict
 
 
 def main():

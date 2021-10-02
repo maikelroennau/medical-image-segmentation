@@ -1,8 +1,7 @@
 import argparse
-import os
 from pathlib import Path
 
-from utils import plot_metrics
+from utils.postprocess import plot_metrics
 
 
 def main():
