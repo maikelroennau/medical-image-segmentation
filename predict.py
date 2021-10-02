@@ -60,6 +60,13 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "-p",
+        "--postprocess",
+        help="Postprocess network output.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -97,6 +104,7 @@ def main():
         copy_images=args.copy_images,
         normalize=args.normalize,
         single_dir=args.single_dir,
+        postprocess=args.postprocess,
         new_input_shape=input_shape)
 
 
