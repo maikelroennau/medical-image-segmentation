@@ -5,13 +5,14 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import pandas as pd
 import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
-import losses
+from utils import losses
+from utils.data_io import load_dataset
+from utils.postprocess import post_process
 
 
 CUSTOM_OBJECTS = {
@@ -34,120 +35,6 @@ METRICS = [
     sm.metrics.f1_score,
     sm.metrics.iou_score
 ]
-
-def write_dataset(dataset, output_path="dataset_visualization", max_batches=None, same_dir=False):
-    output = Path(output_path)
-    images_path = output.joinpath("images")
-
-    if same_dir:
-        masks_path = output.joinpath("images")
-    else:
-        masks_path = output.joinpath("masks")
-
-    images_path.mkdir(exist_ok=True, parents=True)
-    masks_path.mkdir(exist_ok=True, parents=True)
-
-    if max_batches:
-        if max_batches > len(dataset):
-            batches = len(dataset)
-        else:
-            batches = max_batches
-    else:
-        batches = len(dataset)
-
-    for i, batch in tqdm(enumerate(dataset), total=batches):
-        for j, (image, mask) in enumerate(zip(batch[0], batch[1])):
-            image_name = str(images_path.joinpath(f"batch_{i}_{j}.png"))
-            mask_name = str(masks_path.joinpath(f"batch_{i}_{j}.png"))
-            tf.keras.preprocessing.image.save_img(image_name, image)
-            if mask.shape[-1] == 2:
-                mask_reshaped = np.zeros(tuple(mask.shape[:2]) + (3,))
-                mask_reshaped[:, :, :2] = mask.numpy()
-                mask = tf.convert_to_tensor(mask_reshaped)
-            tf.keras.preprocessing.image.save_img(mask_name, mask)
-
-        tf.keras.backend.clear_session()
-        if i == batches:
-            break
-
-
-def list_files(path, validate_masks=False):
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-
-    images_path = Path(path).joinpath("images")
-    masks_path = Path(path).joinpath("masks")
-
-    images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-    masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
-
-    assert len(images_paths) > 0, f"No images found at '{images_path}'."
-    assert len(masks_paths) > 0, f"No masks found at '{masks_paths}'."
-
-    images_paths.sort()
-    masks_paths.sort()
-
-    if validate_masks:
-        assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
-
-        for image_path, mask_path in zip(images_paths, masks_paths):
-            assert image_path.stem.lower().replace("image", "") == mask_path.stem.lower().replace("mask", ""), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
-
-    print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
-
-    images_paths = [str(image_path) for image_path in images_paths]
-    masks_paths = [str(masks_path) for masks_path in masks_paths]
-    return images_paths, masks_paths
-
-
-def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_hot_encoded=False):
-    image = tf.io.read_file(image_path)
-    image = tf.image.decode_png(image, channels=3)
-    image = tf.image.resize(image, target_shape, method="nearest")
-    image = tf.cast(image, dtype=tf.float32)
-    image = image / 255.
-
-    mask = tf.io.read_file(mask_path)
-    mask = tf.image.decode_png(mask, channels=1)
-    mask = tf.image.resize(mask, target_shape, method="nearest")
-
-    if one_hot_encoded:
-        mask = tf.cast(mask, dtype=tf.int32)
-        mask = tf.one_hot(mask, depth=classes, axis=2, dtype=tf.int32)
-        mask = tf.squeeze(mask)
-
-    mask = tf.cast(mask, dtype=tf.float32)
-
-    return image, mask
-
-
-def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, validate_masks=False, seed=7613):
-    if validate_masks:
-        images_paths, masks_paths = list_files(path, validate_masks=validate_masks)
-        dataset = tf.data.Dataset.from_tensor_slices((images_paths, masks_paths))
-    else:
-        images_path = Path(path).joinpath("images").joinpath("*.*")
-        masks_path = Path(path).joinpath("masks").joinpath("*.*")
-
-        images_paths = tf.data.Dataset.list_files(str(images_path), shuffle=True, seed=seed)
-        masks_paths = tf.data.Dataset.list_files(str(masks_path), shuffle=True, seed=seed)
-
-        assert len(images_paths) > 0, f"No images found at '{images_path}'."
-        assert len(masks_paths) > 0, f"No masks found at '{masks_path}'."
-
-        dataset = tf.data.Dataset.zip((images_paths, masks_paths))
-        print(f"Dataset '{str(images_path.parent)}' contains {len(dataset)} images and masks.")
-
-    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded), num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    if shuffle:
-        dataset = dataset.shuffle(buffer_size=batch_size * batch_size, seed=seed)
-    if repeat:
-        dataset = dataset.repeat()
-
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    return dataset
-
 
 def update_model(model, input_shape):
     model_weights = model.get_weights()
@@ -333,17 +220,20 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=verbose)
         prediction = tf.image.resize(prediction[0], original_shape, method="nearest").numpy()
 
+        pixel_intensity = 127
         prediction[:, :, 0] = np.where(
-            np.logical_and(prediction[:, :, 0] > prediction[:, :, 1], prediction[:, :, 0] > prediction[:, :, 2]), 127, 0)
+            np.logical_and(prediction[:, :, 0] > prediction[:, :, 1], prediction[:, :, 0] > prediction[:, :, 2]), pixel_intensity, 0)
         prediction[:, :, 1] = np.where(
-            np.logical_and(prediction[:, :, 1] > prediction[:, :, 0], prediction[:, :, 1] > prediction[:, :, 2]), 127, 0)
+            np.logical_and(prediction[:, :, 1] > prediction[:, :, 0], prediction[:, :, 1] > prediction[:, :, 2]), pixel_intensity, 0)
         prediction[:, :, 2] = np.where(
-            np.logical_and(prediction[:, :, 2] > prediction[:, :, 0], prediction[:, :, 2] > prediction[:, :, 1]), 127, 0)
+            np.logical_and(prediction[:, :, 2] > prediction[:, :, 0], prediction[:, :, 2] > prediction[:, :, 1]), pixel_intensity, 0)
 
         if prediction.shape[-1] == 2:
             prediction_reshaped = np.zeros(tuple(prediction.shape[:2]) + (3,), dtype=np.uint8)
             prediction_reshaped[:, :, :2] = prediction
             prediction = prediction_reshaped
+
+        prediction, _ = post_process(prediction)
 
         if single_dir:
             output_image_path = os.path.join(output_path, f"{model.stem.split('_l')[0]}_{image_path.stem}_prediction.png")
@@ -355,32 +245,6 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
         if copy_images:
             shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
         tf.keras.backend.clear_session()
-
-
-def plot_metrics(data, title="", output=".", figsize=(15, 15)):
-    output_path = Path(output)
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-
-    df = pd.DataFrame(data)
-    df.index = range(1, len(df.index) + 1)
-
-    image = df.plot(grid=True, figsize=figsize)
-    image.set(xlabel="Epoch", title=title)
-    image.set_ylim(ymin=0)
-
-    for column in df.columns:
-        if "loss" in column:
-            text = f"e{np.argmin(list(df[column])) + 1}"
-            value = (np.argmin(list(df[column])) + 1, df[column].min())
-        else:
-            text = f"e{np.argmax(list(df[column])) + 1}"
-            value = (np.argmax(list(df[column])) + 1, df[column].max())
-
-        if column != "lr":
-            image.annotate(text, value, arrowprops=dict(facecolor='black', shrink=0.05))
-
-    image = image.get_figure()
-    image.savefig(str(output_path))
 
 
 def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10), output=".", get_as_weights=False, classes=["Background", "Nucleus", "NOR"]):

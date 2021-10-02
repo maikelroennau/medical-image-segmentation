@@ -3,7 +3,7 @@ import os
 
 import tensorflow as tf
 
-from utils import evaluate
+from utils.utils import evaluate
 
 
 def main():

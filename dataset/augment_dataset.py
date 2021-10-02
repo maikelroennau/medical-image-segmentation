@@ -10,34 +10,7 @@ import albumentations as A
 import cv2
 import numpy as np
 from tqdm import tqdm
-
-
-def list_files(path, validate_masks=False):
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-
-    images_path = Path(path).joinpath("images")
-    masks_path = Path(path).joinpath("masks")
-
-    images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-    masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
-
-    assert len(images_paths) > 0, f"No images found at '{images_path}'."
-    assert len(masks_paths) > 0, f"No masks found at '{masks_paths}'."
-
-    images_paths.sort()
-    masks_paths.sort()
-
-    if validate_masks:
-        assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
-
-        for image_path, mask_path in zip(images_paths, masks_paths):
-            assert image_path.stem.lower().replace("image", "") == mask_path.stem.lower().replace("mask", ""), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
-
-    print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
-
-    images_paths = [str(image_path) for image_path in images_paths]
-    masks_paths = [str(masks_path) for masks_path in masks_paths]
-    return images_paths, masks_paths
+from utils.data_io import list_files
 
 
 def get_transformations():
@@ -106,11 +79,11 @@ class ImageAugmentation:
             cv2.imwrite(str(self.masks_output.joinpath(f"{mask_path.stem}_t{j}{self.suffix}{mask_path.suffix}")), transformed_mask)
 
 
-def augment_dataset(input_dir, output_dir, suffix="", name=None, seed=None):
+def augment_dataset(input_dir, output_dir, suffix="", name=None, seed=None, validate=False):
     if seed:
         np.random.seed(seed)
 
-    images_paths, masks_paths = list_files(input_dir, validate_masks=True)
+    images_paths, masks_paths = list_files(input_dir, validate_masks=validate)
     transformations = get_transformations()
 
     print("\nAugmented dataset specs:")
@@ -163,6 +136,12 @@ def main():
         help="A name for the dataset. If not specified, will be equal to the outputdir.",
         default="",
         type=str)
+    
+    parser.add_argument(
+        "--validate",
+        help="Whether or not to validate if images and masks names match.",
+        default=False,
+        action="store_true")
 
     args = parser.parse_args()
 
@@ -172,7 +151,7 @@ def main():
     if not args.name:
         args.name = Path(args.output_dir).name
 
-    augment_dataset(args.input_dir, args.output_dir, args.suffix, args.name)
+    augment_dataset(args.input_dir, args.output_dir, args.suffix, args.name, args.validate)
 
 
 if __name__ == "__main__":

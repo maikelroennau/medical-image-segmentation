@@ -10,7 +10,7 @@ import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
-import utils
+from utils import utils
 
 
 def train(
