@@ -2,7 +2,9 @@ import argparse
 import itertools
 import json
 import multiprocessing
+import os
 import random
+import sys
 import time
 from pathlib import Path
 
@@ -10,6 +12,11 @@ import albumentations as A
 import cv2
 import numpy as np
 from tqdm import tqdm
+
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from utils.data_io import list_files
 
 

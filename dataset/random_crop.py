@@ -1,11 +1,17 @@
 import argparse
+import os
 import random
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
-import tensorflow as tf
 from tqdm import tqdm
+
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from utils.data_io import list_files, load_image, load_mask
 
 
@@ -134,10 +140,9 @@ def main():
 
     parser.add_argument(
         "--gamma",
-        help="Percentage factor used to rescale the size of the crop retangle. Defaults to 50% (1.5).",
+        help="Percentage factor used to rescale the size of the crop retangle. Defaults to 50 percent (1.5).",
         default=1.5,
         type=float)
-
 
     parser.add_argument(
         "--suffix",
@@ -160,7 +165,6 @@ def main():
 
     random.seed(seed)
     np.random.seed(seed)
-    tf.random.set_seed(seed)
 
     if not args.output_dir:
         args.output_dir = "cropped"
