@@ -159,7 +159,17 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         return best_model, models_metrics
 
 
-def predict(model, images_path, batch_size, output_path="predictions", copy_images=False, new_input_shape=None, normalize=False, single_dir=False, postprocess=False, verbose=1):
+def predict(
+    model, 
+    images_path, 
+    batch_size, 
+    output_path="predictions", 
+    copy_images=False, 
+    new_input_shape=None, 
+    normalize=False, 
+    single_dir=False, 
+    postprocess=False, 
+    verbose=1):
     if isinstance(model, str) or isinstance(model, Path):
         model = Path(model)
         if model.is_file():
@@ -178,6 +188,7 @@ def predict(model, images_path, batch_size, output_path="predictions", copy_imag
                         new_input_shape=new_input_shape,
                         normalize=normalize,
                         single_dir=single_dir,
+                        postprocess=postprocess,
                         verbose=0)
             return
     elif model != None:
