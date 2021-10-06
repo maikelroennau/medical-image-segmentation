@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.interpolate import splev, splprep
 
 
-def post_process(image):
+def post_process(image, id="ABC123", image_id="image_0"):
     image[image > 0] = 255
     nuclei_prediction = image[:, :, 1].astype(np.uint8)
     nors_prediction = image[:, :, 2].astype(np.uint8)
@@ -60,19 +60,12 @@ def post_process(image):
     post_processed_image = np.stack([background, nucleus, nor], axis=2)
     post_processed_image[post_processed_image > 0] = 127
     
-    measurements = {}
+    measurements = []
     for i, nucleus in enumerate(filtered_nuclei):
-        i = str(i)
-        measurements[i] = {
-                "nucleus_area": cv2.contourArea(nucleus),
-                "n_nors": 0,
-                "nors_area": {}
-            }
         for j, nor in enumerate(filtered_nors):
             for nor_point in nor:
                 if cv2.pointPolygonTest(nucleus, tuple(nor_point[0]), True) >= 0:
-                    measurements[i]["n_nors"] = measurements[i]["n_nors"] + 1
-                    measurements[i]["nors_area"][str(j)] = cv2.contourArea(nor)
+                    measurements.append([id, image_id, i, j, cv2.contourArea(nucleus), cv2.contourArea(nor)])
                     break
 
     return post_processed_image.astype(np.uint8), measurements

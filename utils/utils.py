@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pandas as pd
 import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
@@ -13,7 +14,6 @@ from tqdm import tqdm
 from utils import losses
 from utils.data_io import load_dataset
 from utils.postprocess import post_process
-
 
 CUSTOM_OBJECTS = {
     "dice_coef": losses.dice_coef,
@@ -160,15 +160,16 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
 
 
 def predict(
-    model, 
-    images_path, 
-    batch_size, 
-    output_path="predictions", 
-    copy_images=False, 
-    new_input_shape=None, 
-    normalize=False, 
-    single_dir=False, 
-    postprocess=False, 
+    model,
+    images_path,
+    batch_size,
+    output_path="predictions",
+    copy_images=False,
+    new_input_shape=None,
+    normalize=False,
+    single_dir=False,
+    postprocess=False,
+    measurements_id="ABC123",
     verbose=1):
     if isinstance(model, str) or isinstance(model, Path):
         model = Path(model)
@@ -215,8 +216,9 @@ def predict(
 
     images_tensor = np.empty((1, height, width, channels))
     Path(output_path).mkdir(exist_ok=True, parents=True)
+    measurements = []
 
-    for image_path in images:
+    for i, image_path in enumerate(images):
         image = tf.io.read_file(str(image_path))
         image = tf.image.decode_png(image, channels=3)
         original_shape = image.shape[:2]
@@ -245,7 +247,8 @@ def predict(
             prediction = prediction_reshaped
 
         if postprocess:
-            prediction, _ = post_process(prediction)
+            prediction, measurement = post_process(prediction, measurements_id, i)
+            measurements.extend(measurement)
 
         if single_dir:
             output_image_path = os.path.join(output_path, f"{model.stem.split('_l')[0]}_{image_path.stem}_prediction.png")
@@ -257,6 +260,12 @@ def predict(
         if copy_images:
             shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
         tf.keras.backend.clear_session()
+
+    if len(measurements) > 0:
+        classes = ["id", "source", "nucleus", "nor", "nucleus_area", "nor_area"]
+        df = pd.DataFrame(measurements, columns=classes)
+        measurements_output = Path(output_path).joinpath("measurements_raw.csv")
+        df.to_csv(str(measurements_output), mode="w", header=True, index=False)
 
 
 def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10), output=".", get_as_weights=False, classes=["Background", "Nucleus", "NOR"]):
@@ -287,8 +296,6 @@ def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10)
         distribution[class_name] = float(occurence)
 
     if plot:
-        import pandas as pd
-
         output_path = Path(output)
         output_path.mkdir(exist_ok=True, parents=True)
 
