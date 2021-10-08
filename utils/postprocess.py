@@ -30,12 +30,6 @@ def post_process(image, id="ABC123", image_id="image_0"):
         if keep_nucleus:
             filtered_nuclei.append(nucleus)
 
-    # Filter out non-convex nuclei
-    # double_filtered_nuclei = []
-    # for nucleus in filtered_nuclei:
-    #     if cv2.contourArea(cv2.convexHull(nucleus)) - cv2.contourArea(nucleus) < 1000:
-    #         double_filtered_nuclei.append(nucleus)
-
     # Filter out NORs outside nuclei
     filtered_nors = []
     for nor in nors_polygons:
