@@ -11,7 +11,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 from utils.data_io import list_files, load_dataset
-from utils.postprocess import plot_metrics
+from utils.post_process import plot_metrics
 from utils.utils import (CUSTOM_OBJECTS, compute_classes_distribution,
                          evaluate, predict, update_model)
 
