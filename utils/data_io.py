@@ -19,9 +19,12 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
     masks_path.mkdir(exist_ok=True, parents=True)
 
     if max_batches:
-        if max_batches > len(dataset):
-            batches = len(dataset)
-        else:
+        try:
+            if max_batches > len(dataset):
+                batches = len(dataset)
+            else:
+                batches = max_batches
+        except Exception:
             batches = max_batches
     else:
         batches = len(dataset)
@@ -35,7 +38,7 @@ def write_dataset(dataset, output_path="dataset_visualization", max_batches=None
                 mask_reshaped = np.zeros(tuple(mask.shape[:2]) + (3,))
                 mask_reshaped[:, :, :2] = mask.numpy()
                 mask = tf.convert_to_tensor(mask_reshaped)
-            tf.keras.preprocessing.image.save_img(mask_name, mask)
+            tf.keras.preprocessing.image.save_img(mask_name, mask * 127, scale=False)
 
         tf.keras.backend.clear_session()
         if i == batches:
