@@ -13,7 +13,7 @@ from tensorflow.keras.optimizers import Adam
 from utils.data_io import list_files, load_dataset
 from utils.postprocess import plot_metrics
 from utils.utils import (CUSTOM_OBJECTS, compute_classes_distribution,
-                         evaluate, update_model)
+                         evaluate, predict, update_model)
 
 
 def train(
@@ -29,10 +29,10 @@ def train(
     epochs=10,
     batch_size=1,
     steps_per_epoch=420,
-    height=480,  # 240 480 960 1152 1440 1920
-    width=640,  # 320 640 1280 1536 1920 2560
+    height=960,  # 240 480 960 1152 1440 1920
+    width=1280,  # 320 640 1280 1536 1920 2560
     rgb=True,
-    predict=False,
+    predict_images=False,
     gpu=0,
     save_all=False,
     seed=None,  # 7613
@@ -80,7 +80,7 @@ def train(
         shuffle=True,
         classes=classes,
         one_hot_encoded=one_hot_encoded,
-        validate_masks=True)
+        validate_masks=False)
 
     validation_dataset = load_dataset(
         validation_dataset_path,
@@ -88,7 +88,7 @@ def train(
         target_shape=(height, width),
         classes=classes,
         one_hot_encoded=one_hot_encoded,
-        validate_masks=True)
+        validate_masks=False)
 
     ########
     ########
@@ -395,7 +395,7 @@ def train(
     ########
     ########
 
-    if predict:
+    if predict_images:
         print(f"\n\nPredict with best model on test data '{test_dataset_path}'")
         predict(
             str(Path(checkpoint_directory).joinpath(model_path)),
@@ -542,7 +542,7 @@ if __name__ == "__main__":
             height=args.height,
             width=args.width,
             rgb=args.rgb,
-            predict=args.predict,
+            predict_images=args.predict,
             save_all=args.save_all,
             gpu=args.gpu,
             seed=args.seed,
