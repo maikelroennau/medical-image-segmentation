@@ -13,7 +13,8 @@ from tqdm import tqdm
 
 from utils import losses
 from utils.data_io import load_dataset
-from utils.postprocess import post_process
+from utils.post_process import post_process
+
 
 CUSTOM_OBJECTS = {
     "dice_coef": losses.dice_coef,
@@ -216,7 +217,6 @@ def predict(
 
     images_tensor = np.empty((1, height, width, channels))
     Path(output_path).mkdir(exist_ok=True, parents=True)
-    measurements = []
 
     for i, image_path in enumerate(images):
         image = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
@@ -247,8 +247,16 @@ def predict(
             prediction = prediction_reshaped
 
         if postprocess:
-            prediction, measurement = post_process(prediction, measurements_id, i)
-            measurements.extend(measurement)
+            prediction, measurement = post_process(prediction, measurements_id, image_path.name)
+
+            columns = ["id", "source_image", "nucleus", "nor", "nucleus_area", "nor_area"]
+            df = pd.DataFrame(measurement, columns=columns)
+            measurements_output = Path(output_path).joinpath("measurements_raw.csv")
+
+            if Path(measurements_output).is_file():
+                df.to_csv(str(measurements_output), mode="a", header=False, index=False)
+            else:
+                df.to_csv(str(measurements_output), mode="w", header=True, index=False)
 
         if single_dir:
             output_image_path = os.path.join(output_path, f"{model.stem.split('_l')[0]}_{image_path.stem}_prediction.png")
@@ -260,12 +268,6 @@ def predict(
         if copy_images:
             shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
         tf.keras.backend.clear_session()
-
-    if len(measurements) > 0:
-        classes = ["id", "source", "nucleus", "nor", "nucleus_area", "nor_area"]
-        df = pd.DataFrame(measurements, columns=classes)
-        measurements_output = Path(output_path).joinpath("measurements_raw.csv")
-        df.to_csv(str(measurements_output), mode="w", header=True, index=False)
 
 
 def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10), output=".", get_as_weights=False, classes=["Background", "Nucleus", "NOR"]):

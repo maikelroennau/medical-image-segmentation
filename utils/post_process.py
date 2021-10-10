@@ -6,10 +6,41 @@ import pandas as pd
 from scipy.interpolate import splev, splprep
 
 
-def post_process(image, id="ABC123", image_id="image_0"):
-    image[image > 0] = 255
-    nuclei_prediction = image[:, :, 1].astype(np.uint8)
-    nors_prediction = image[:, :, 2].astype(np.uint8)
+def get_pixel_count(contour, shape):
+    image = np.zeros(shape)
+    cv2.drawContours(image, contours=[contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
+    return np.count_nonzero(image)
+
+
+def get_measurements(nuclei, nors, source_shape, id="", source_image=""):
+    """
+    Calculate nuclei and NORs areas in pixels.
+
+    :param nuclei:       List of nuclei contours.
+    :param nors:         List of NORs contour.
+    :param source_shape: Shape of the image where the contours were obtained from, in the format (height, width).
+    :param id:           ID to be added to the measurement records. (Default value = "")
+    :param source_image: Name of any identifier of the source image for the countours. (Default value = "")
+    :return:             List with all nuclei and NORs measurements.
+    :rtype:              List
+    """
+    measurements = []
+    for i, nucleus in enumerate(nuclei):
+        for j, nor in enumerate(nors):
+            for nor_point in nor:
+                if cv2.pointPolygonTest(nucleus, tuple(nor_point[0]), True) >= 0:
+                    nucleus_pixels = get_pixel_count(nucleus, source_shape)
+                    nor_pixels = get_pixel_count(nor, source_shape)
+                    measurements.append([id, source_image, i, j, nucleus_pixels, nor_pixels])
+                    break
+
+    return measurements
+
+
+def post_process(prediction, id="", source_image=""):
+    prediction[prediction > 0] = 255
+    nuclei_prediction = prediction[:, :, 1].astype(np.uint8)
+    nors_prediction = prediction[:, :, 2].astype(np.uint8)
 
     # Find segmentation contours
     nuclei_polygons, _ = cv2.findContours(nuclei_prediction.astype("uint8"), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -18,7 +49,7 @@ def post_process(image, id="ABC123", image_id="image_0"):
 
     nors_polygons, _ = cv2.findContours(nors_prediction.astype("uint8"), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     nors_polygons = smooth_contours(nors_polygons, 20)
-    
+
     # Filter out nuclei without NORs
     filtered_nuclei = []
     for nucleus in nuclei_polygons:
@@ -29,6 +60,15 @@ def post_process(image, id="ABC123", image_id="image_0"):
                     keep_nucleus = True
         if keep_nucleus:
             filtered_nuclei.append(nucleus)
+
+    # Filter out non-convex enough nuclei
+    # convex_enough = []
+    # for nucleus in filtered_nuclei:
+    #     smoothed = get_pixel_count(nucleus, prediction.shape[:2])
+    #     convex = get_pixel_count(cv2.convexHull(nucleus), prediction.shape[:2])
+    #     if convex - smoothed < 1000:
+    #         convex_enough.append(nucleus)
+    # filtered_nuclei = convex_enough
 
     # Filter out NORs outside nuclei
     filtered_nors = []
@@ -41,9 +81,9 @@ def post_process(image, id="ABC123", image_id="image_0"):
         if keep_nor:
             filtered_nors.append(nor)
 
-    nucleus = np.zeros(image.shape[:2], dtype=np.uint8)
-    nor = np.zeros(image.shape[:2], dtype=np.uint8)
-    background = np.ones(image.shape[:2], dtype=np.uint8)
+    nucleus = np.zeros(prediction.shape[:2], dtype=np.uint8)
+    nor = np.zeros(prediction.shape[:2], dtype=np.uint8)
+    background = np.ones(prediction.shape[:2], dtype=np.uint8)
 
     cv2.drawContours(nucleus, contours=filtered_nuclei, contourIdx=-1, color=1, thickness=cv2.FILLED)
     cv2.drawContours(nor, contours=filtered_nors, contourIdx=-1, color=1, thickness=cv2.FILLED)
@@ -53,16 +93,8 @@ def post_process(image, id="ABC123", image_id="image_0"):
 
     post_processed_image = np.stack([background, nucleus, nor], axis=2)
     post_processed_image[post_processed_image > 0] = 127
-    
-    measurements = []
-    for i, nucleus in enumerate(filtered_nuclei):
-        for j, nor in enumerate(filtered_nors):
-            for nor_point in nor:
-                if cv2.pointPolygonTest(nucleus, tuple(nor_point[0]), True) >= 0:
-                    measurements.append([id, image_id, i, j, cv2.contourArea(nucleus), cv2.contourArea(nor)])
-                    break
 
-    return post_processed_image.astype(np.uint8), measurements
+    return post_processed_image.astype(np.uint8), get_measurements(filtered_nuclei, filtered_nors, prediction.shape[:2], id, source_image)
 
 
 def plot_metrics(data, title="", output=".", figsize=(15, 15)):
