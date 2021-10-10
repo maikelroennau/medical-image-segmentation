@@ -219,8 +219,8 @@ def predict(
     measurements = []
 
     for i, image_path in enumerate(images):
-        image = tf.io.read_file(str(image_path))
-        image = tf.image.decode_png(image, channels=3)
+        image = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         original_shape = image.shape[:2]
         image = tf.image.resize(image, (height, width), method="nearest")
 
