@@ -16,25 +16,31 @@ def get_measurements(nuclei, nors, source_shape, id="", source_image=""):
     """
     Calculate nuclei and NORs areas in pixels.
 
-    :param nuclei:       List of nuclei contours.
-    :param nors:         List of NORs contour.
-    :param source_shape: Shape of the image where the contours were obtained from, in the format (height, width).
-    :param id:           ID to be added to the measurement records. (Default value = "")
-    :param source_image: Name of any identifier of the source image for the countours. (Default value = "")
-    :return:             List with all nuclei and NORs measurements.
-    :rtype:              List
+    :param nuclei:               List of nuclei contours.
+    :param nors:                 List of NORs contour.
+    :param source_shape:         Shape of the image where the contours were obtained from, in the format (height, width).
+    :param id:                   ID to be added to the measurement records. (Default value = "")
+    :param source_image:         Name of any identifier of the source image for the countours. (Default value = "")
+    :return nuclei_measurements: List with all nuclei measurements.
+    :rtype:                      List
+    :return nor_measurements:    List with all NORs measurements.
+    :rtype:                      List
     """
-    measurements = []
-    for i, nucleus in enumerate(nuclei):
-        for j, nor in enumerate(nors):
+    nuclei_measurements = []
+    nor_measurements = []
+
+    for nucleus_id, nucleus in enumerate(nuclei):
+        nucleus_pixels = get_pixel_count(nucleus, source_shape)
+        nuclei_measurements.append([id, source_image, nucleus_id, nucleus_pixels])
+
+        for nor_id, nor in enumerate(nors):
             for nor_point in nor:
                 if cv2.pointPolygonTest(nucleus, tuple(nor_point[0]), True) >= 0:
-                    nucleus_pixels = get_pixel_count(nucleus, source_shape)
                     nor_pixels = get_pixel_count(nor, source_shape)
-                    measurements.append([id, source_image, i, j, nucleus_pixels, nor_pixels])
+                    nor_measurements.append([id, source_image, nucleus_id, nor_id, nor_pixels])
                     break
 
-    return measurements
+    return nuclei_measurements, nor_measurements
 
 
 def post_process(prediction, id="", source_image=""):
