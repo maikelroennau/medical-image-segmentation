@@ -249,14 +249,23 @@ def predict(
         if postprocess:
             prediction, measurement = post_process(prediction, measurements_id, image_path.name)
 
-            columns = ["id", "source_image", "nucleus", "nor", "nucleus_area", "nor_area"]
-            df = pd.DataFrame(measurement, columns=columns)
-            measurements_output = Path(output_path).joinpath("measurements_raw.csv")
+            nucleus_columns = ["id", "source_image", "nucleus", "nucleus_pixel_count"]
+            nor_columns = ["id", "source_image", "nucleus", "nor", "nor_pixel_count"]
 
-            if Path(measurements_output).is_file():
-                df.to_csv(str(measurements_output), mode="a", header=False, index=False)
+            df_nuclei = pd.DataFrame(measurement[0], columns=nucleus_columns)
+            df_nor = pd.DataFrame(measurement[1], columns=nor_columns)
+
+            nucleus_measurements_output = Path(output_path).joinpath("nuclei_measurements_raw.csv")
+            nor_measurements_output = Path(output_path).joinpath("nor_measurements_raw.csv")
+
+            if Path(nucleus_measurements_output).is_file():
+                df_nuclei.to_csv(str(nucleus_measurements_output), mode="a", header=False, index=False)
             else:
-                df.to_csv(str(measurements_output), mode="w", header=True, index=False)
+                df_nuclei.to_csv(str(nucleus_measurements_output), mode="w", header=True, index=False)
+            if Path(nor_measurements_output).is_file():
+                df_nor.to_csv(str(nor_measurements_output), mode="a", header=False, index=False)
+            else:
+                df_nor.to_csv(str(nor_measurements_output), mode="w", header=True, index=False)
 
         if single_dir:
             output_image_path = os.path.join(output_path, f"{model.stem.split('_l')[0]}_{image_path.stem}_prediction.png")
