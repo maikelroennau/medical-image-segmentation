@@ -249,7 +249,7 @@ def predict(
         if postprocess:
             prediction, measurement = post_process(prediction, measurements_id, image_path.name)
 
-            nucleus_columns = ["id", "source_image", "nucleus", "nucleus_pixel_count"]
+            nucleus_columns = ["id", "source_image", "nucleus", "flag", "nucleus_pixel_count"]
             nor_columns = ["id", "source_image", "nucleus", "nor", "nor_pixel_count"]
 
             df_nuclei = pd.DataFrame(measurement[0], columns=nucleus_columns)

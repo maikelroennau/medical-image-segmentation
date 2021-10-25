@@ -1,9 +1,9 @@
 from pathlib import Path
 
-import cv2
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
+from skimage.io import imread
 
 
 def write_dataset(dataset, output_path="dataset_visualization", max_batches=None, same_dir=False):
@@ -62,9 +62,8 @@ def list_files(path, validate_masks=False):
 
     if validate_masks:
         assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
-
-        # for image_path, mask_path in zip(images_paths, masks_paths):
-        #     assert image_path.stem.lower().replace("image", "") == mask_path.stem.lower().replace("mask", ""), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
+        for image_path, mask_path in zip(images_paths, masks_paths):
+            assert image_path.stem.lower() == mask_path.stem.lower(), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
 
     print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
 
@@ -76,13 +75,15 @@ def list_files(path, validate_masks=False):
 def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_hot_encoded=False):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_png(image, channels=3)
-    image = tf.image.resize(image, target_shape, method="nearest")
+    if image.shape != target_shape:
+        image = tf.image.resize(image, target_shape, method="nearest")
     image = tf.cast(image, dtype=tf.float32)
     image = image / 255.
 
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
-    mask = tf.image.resize(mask, target_shape, method="nearest")
+    if mask.shape != target_shape:
+        mask = tf.image.resize(mask, target_shape, method="nearest")
 
     if one_hot_encoded:
         mask = tf.cast(mask, dtype=tf.int32)
@@ -124,12 +125,8 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
 
 
 def load_image(image_path):
-    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    return image
+    return imread(str(image_path))
 
 
 def load_mask(mask_path):
-    mask = cv2.imread(str(mask_path), cv2.IMREAD_COLOR)
-    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
-    return mask
+    return load_image(mask_path)
