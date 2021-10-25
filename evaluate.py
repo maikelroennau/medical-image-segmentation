@@ -3,7 +3,7 @@ import os
 
 import tensorflow as tf
 
-from utils import evaluate
+from utils.utils import evaluate
 
 
 def main():
@@ -44,7 +44,7 @@ def main():
 
     parser.add_argument(
         "--ohe",
-        help="Wheter or not to convert masks to one-hot-encoded.",
+        help="Whether or not to convert masks to one-hot-encoded.",
         default=False,
         action="store_true")
 

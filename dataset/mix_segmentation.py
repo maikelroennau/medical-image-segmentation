@@ -1,5 +1,7 @@
 import argparse
+import os
 import random
+import sys
 from pathlib import Path
 
 import albumentations as A
@@ -8,44 +10,11 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 
-def list_files(path, validate_masks=False):
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-
-    images_path = Path(path).joinpath("images")
-    masks_path = Path(path).joinpath("masks")
-
-    images_paths = [image_path for image_path in images_path.glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-    masks_paths = [mask_path for mask_path in masks_path.glob("*.*") if mask_path.suffix.lower() in supported_types and not mask_path.stem.endswith("_prediction")]
-
-    assert len(images_paths) > 0, f"No images found at '{images_path}'."
-    assert len(masks_paths) > 0, f"No masks found at '{masks_paths}'."
-
-    images_paths.sort()
-    masks_paths.sort()
-
-    if validate_masks:
-        assert len(images_paths) == len(masks_paths), f"Different quantity of images ({len(images_paths)}) and masks ({len(masks_paths)})"
-
-        for image_path, mask_path in zip(images_paths, masks_paths):
-            assert image_path.stem.lower().replace("image", "") == mask_path.stem.lower().replace("mask", ""), f"Image and mask do not correspond: {image_path.name} <==> {mask_path.name}"
-
-    print(f"Dataset '{str(images_path.parent)}' contains {len(images_paths)} images and masks.")
-
-    images_paths = [str(image_path) for image_path in images_paths]
-    masks_paths = [str(masks_path) for masks_path in masks_paths]
-    return images_paths, masks_paths
-
-
-def load_image(image_path):
-    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    return image
-
-
-def load_mask(mask_path):
-    mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-    return mask
+from utils.data_io import list_files, load_image, load_mask
 
 
 def get_masks_properties(masks_paths):
