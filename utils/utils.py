@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 
 import cv2
@@ -218,6 +219,8 @@ def predict(
     images_tensor = np.empty((1, height, width, channels))
     Path(output_path).mkdir(exist_ok=True, parents=True)
 
+    current_time = time.strftime('%Y%m%d%H%M%S')
+
     for i, image_path in enumerate(images):
         image = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -254,6 +257,9 @@ def predict(
 
             df_nuclei = pd.DataFrame(measurement[0], columns=nucleus_columns)
             df_nor = pd.DataFrame(measurement[1], columns=nor_columns)
+
+            df_nuclei["datetime"] = current_time
+            df_nor["datetime"] = current_time
 
             nucleus_measurements_output = Path(output_path).joinpath("nuclei_measurements_raw.csv")
             nor_measurements_output = Path(output_path).joinpath("nor_measurements_raw.csv")
