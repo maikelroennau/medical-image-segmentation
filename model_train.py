@@ -265,25 +265,34 @@ def train(
                 callbacks=callbacks)
         else:
             if "," in str(gpu):
-                strategy = tf.distribute.MirroredStrategy()
+                # strategy = tf.distribute.MirroredStrategy()
+                strategy = tf.distribute.MultiWorkerMirroredStrategy()
                 with strategy.scope():
                     model = tf.keras.models.load_model(str(Path(resume)), custom_objects=CUSTOM_OBJECTS)
                     if previous_train_config["input_shape"] != input_shape:
                         model = update_model(model, input_shape)
                     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
+                    
+                    history = model.fit(
+                      train_dataset,
+                      epochs=epochs,
+                      steps_per_epoch=steps_per_epoch,
+                      validation_data=validation_dataset,
+                      initial_epoch=int(resume_epoch),
+                      callbacks=callbacks)
             else:
                 model = tf.keras.models.load_model(str(Path(resume)), custom_objects=CUSTOM_OBJECTS)
                 if previous_train_config["input_shape"] != input_shape:
                     model = update_model(model, input_shape)
                 model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
 
-            history = model.fit(
-                train_dataset,
-                epochs=epochs,
-                steps_per_epoch=steps_per_epoch,
-                validation_data=validation_dataset,
-                initial_epoch=int(resume_epoch),
-                callbacks=callbacks)
+                history = model.fit(
+                    train_dataset,
+                    epochs=epochs,
+                    steps_per_epoch=steps_per_epoch,
+                    validation_data=validation_dataset,
+                    initial_epoch=int(resume_epoch),
+                    callbacks=callbacks)
     except Exception as e:
         print(f"\nThere was an error during training that caused it to stop: \n{e}")
         train_config["error"] = str(e)
