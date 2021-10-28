@@ -1,5 +1,6 @@
 import argparse
 import glob
+import json
 import os
 from pathlib import Path
 
@@ -69,6 +70,11 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
 
         for filename in tqdm(glob.glob(os.path.join(input_dir, "*.json")), desc=res_name):
             try:
+                with open(filename, "r") as annotation_file:
+                    annotation_file = json.load(annotation_file)
+                    if annotation_file["invalidated"]:
+                        continue
+
                 label_file = labelme.LabelFile(filename=filename)
                 if filter_labels:
                     label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in filter_labels]
