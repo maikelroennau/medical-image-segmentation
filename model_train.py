@@ -63,7 +63,7 @@ def train(
     if loss == "dice":
         loss_function = sm.losses.cce_dice_loss
     if loss == "focal":
-        loss_function = sm.losses.categorical_focal_dice_loss
+        loss_function = sm.losses.categorical_focal_loss
     elif loss == "categorical":
         loss_function = sm.losses.categorical_crossentropy
 
@@ -194,7 +194,7 @@ def train(
         "steps_per_epoch": steps_per_epoch,
         "input_shape": input_shape,
         "one_hot_encoded": one_hot_encoded,
-        "loss_fuction": loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name,
+        "loss_function": loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name,
         "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
         "initial_learning_rate": model.optimizer.get_config()['learning_rate'],
         "learning_rate_change_factor": learning_rate_change_factor,
