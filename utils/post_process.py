@@ -138,17 +138,22 @@ def get_measurements(nuclei, nors, source_shape, id="", source_image="", start_i
     return nuclei_measurements, nor_measurements
 
 
-def post_process(prediction, id="", source_image=""):
-    prediction[prediction > 0] = 255
-    nuclei_prediction = prediction[:, :, 1].astype(np.uint8)
-    nors_prediction = prediction[:, :, 2].astype(np.uint8)
+def get_contours(binary_mask):
+    binary_mask[binary_mask > 0] = 255
+    binary_mask = binary_mask.astype(np.uint8)
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return contours
 
+
+def post_process(prediction, id="", source_image=""):
     # Find segmentation contours
-    nuclei_polygons, _ = cv2.findContours(nuclei_prediction.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    nuclei_prediction = get_contours(prediction[:, :, 1])
+    nuclei_polygons, _ = cv2.findContours(nuclei_prediction, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     nuclei_polygons, _ = filter_contours_by_size(nuclei_polygons)
     nuclei_polygons = smooth_contours(nuclei_polygons, 40)
 
-    nors_polygons, _ = cv2.findContours(nors_prediction.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    nors_prediction = get_contours(prediction[:, :, 2])
+    nors_polygons, _ = cv2.findContours(nors_prediction, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     nors_polygons = smooth_contours(nors_polygons, 20)
 
     filtered_nuclei, _ = filter_nuclei_whithout_nors(nuclei_polygons, nors_polygons)
