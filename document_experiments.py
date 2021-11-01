@@ -16,7 +16,7 @@ experiment_data = {
     "batch_size": None,
     "steps_per_epoch": None,
     "input_shape": None,
-    "loss_fuction": None,
+    "loss_function": None,
     "initial_learning_rate": None,
     "train_dataset": None,
     "train_samples": None,
