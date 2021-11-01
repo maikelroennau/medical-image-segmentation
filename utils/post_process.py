@@ -56,7 +56,7 @@ def filter_contours_by_size(contours, min_area=5000, max_area=40000):
     return filtered_contours, discarded
 
 
-def filter_nuclei_whithout_nors(nuclei_polygons, nors_polygons):
+def filter_nuclei_without_nors(nuclei_polygons, nors_polygons):
     """Filter out nuclei without NORs."""
     filtered_nuclei = []
     discarded = []
@@ -147,16 +147,14 @@ def get_contours(binary_mask):
 
 def post_process(prediction, id="", source_image=""):
     # Find segmentation contours
-    nuclei_prediction = get_contours(prediction[:, :, 1])
-    nuclei_polygons, _ = cv2.findContours(nuclei_prediction, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    nuclei_polygons = get_contours(prediction[:, :, 1])
     nuclei_polygons, _ = filter_contours_by_size(nuclei_polygons)
     nuclei_polygons = smooth_contours(nuclei_polygons, 40)
 
-    nors_prediction = get_contours(prediction[:, :, 2])
-    nors_polygons, _ = cv2.findContours(nors_prediction, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    nors_polygons = smooth_contours(nors_polygons, 20)
+    nors_polygons = get_contours(prediction[:, :, 2])
+    nors_polygons = smooth_contours(nors_polygons, 16)
 
-    filtered_nuclei, _ = filter_nuclei_whithout_nors(nuclei_polygons, nors_polygons)
+    filtered_nuclei, _ = filter_nuclei_without_nors(nuclei_polygons, nors_polygons)
     filtered_nuclei, non_convex = filter_non_convex_nuclei(filtered_nuclei, prediction.shape[:2])
     filtered_nors, _ = filter_nors_outside_nuclei(filtered_nuclei, nors_polygons)
     nors_from_non_convex, _ = filter_nors_outside_nuclei(non_convex, nors_polygons)
