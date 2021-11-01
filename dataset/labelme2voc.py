@@ -72,8 +72,9 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
             try:
                 with open(filename, "r") as annotation_file:
                     annotation_file = json.load(annotation_file)
-                    if annotation_file["invalidated"]:
-                        continue
+                    if "invalidated" in annotation_file.keys():
+                        if annotation_file["invalidated"]:
+                            continue
 
                 label_file = labelme.LabelFile(filename=filename)
                 if filter_labels:
