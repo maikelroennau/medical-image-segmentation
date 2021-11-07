@@ -12,7 +12,7 @@ import tifffile
 from tqdm import tqdm
 
 
-def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None, multiple_resolutions=False, tif=False, color=False, noviz=False):
+def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None, empty=False, multiple_resolutions=False, tif=False, color=False, noviz=False):
     resolutions = ((1920, 2560), (960, 1280), (480, 640), (240, 320))
     factors = (1, 0.5, 0.25, 0.125)
     class_names = []
@@ -70,11 +70,12 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
 
         for filename in tqdm(glob.glob(os.path.join(input_dir, "*.json")), desc=res_name):
             try:
-                with open(filename, "r") as annotation_file:
-                    annotation_file = json.load(annotation_file)
-                    if "invalidated" in annotation_file.keys():
-                        if annotation_file["invalidated"]:
-                            continue
+                if not empty:
+                    with open(filename, "r") as annotation_file:
+                        annotation_file = json.load(annotation_file)
+                        if "invalidated" in annotation_file.keys():
+                            if annotation_file["invalidated"]:
+                                continue
 
                 label_file = labelme.LabelFile(filename=filename)
                 if filter_labels:
@@ -83,22 +84,28 @@ def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None,
                 base = os.path.splitext(os.path.basename(filename))[0]
                 image_type = ".tif" if tif else ".png"
                 out_img_file = str(images_dir.joinpath(base + image_type))
-                out_png_file = str(segmentation_dir.joinpath(base + ".png"))
+                out_png_file = str(segmentation_dir.joinpath(base + "_mask.png"))
 
                 if not noviz:
                     out_viz_file = str(viz_dir.joinpath(base + ".png"))
 
                 # Save image to dir
                 img = labelme.utils.img_data_to_arr(label_file.imageData)
-                img = cv2.resize(img, dsize=resolution[::-1], interpolation=cv2.INTER_NEAREST)
+                # img = cv2.resize(img, dsize=resolution[::-1], interpolation=cv2.INTER_NEAREST)
                 if tif:
                     tifffile.imwrite(out_img_file, img, photometric="rgb")
                 else:
                     cv2.imwrite(out_img_file, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
                 # Rescale points accordingly to resolution factor
-                for i in range(len(label_file.shapes)):
-                    label_file.shapes[i]["points"] = list(np.asarray(label_file.shapes[i]["points"]) * factor)
+                # for i in range(len(label_file.shapes)):
+                #     label_file.shapes[i]["points"] = list(np.asarray(label_file.shapes[i]["points"]) * factor)
+
+                shapes = []
+                for i, shape in enumerate(label_file.shapes):
+                    if len(shape["points"]) > 2:
+                        shapes.append(shape)
+                label_file.shapes = shapes
 
                 lbl, _ = labelme.utils.shapes_to_label(
                     img_shape=resolution + (3,),
@@ -156,6 +163,13 @@ def main():
         type=str)
 
     parser.add_argument(
+        "-e",
+        "--empty",
+        help="Keep empty masks.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-m",
         "--multiple-resolutions",
         help="Generate images and masks in multiple resolutions.",
@@ -194,6 +208,7 @@ def main():
         args.output_dir,
         args.labels,
         args.filter_labels,
+        args.empty,
         args.multiple_resolutions,
         args.tif,
         args.color,
