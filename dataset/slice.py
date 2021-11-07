@@ -58,12 +58,12 @@ def slice_images(input_dir, height, width, filter, overlap, output):
                     if np.unique(sliced_mask).size == 1:
                         continue
                     else:
-                        contours = get_contours(sliced_mask[:, :, 1])
+                        contours = get_contours(sliced_mask[:, :, 1].copy())
                         contours, _ = filter_contours_by_size(contours)
                         if len(contours) == 0:
                             continue
 
-                output_image = output.joinpath(image_path.parent.name).joinpath(f"{image_path.stem}_x{x}-{x+height}_y{y}-{y+width}.jpg")
+                output_image = output.joinpath(image_path.parent.name).joinpath(f"{image_path.stem}_x{x}-{x+height}_y{y}-{y+width}.png")
                 output_mask = output.joinpath(mask_path.parent.name).joinpath(f"{mask_path.stem}_x{x}-{x+height}_y{y}-{y+width}.png")
                 output_image.parent.mkdir(parents=True, exist_ok=True)
                 output_mask.parent.mkdir(parents=True, exist_ok=True)
