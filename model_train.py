@@ -509,7 +509,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--seed",
-        default=7613,
+        default=None,
         type=int)
 
     parser.add_argument(
