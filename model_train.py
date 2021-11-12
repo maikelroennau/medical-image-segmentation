@@ -358,7 +358,7 @@ def train(
     best_model, models_metrics = evaluate(
         str(checkpoint_directory),
         test_dataset_path,
-        batch_size,
+        1,
         input_shape=None,
         classes=classes,
         one_hot_encoded=one_hot_encoded)
