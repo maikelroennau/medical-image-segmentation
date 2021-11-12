@@ -63,7 +63,7 @@ def train(
     if loss == "dice":
         loss_function = sm.losses.cce_dice_loss
     if loss == "focal":
-        loss_function = sm.losses.categorical_focal_loss
+        loss_function = sm.losses.categorical_focal_dice_loss
     elif loss == "categorical":
         loss_function = sm.losses.categorical_crossentropy
 
