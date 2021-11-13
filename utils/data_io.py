@@ -95,7 +95,7 @@ def load_files(image_path, mask_path, target_shape=(1920, 2560), classes=1, one_
     return image, mask
 
 
-def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, validate_masks=False, seed=7613):
+def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, shuffle=False, classes=1, one_hot_encoded=False, validate_masks=False, seed=None):
     if validate_masks:
         images_paths, masks_paths = list_files(path, validate_masks=validate_masks)
         dataset = tf.data.Dataset.from_tensor_slices((images_paths, masks_paths))
@@ -112,7 +112,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         dataset = tf.data.Dataset.zip((images_paths, masks_paths))
         print(f"Dataset '{str(images_path.parent)}' contains {len(dataset)} images and masks.")
 
-    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded), num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
 
     if shuffle:
         dataset = dataset.shuffle(buffer_size=batch_size * batch_size, seed=seed)

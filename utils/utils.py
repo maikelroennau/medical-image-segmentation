@@ -50,14 +50,17 @@ def update_model(model, input_shape):
     return updated_model
 
 
-def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_hot_encoded=False):
+def evaluate(model, images_path, batch_size=1, loss_function=None, input_shape=None, classes=1, one_hot_encoded=False):
+    if not loss_function:
+        loss_function = sm.losses.cce_dice_loss
+
     if Path(model).is_file():
         loaded_model = tf.keras.models.load_model(model, custom_objects=CUSTOM_OBJECTS)
 
         if input_shape:
             loaded_model = update_model(loaded_model, input_shape)
 
-        loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=sm.losses.cce_dice_loss, metrics=[METRICS])
+        loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=loss_function, metrics=[METRICS])
 
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
@@ -83,19 +86,11 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
         models = [model_path for model_path in Path(model).glob("*.h5")]
         models.sort()
 
-        if len(models) > 0:
-            loaded_model = tf.keras.models.load_model(str(models[0]), custom_objects=CUSTOM_OBJECTS)
-        else:
+        if len(models) == 0:
             print("No models found")
             return None, None
 
-        if input_shape:
-            loaded_model = update_model(loaded_model, input_shape)
-
-        input_shape = loaded_model.input_shape[1:]
-        height, width, channels = input_shape
-
-        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
+        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=input_shape, classes=classes, one_hot_encoded=one_hot_encoded)
 
         if models[0].parent.joinpath("train_config.json").is_file():
             with open(str(models[0].parent.joinpath("train_config.json")), "r") as config_file:
@@ -116,7 +111,7 @@ def evaluate(model, images_path, batch_size, input_shape=None, classes=1, one_ho
             if input_shape:
                 loaded_model = update_model(loaded_model, input_shape)
 
-            loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=sm.losses.cce_dice_loss, metrics=[METRICS])
+            loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=loss_function, metrics=[METRICS])
             evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
             print(f"Model {str(model_path)}")
             print(f"  - Loss: {np.round(evaluation_metrics[0], 4)}")
