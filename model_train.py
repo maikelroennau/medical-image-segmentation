@@ -272,7 +272,7 @@ def train(
                     if previous_train_config["input_shape"] != input_shape:
                         model = update_model(model, input_shape)
                     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
-                    
+
                     history = model.fit(
                       train_dataset,
                       epochs=epochs,
@@ -357,9 +357,10 @@ def train(
     print(f"\nEvaluate all saved models on test data '{test_dataset_path}'")
     best_model, models_metrics = evaluate(
         str(checkpoint_directory),
-        test_dataset_path,
-        1,
+        images_path=test_dataset_path,
+        batch_size=1,
         input_shape=(1920, 2560, 3),
+        loss_function=loss_function,
         classes=classes,
         one_hot_encoded=one_hot_encoded)
 
@@ -382,7 +383,7 @@ def train(
             json.dump(train_config, config_file, indent=4)
 
         plot_metrics(
-            { key: value for key, value in train_config["train_metrics"].items() 
+            { key: value for key, value in train_config["train_metrics"].items()
               if not key.startswith("val_") and not key.startswith("lr")},
             title="Training metrics",
             output=str(checkpoint_directory.joinpath("01_train.png")))
