@@ -359,7 +359,7 @@ def train(
         str(checkpoint_directory),
         test_dataset_path,
         1,
-        input_shape=None,
+        input_shape=(1920, 2560, 3),
         classes=classes,
         one_hot_encoded=one_hot_encoded)
 
