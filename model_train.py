@@ -84,7 +84,7 @@ def train(
 
     validation_dataset = load_dataset(
         validation_dataset_path,
-        batch_size=batch_size,
+        batch_size=1,
         target_shape=(height, width),
         classes=classes,
         one_hot_encoded=one_hot_encoded,
@@ -410,7 +410,7 @@ def train(
         predict(
             str(Path(checkpoint_directory).joinpath(model_path)),
             images_path=Path(test_dataset_path).joinpath("images"),
-            batch_size=batch_size,
+            batch_size=1,
             output_path=Path(test_dataset_path).joinpath("images"),
             copy_images=False,
             new_input_shape=None,
