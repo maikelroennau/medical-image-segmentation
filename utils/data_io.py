@@ -119,7 +119,8 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
     if repeat:
         dataset = dataset.repeat()
 
-    dataset = dataset.batch(batch_size).prefetch(1)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch()
     return dataset
 
 
