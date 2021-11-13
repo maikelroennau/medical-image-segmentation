@@ -35,7 +35,7 @@ def train(
     predict_images=False,
     gpu=0,
     save_all=False,
-    seed=None,  # 7613
+    seed=None,
     resume=None,
     resume_epoch=None
 ):
@@ -358,8 +358,9 @@ def train(
     best_model, models_metrics = evaluate(
         str(checkpoint_directory),
         test_dataset_path,
-        1,
-        input_shape=None,
+        batch_size=1,
+        loss_function=loss_function,
+        input_shape=(1920, 2560),
         classes=classes,
         one_hot_encoded=one_hot_encoded)
 
