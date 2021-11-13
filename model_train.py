@@ -272,7 +272,7 @@ def train(
                     if previous_train_config["input_shape"] != input_shape:
                         model = update_model(model, input_shape)
                     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss_function, metrics=metrics)
-                    
+
                     history = model.fit(
                       train_dataset,
                       epochs=epochs,
@@ -383,7 +383,7 @@ def train(
             json.dump(train_config, config_file, indent=4)
 
         plot_metrics(
-            { key: value for key, value in train_config["train_metrics"].items() 
+            { key: value for key, value in train_config["train_metrics"].items()
               if not key.startswith("val_") and not key.startswith("lr")},
             title="Training metrics",
             output=str(checkpoint_directory.joinpath("01_train.png")))
@@ -410,7 +410,7 @@ def train(
         predict(
             str(Path(checkpoint_directory).joinpath(model_path)),
             images_path=Path(test_dataset_path).joinpath("images"),
-            batch_size=batch_size,
+            batch_size=1,
             output_path=Path(test_dataset_path).joinpath("images"),
             copy_images=False,
             new_input_shape=None,

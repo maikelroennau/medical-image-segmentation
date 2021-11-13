@@ -103,8 +103,8 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         images_path = Path(path).joinpath("images").joinpath("*.*")
         masks_path = Path(path).joinpath("masks").joinpath("*.*")
 
-        images_paths = tf.data.Dataset.list_files(str(images_path), shuffle=True, seed=seed)
-        masks_paths = tf.data.Dataset.list_files(str(masks_path), shuffle=True, seed=seed)
+        images_paths = tf.data.Dataset.list_files(str(images_path), shuffle=True)
+        masks_paths = tf.data.Dataset.list_files(str(masks_path), shuffle=True)
 
         assert len(images_paths) > 0, f"No images found at '{images_path}'."
         assert len(masks_paths) > 0, f"No masks found at '{masks_path}'."
@@ -115,7 +115,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
     dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
 
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=batch_size * batch_size, seed=seed)
+        dataset = dataset.shuffle(buffer_size=batch_size * batch_size)
     if repeat:
         dataset = dataset.repeat()
 
