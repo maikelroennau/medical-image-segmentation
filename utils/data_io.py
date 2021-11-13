@@ -120,7 +120,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         dataset = dataset.repeat()
 
     dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch()
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     return dataset
 
 
