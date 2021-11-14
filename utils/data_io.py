@@ -112,7 +112,7 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         dataset = tf.data.Dataset.zip((images_paths, masks_paths))
         print(f"Dataset '{str(images_path.parent)}' contains {len(dataset)} images and masks.")
 
-    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
+    dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if shuffle:
         dataset = dataset.shuffle(buffer_size=batch_size * batch_size)
