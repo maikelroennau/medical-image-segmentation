@@ -50,7 +50,7 @@ def update_model(model, input_shape):
     return updated_model
 
 
-def evaluate(model, images_path, batch_size=1, loss_function=None, input_shape=None, classes=1, one_hot_encoded=False):
+def evaluate(model, images_path, batch_size=1, input_shape=None, loss_function=None, classes=1, one_hot_encoded=False):
     if not loss_function:
         loss_function = sm.losses.cce_dice_loss
 
@@ -65,7 +65,7 @@ def evaluate(model, images_path, batch_size=1, loss_function=None, input_shape=N
         input_shape = loaded_model.input_shape[1:]
         height, width, channels = input_shape
 
-        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=input_shape[:2], classes=classes, one_hot_encoded=one_hot_encoded)
+        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
         evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
 
         print(f"Model {str(model)}")
@@ -90,7 +90,7 @@ def evaluate(model, images_path, batch_size=1, loss_function=None, input_shape=N
             print("No models found")
             return None, None
 
-        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=input_shape, classes=classes, one_hot_encoded=one_hot_encoded)
+        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=input_shape[:2], classes=classes, one_hot_encoded=one_hot_encoded)
 
         if models[0].parent.joinpath("train_config.json").is_file():
             with open(str(models[0].parent.joinpath("train_config.json")), "r") as config_file:
@@ -112,7 +112,6 @@ def evaluate(model, images_path, batch_size=1, loss_function=None, input_shape=N
                 loaded_model = update_model(loaded_model, input_shape)
 
             loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=loss_function, metrics=[METRICS])
-
             evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
             print(f"Model {str(model_path)}")
             print(f"  - Loss: {np.round(evaluation_metrics[0], 4)}")

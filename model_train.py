@@ -359,8 +359,8 @@ def train(
         str(checkpoint_directory),
         test_dataset_path,
         batch_size=1,
-        loss_function=loss_function,
         input_shape=(1920, 2560, 3),
+        loss_function=loss_function,
         classes=classes,
         one_hot_encoded=one_hot_encoded)
 
@@ -410,7 +410,7 @@ def train(
         predict(
             str(Path(checkpoint_directory).joinpath(model_path)),
             images_path=Path(test_dataset_path).joinpath("images"),
-            batch_size=1,
+            batch_size=batch_size,
             output_path=Path(test_dataset_path).joinpath("images"),
             copy_images=False,
             new_input_shape=None,
