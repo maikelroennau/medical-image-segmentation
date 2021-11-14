@@ -84,7 +84,7 @@ def train(
 
     validation_dataset = load_dataset(
         validation_dataset_path,
-        batch_size=batch_size,
+        batch_size=1,
         target_shape=(height, width),
         classes=classes,
         one_hot_encoded=one_hot_encoded,
@@ -360,7 +360,7 @@ def train(
         test_dataset_path,
         batch_size=1,
         loss_function=loss_function,
-        input_shape=(1920, 2560),
+        input_shape=(1920, 2560, 3),
         classes=classes,
         one_hot_encoded=one_hot_encoded)
 
