@@ -233,7 +233,8 @@ def train(
     ########
 
     start = time.time()
-    print(f"\nTraining start: {time.strftime('%x %X')}")
+    start_time = time.strftime('%x %X')
+    print(f"\nTraining start: {start_time}")
     print(f"  - Model name: {model.name}")
     print(f"  - Backbone: {backbone}")
     print(f"  - Decoder: {decoder}")
@@ -305,14 +306,20 @@ def train(
 
     if "duration" in train_config.keys():
         import datetime
-        old_duration = datetime.datetime.strptime(train_config["duration"], "%H:%M:%S")
-        new_duration = datetime.datetime.strptime(duration, "%H:%M:%S")
-        new_duration = datetime.timedelta(minutes=new_duration.minute, seconds=new_duration.second, microseconds=new_duration.microsecond)
-        train_config["duration"] = (old_duration + new_duration).strftime("%H:%M:%S")
+
+        new_duration = datetime.timedelta(hours=int(hours), minutes=int(minutes), seconds=int(seconds))
+
+        hours, minutes, seconds = train_config["duration"].split(":")
+        old_duration = datetime.timedelta(hours=int(hours), minutes=int(minutes), seconds=int(seconds))
+
+        total_seconds = (new_duration + old_duration).total_seconds()
+        duration = "%d:%02d:%02d" % (total_seconds / 3600, total_seconds / 60 % 60, total_seconds % 60)
+
+        train_config["duration"] = duration
     else:
         train_config["duration"] = duration
 
-    print(f"Training start: {time.strftime('%x %X')}")
+    print(f"Training start: {start_time}")
     print(f"Training end: {time.strftime('%x %X')}")
     print(f"Duration: {duration}")
     print(f"  - Model name: {model.name}")
