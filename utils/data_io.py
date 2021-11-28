@@ -103,8 +103,9 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
         images_path = Path(path).joinpath("images").joinpath("*.*")
         masks_path = Path(path).joinpath("masks").joinpath("*.*")
 
-        images_paths = tf.data.Dataset.list_files(str(images_path), shuffle=True)
-        masks_paths = tf.data.Dataset.list_files(str(masks_path), shuffle=True)
+        # A seed is required here so that images and masks are shuffled in a way they will match.
+        images_paths = tf.data.Dataset.list_files(str(images_path), shuffle=True, seed=1234)
+        masks_paths = tf.data.Dataset.list_files(str(masks_path), shuffle=True, seed=1234)
 
         assert len(images_paths) > 0, f"No images found at '{images_path}'."
         assert len(masks_paths) > 0, f"No masks found at '{masks_path}'."
@@ -115,12 +116,12 @@ def load_dataset(path, batch_size=1, target_shape=(1920, 2560), repeat=False, sh
     dataset = dataset.map(lambda image_path, mask_path: load_files(image_path, mask_path, target_shape, classes, one_hot_encoded))
 
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=batch_size * batch_size)
+        dataset = dataset.shuffle(buffer_size=batch_size * batch_size, seed=seed)
     if repeat:
         dataset = dataset.repeat()
 
     dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.prefetch(buffer_size=1)
     return dataset
 
 
