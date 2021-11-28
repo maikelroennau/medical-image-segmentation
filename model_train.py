@@ -35,7 +35,7 @@ def train(
     predict_images=False,
     gpu=0,
     save_all=False,
-    seed=None,  # 7613
+    seed=None,
     resume=None,
     resume_epoch=None
 ):
@@ -84,7 +84,7 @@ def train(
 
     validation_dataset = load_dataset(
         validation_dataset_path,
-        batch_size=batch_size,
+        batch_size=1,
         target_shape=(height, width),
         classes=classes,
         one_hot_encoded=one_hot_encoded,
@@ -364,7 +364,7 @@ def train(
     print(f"\nEvaluate all saved models on test data '{test_dataset_path}'")
     best_model, models_metrics = evaluate(
         str(checkpoint_directory),
-        images_path=test_dataset_path,
+        test_dataset_path,
         batch_size=1,
         input_shape=(1920, 2560, 3),
         loss_function=loss_function,
@@ -417,7 +417,7 @@ def train(
         predict(
             str(Path(checkpoint_directory).joinpath(model_path)),
             images_path=Path(test_dataset_path).joinpath("images"),
-            batch_size=1,
+            batch_size=batch_size,
             output_path=Path(test_dataset_path).joinpath("images"),
             copy_images=False,
             new_input_shape=None,
