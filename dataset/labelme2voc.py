@@ -1,134 +1,201 @@
 import argparse
-import glob
 import json
 import os
+import sys
 from pathlib import Path
+from typing import List, Optional, Tuple
 
 import cv2
 import imgviz
 import labelme
-import numpy as np
 import tifffile
+from skimage.io import imsave
 from tqdm import tqdm
 
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 
-def convert_labels(input_dir, output_dir="voc", labels=None, filter_labels=None, empty=False, multiple_resolutions=False, tif=False, color=False, noviz=False):
-    resolutions = ((1920, 2560), (960, 1280), (480, 640), (240, 320))
-    factors = (1, 0.5, 0.25, 0.125)
-    class_names = []
-    class_name_to_id = {}
+from utils.utils import color_classes
 
-    if filter_labels:
-        lines = [line.strip() for line in open(labels).readlines() if line.strip() not in filter_labels]
-    else:
-        lines = open(labels).readlines()
 
-    for i, line in enumerate(lines):
-        class_id = i - 1  # starts with -1
-        class_name = line.strip()
+def parse_labels_file(labels_file: str, filter_labels: bool) -> Tuple[List, dict]:
+    """Parse the labels file into the required format to be used with the `Labelme` API.
 
-        class_name_to_id[class_name] = class_id
+    Args:
+        labels_file (str): Path to the labels file.
+        filter_labels (bool): A list of labels to be ignored.
 
-        if class_id == -1:
-            assert class_name == "__ignore__"
-            continue
-        elif class_id == 0:
-            assert class_name == "_background_"
+    Raises:
+        FileNotFoundError: If the labels file path does not point to a existing file.
 
-        class_names.append(class_name)
-    class_names = tuple(class_names)
-
-    print("class_names:", class_names)
-
-    if not multiple_resolutions:
-        resolutions = resolutions[:1]
-        factors = factors[:1]
-
-    for resolution, factor in zip(resolutions, factors):
-        if multiple_resolutions:
-            res_name = "x".join([str(x) for x in resolution])
-            current_general_path = Path(output_dir).joinpath(res_name)
+    Returns:
+        Tuple[Tuple, dict]: A tuple where the first element is another tuple containing the classes names. The second element is a `dict` mapping the class name to an ID.
+    """
+    if Path(labels_file).is_file():
+        if filter_labels:
+            lines = [line.strip() for line in open(labels_file).readlines() if line.strip() not in filter_labels]
         else:
-            res_name = ""
-            current_general_path = Path(output_dir)
+            lines = open(labels_file).readlines()
 
-        current_general_path.mkdir(exist_ok=True, parents=True)
+        class_names = []
+        class_name_to_id = {}
+        for i, line in enumerate(lines):
+            class_id = i - 1  # starts with -1
+            class_name = line.strip()
+            class_name_to_id[class_name] = class_id
 
-        classes_file = str(current_general_path.joinpath("class_names.txt"))
-        with open(classes_file, "w") as f:
-            f.writelines("\n".join(class_names))
+            if class_id == -1:
+                assert class_name == "__ignore__"
+                continue
+            elif class_id == 0:
+                assert class_name == "_background_"
 
-        images_dir = current_general_path.joinpath("Images")
-        images_dir.mkdir(exist_ok=True, parents=True)
+            class_names.append(class_name)
+        class_names = tuple(class_names)
 
-        segmentation_dir = current_general_path.joinpath("SegmentationClassPNG")
-        segmentation_dir.mkdir(exist_ok=True, parents=True)
+        return class_names, class_name_to_id
+    else:
+        raise FileNotFoundError(f"No file was found at `{labels_file}`.")
 
-        if not noviz:
-            viz_dir = current_general_path.joinpath("SegmentationClassVisualization")
-            viz_dir.mkdir(exist_ok=True, parents=True)
 
-        for filename in tqdm(glob.glob(os.path.join(input_dir, "*.json")), desc=res_name):
+def filter_shapes(label_file: labelme.LabelFile) -> labelme.LabelFile:
+    """Filter shapes that do not meet the minimum points criteria.
+
+    Args:
+        label_file (labelme.LabelFile): The label file containing the shapes to be evaluated.
+
+    Returns:
+        labelme.LabelFile: The label file with the filtered shapes.
+    """
+    shapes = []
+    for shape in label_file.shapes:
+        if shape["shape_type"] == "polygon" and len(shape["points"]) > 2:
+            shapes.append(shape)
+        elif shape["shape_type"] == "circle" and len(shape["points"]) == 2:
+            shapes.append(shape)
+    label_file.shapes = shapes
+    return label_file
+
+
+def merge_classes(label_file: labelme.LabelFile, stand_class: str, mergin_class: str) -> labelme.LabelFile:
+    """Merges the shapes of a class into another shape class.
+
+    Args:
+        label_file (labelme.LabelFile): The label file containing the shape classes to be evaluated.
+        stand_class (str): The class that will receive the shapes from `mergin_class`.
+        mergin_class (str): The class that will be merged into `stand_class`.
+
+    Returns:
+        labelme.LabelFile: The label file with the updated shape classes.
+    """
+    shapes = []
+    for shape in label_file.shapes:
+        if shape["label"] == mergin_class:
+            shape["label"] = stand_class
+        shapes.append(shape)
+    label_file.shapes = shapes
+    return label_file
+
+
+def convert_annotations_to_masks(
+    input_dir: str,
+    output_dir: str,
+    labels: str,
+    filter_labels: Optional[list] = None,
+    filter_invalid: Optional[bool] = False,
+    save_as_tif: Optional[bool] = False,
+    overlay: Optional[bool] = False,
+    color: Optional[bool] = False) -> None:
+    """Converts `Labelme` annotations (Pascal VOC) into images and labels.
+
+    Args:
+        input_dir (str): The path to the images and annotation files.
+        output_dir (str): The path where to save the converted images and labels.
+        labels (str): The path to a `.txt`. file containing annotated classes. It must contain one class per row and start with `__ignore__`, followed by `_background_`.
+        filter_labels (Optional[list], optional): A `list` of labels to ignore. Defaults to None.
+        filter_invalid (Optional[bool], optional): Whether or not to ignore images annotated as invalid. Defaults to False.
+        save_as_tif (Optional[bool], optional): Whether or not to save images in the `.tif` format. If `False`, images will be saved as `.png`. Defaults to False.
+        overlay (Optional[bool], optional): Whether or not to generate a annotation overlay. Defaults to False.
+        color (Optional[bool], optional): Whether or not to save masks as colored images. Defaults to False.
+
+    Raises:
+        FileNotFoundError: If the input directory is not found.
+    """
+
+    input_dir = Path(input_dir)
+
+    if input_dir.is_dir():
+        annotations = [annotation for annotation in input_dir.glob("*.json")]
+        class_names, class_name_to_id = parse_labels_file(labels, filter_labels)
+
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        images_dir = output_dir.joinpath("images")
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        masks_dir = output_dir.joinpath("masks")
+        masks_dir.mkdir(parents=True, exist_ok=True)
+
+        if overlay:
+            overlay_dir = output_dir.joinpath("overlay")
+            overlay_dir.mkdir(parents=True, exist_ok=True)
+
+        for annotation in tqdm(annotations):
             try:
-                if not empty:
-                    with open(filename, "r") as annotation_file:
+                if filter_invalid:
+                    with open(str(annotation), "r") as annotation_file:
                         annotation_file = json.load(annotation_file)
                         if "invalidated" in annotation_file.keys():
                             if annotation_file["invalidated"]:
                                 continue
 
-                label_file = labelme.LabelFile(filename=filename)
+                label_file = labelme.LabelFile(filename=annotation)
+
                 if filter_labels:
-                    label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in filter_labels]
+                    label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in class_names]
 
-                base = os.path.splitext(os.path.basename(filename))[0]
-                image_type = ".tif" if tif else ".png"
-                out_img_file = str(images_dir.joinpath(base + image_type))
-                out_png_file = str(segmentation_dir.joinpath(base + "_mask.png"))
+                image_type = ".tif" if save_as_tif else ".png"
+                image_file_path = str(images_dir.joinpath(annotation.stem + image_type))
+                mask_file_path = str(masks_dir.joinpath(annotation.stem + "_mask.png"))
 
-                if not noviz:
-                    out_viz_file = str(viz_dir.joinpath(base + ".png"))
-
-                # Save image to dir
-                img = labelme.utils.img_data_to_arr(label_file.imageData)
-                # img = cv2.resize(img, dsize=resolution[::-1], interpolation=cv2.INTER_NEAREST)
-                if tif:
-                    tifffile.imwrite(out_img_file, img, photometric="rgb")
+                image = labelme.utils.img_data_to_arr(label_file.imageData)
+                if save_as_tif:
+                    tifffile.imwrite(image_file_path, image, photometric="rgb")
                 else:
-                    cv2.imwrite(out_img_file, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                    imsave(image_file_path, image)
+                    cv2.imwrite(image_file_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
-                # Rescale points accordingly to resolution factor
-                # for i in range(len(label_file.shapes)):
-                #     label_file.shapes[i]["points"] = list(np.asarray(label_file.shapes[i]["points"]) * factor)
+                label_file = filter_shapes(label_file)
+                label_file = merge_classes(label_file, "nucleus", "discarded_nucleus")
+                label_file = merge_classes(label_file, "nor", "discarded_nor")
+                class_names = tuple(class_name for class_name in class_names if class_name not in ["discarded_nucleus", "discarded_nor"])
 
-                shapes = []
-                for i, shape in enumerate(label_file.shapes):
-                    if len(shape["points"]) > 2:
-                        shapes.append(shape)
-                label_file.shapes = shapes
-
-                lbl, _ = labelme.utils.shapes_to_label(
-                    img_shape=resolution + (3,),
+                mask, _ = labelme.utils.shapes_to_label(
+                    img_shape=image.shape,
                     shapes=label_file.shapes,
-                    label_name_to_value=class_name_to_id,
-                )
+                    label_name_to_value=class_name_to_id)
 
-                if not color:
-                    cv2.imwrite(out_png_file, lbl)
+                if color:
+                    colored_mask = color_classes(mask)
+                    imsave(mask_file_path, colored_mask, check_contrast=False)
                 else:
-                    labelme.utils.lblsave(out_png_file, lbl)
+                    imsave(mask_file_path, mask, check_contrast=False)
 
-                if not noviz:
-                    viz = imgviz.label2rgb(
-                        label=lbl,
-                        img=imgviz.rgb2gray(img),
-                        font_size=15,
+                if overlay:
+                    overlay_file_path = str(overlay_dir.joinpath(annotation.stem + "_overlay.png"))
+                    overlay_mask = imgviz.label2rgb(
+                        label=mask,
+                        img=image,
+                        font_size=20,
                         label_names=class_names,
-                        loc="rb",
-                    )
-                    imgviz.io.imsave(out_viz_file, viz)
+                        loc="rb")
+                    imsave(overlay_file_path, overlay_mask)
             except Exception as e:
                 print(e)
+    else:
+        raise FileNotFoundError(f"No directory was found at `{input_dir}`.")
 
 
 def main():
@@ -143,7 +210,7 @@ def main():
 
     parser.add_argument(
         "-o",
-        "--output-dir",
+        "--output",
         help="Output directory.",
         default="voc",
         type=str)
@@ -163,16 +230,8 @@ def main():
         type=str)
 
     parser.add_argument(
-        "-e",
-        "--empty",
+        "--filter-invalid",
         help="Keep empty masks.",
-        default=False,
-        action="store_true")
-
-    parser.add_argument(
-        "-m",
-        "--multiple-resolutions",
-        help="Generate images and masks in multiple resolutions.",
         default=False,
         action="store_true")
 
@@ -184,15 +243,15 @@ def main():
         action="store_true")
 
     parser.add_argument(
-        "-c",
-        "--color",
-        help="Generate RGB segmentation masks.",
+        "--overlay",
+        help="Generate overlay visualization.",
         default=False,
         action="store_true")
 
     parser.add_argument(
-        "--noviz",
-        help="Do not generate overlay visualization.",
+        "-c",
+        "--color",
+        help="Generate RGB segmentation masks.",
         default=False,
         action="store_true")
 
@@ -203,17 +262,15 @@ def main():
     if args.filter_labels:
         args.filter_labels = args.filter_labels.split(",")
 
-    convert_labels(
-        args.input_dir,
-        args.output_dir,
-        args.labels,
-        args.filter_labels,
-        args.empty,
-        args.multiple_resolutions,
-        args.tif,
-        args.color,
-        args.noviz
-    )
+    convert_annotations_to_masks(
+        input_dir=args.input_dir,
+        output_dir=args.output,
+        labels=args.labels,
+        filter_labels=args.filter_labels,
+        filter_invalid=args.filter_invalid,
+        save_as_tif=args.tif,
+        overlay=args.overlay,
+        color=args.color)
 
 
 if __name__ == "__main__":

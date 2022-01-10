@@ -1,13 +1,14 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 
-experiment_data = {
+EXPERIMENT_DATA = {
     "directory": None,
     "model_name": None,
     "backbone": None,
@@ -32,10 +33,9 @@ experiment_data = {
     "test_loss": None,
     "test_f1-score": None,
     "test_iou_score": None,
-    "description": None
 }
 
-model_metric_keys = [
+MODEL_METRIC_KEYS = [
     "train_loss",
     "train_f1-score",
     "train_iou_score",
@@ -47,14 +47,21 @@ model_metric_keys = [
     "test_iou_score"
 ]
 
-rename_keys = {
+RENAME_KEYS = {
     "loss": "train_loss",
     "f1-score": "train_f1-score",
     "iou_score": "train_iou_score"
 }
 
 
-def document(experiment_file, file_pattern="*train_config.json", output="."):
+def document(experiment_file: str, file_pattern: Optional[str] = "*train_config.json", output: Optional[str] = "."):
+    """Extract model information like metrics and hyperparameters from `train_config.json` files.
+
+    Args:
+        experiment_file (str): Path to a `train_config.json` file or a directory containing multiple `train_config.json` files.
+        file_pattern (Optional[str], optional): A pattern of file names to search for recursively. Defaults to "*train_config.json".
+        output (Optional[str], optional): The location where to save the `.csv` with the extracted metrics. Defaults to ".".
+    """
     experiment_file = Path(experiment_file)
     if experiment_file.is_file():
         files = [str(experiment_file)]
@@ -78,7 +85,7 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                     for key in experiment["train_metrics"].keys():
                         experiment[key] = experiment["train_metrics"][key]
 
-                for key, value in rename_keys.items():
+                for key, value in RENAME_KEYS.items():
                     if key in experiment.keys():
                         experiment[value] = experiment[key]
 
@@ -87,7 +94,7 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                         experiment[key] = experiment["test_metrics"][key]
 
                 if "train_loss" in experiment.keys() or "test_loss" in experiment.keys():
-                    for key in model_metric_keys:
+                    for key in MODEL_METRIC_KEYS:
                         if key not in experiment.keys():
                             continue
                         if "loss" in key:
@@ -103,17 +110,17 @@ def document(experiment_file, file_pattern="*train_config.json", output="."):
                 experiment["directory"] = Path(experiment["directory"]).name
                 experiment["input_shape"] = "x".join([str(value) for value in experiment["input_shape"]])
 
-                for key in experiment_data.keys():
-                    experiment_data[key] = None
+                for key in EXPERIMENT_DATA.keys():
+                    EXPERIMENT_DATA[key] = None
                     if key in experiment.keys():
-                        experiment_data[key] = [experiment[key]]
+                        EXPERIMENT_DATA[key] = [experiment[key]]
 
-                df = pd.DataFrame.from_dict(experiment_data)
+                df = pd.DataFrame.from_dict(EXPERIMENT_DATA)
 
                 if output.name.endswith(".csv"):
                     if output.is_file():
                         existing_data = pd.read_csv(str(output))
-                        if int(experiment_data["directory"][0]) not in existing_data["directory"].values:
+                        if int(EXPERIMENT_DATA["directory"][0]) not in existing_data["directory"].values:
                             df.to_csv(str(output), mode="a", header=False, index=False)
                     else:
                         df.to_csv(str(output), mode="w", header=True, index=False)

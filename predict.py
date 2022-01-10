@@ -1,6 +1,7 @@
 import argparse
 import os
 from pathlib import Path
+
 from utils.utils import predict
 
 
@@ -10,59 +11,78 @@ def main():
     parser.add_argument(
         "-m",
         "--model",
-        help="Path to the model to use for prediction.",
+        help="The path to the model to be used to perform the prediction(s).",
         required=True,
         type=str)
 
     parser.add_argument(
         "-i",
         "--images",
-        help="Path to the directory containing the images to predict or to a single image file.",
-        default="dataset/test/images/",
+        help="A path to an image file, or a path to a directory containing images, or a path to a directory containing subdirectories of classes.",
+        required=True,
         type=str)
-
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="Where to save the resulting predictions.",
-        type=str)
-
-    parser.add_argument(
-        "--input-shape",
-        help="Whether to replace the model's input shape with the given input shape. Expects input shape in the following format: `HEIGHTxWIDTH`.",
-        type=str)
-
-    parser.add_argument(
-        "-b",
-        "--batch-size",
-        help="Batch size during evaluation.",
-        default=1,
-        type=int)
-
-    parser.add_argument(
-        "-c",
-        "--copy-images",
-        help="Copy predicted images to output directory. Only effective when `--output` is provided.",
-        default=False,
-        action="store_true")
 
     parser.add_argument(
         "-n",
         "--normalize",
-        help="Normalize input images in range [0, 1].",
+        help="Whether or not to put the image values between zero and one ([0,1]).",
+        default=True,
+        action="store_true")
+
+    parser.add_argument(
+        "--input-shape",
+        help="The input shape the loaded model and images should have, in format `(HEIGHT, WIDTH, CHANNELS)`. If `model` is a `tf.keras.model` with an input shape different from `input_shape`, then its input shape will be changed to `input_shape`.",
+        required=False,
+        type=str)
+
+    parser.add_argument(
+        "-c",
+        "--copy-images",
+        help="Whether or not to copy the input images to the predictions output directory.",
         default=False,
         action="store_true")
 
     parser.add_argument(
-        "--single-dir",
-        help="Save all predictions of different models to the same directory.",
+        "-a",
+        "--analyze-contours",
+        help="Whether or not to apply the contour analysis algorithm. If `True`, it will also write the contour measurements to a `.csv` file.",
         default=False,
         action="store_true")
 
     parser.add_argument(
-        "-p",
-        "--postprocess",
-        help="Postprocess network output.",
+        "-o",
+        "--output",
+        help="The path where to save the predicted segmentation masks.",
+        default="predictions",
+        type=str)
+
+    parser.add_argument(
+        "--analysis-output",
+        help="The path where to save the `.csv` file containing the contour measurements. Only effective if `analyze_contour` is `True`.",
+        required=False,
+        type=str)
+
+    parser.add_argument(
+        "--record-id",
+        help="An ID that will identify the contour measurements.",
+        required=False,
+        type=str)
+
+    parser.add_argument(
+        "--record-class",
+        help="The class the contour measurements belong to.",
+        required=False,
+        type=str)
+
+    parser.add_argument(
+        "--measures-only",
+        help="Do not save the predicted images or copy the input images to the output path. If `True`, it will override the effect of `output`.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
+        "--multi-measurements",
+        help="Performs the measurement of multiple records in a directory containing subdirectories of classes. The classes subdirectores should contain subdirectories with images.",
         default=False,
         action="store_true")
 
@@ -72,20 +92,13 @@ def main():
         help="What GPU to use. Pass `-1` to use CPU.",
         default=0)
 
-    parser.add_argument(
-        "--memory-growth",
-        help="Whether or not to allow GPU memory growth.",
-        default=False,
-        action="store_true")
-
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = str(args.memory_growth).lower()
 
     if args.input_shape:
         input_shape = args.input_shape.lower().split("x")
-        input_shape = (int(input_shape[0]), int(input_shape[1]), (3))
+        input_shape = (int(input_shape[0]), int(input_shape[1]), int(input_shape[2]))
     else:
         input_shape = None
 
@@ -96,16 +109,39 @@ def main():
     elif not args.output and Path(args.model).is_dir():
         output = Path(args.model).joinpath("predictions")
 
-    predict(
-        model=args.model,
-        images_path=args.images,
-        batch_size=args.batch_size,
-        output_path=output,
-        copy_images=args.copy_images,
-        normalize=args.normalize,
-        single_dir=args.single_dir,
-        postprocess=args.postprocess,
-        new_input_shape=input_shape)
+    if args.multi_measurements:
+        directories = [
+            directory
+            for directory in Path(args.images).rglob("*") if directory.is_dir() and directory.parent.name != args.images]
+
+        for directory in directories:
+            predict(
+                model=args.model,
+                images=str(directory),
+                normalize=args.normalize,
+                input_shape=input_shape,
+                copy_images=args.copy_images,
+                analyze_contours=args.analyze_contours,
+                output_predictions=str(Path(output).joinpath(directory.parent.name).joinpath(directory.name)),
+                output_contour_analysis=output,
+                record_id=directory.name,
+                record_class=directory.parent.name,
+                measures_only=args.measures_only,
+            )
+    else:
+        predict(
+            model=args.model,
+            images=args.images,
+            normalize=args.normalize,
+            input_shape=input_shape,
+            copy_images=args.copy_images,
+            analyze_contours=args.analyze_contours,
+            output_predictions=output,
+            output_contour_analysis=args.analysis_output,
+            record_id=args.record_id,
+            record_class=args.record_class,
+            measures_only=args.measures_only,
+        )
 
 
 if __name__ == "__main__":
