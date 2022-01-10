@@ -312,7 +312,7 @@ def train(
     print(f"\nEvaluate all saved models on test data '{str(test_dataset_path)}'")
     best_model, models_metrics = evaluate(
         models_paths=str(checkpoint_directory),
-        images_path=str("dataset/v25/1920x2560/test_1920x2560"),
+        images_path=str(test_dataset_path),
         batch_size=1,
         classes=classes,
         one_hot_encoded=one_hot_encoded,
