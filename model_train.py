@@ -1,4 +1,5 @@
 import argparse
+import glob
 import json
 import os
 import time
@@ -32,7 +33,7 @@ def show_train_config(
     if start_time:
         print(f"\nTraining start: {start_time}")
     if end_time:
-        print(f"Training end: {start_time}")
+        print(f"Training end: {end_time}")
     if duration:
         print(f"Duration: {duration}")
 
@@ -309,24 +310,27 @@ def train(
     with open(train_config_path, "w") as config_file:
         json.dump(train_config, config_file, indent=4)
 
-    print(f"\nEvaluate all saved models on test data '{str(test_dataset_path)}'")
-    best_model, models_metrics = evaluate(
-        models_paths=str(checkpoint_directory),
-        images_path=str(test_dataset_path),
-        batch_size=1,
-        classes=classes,
-        one_hot_encoded=one_hot_encoded,
-        input_shape=(1920, 2560, 3), # TODO: Update to be the same value specified in the arguments.
-        loss_function=loss_function,
-        model_name=model_name)
+    if len(glob.glob(str(checkpoint_directory.joinpath("*.h5")))) > 0:
+        print(f"\nEvaluate all saved models on test data '{str(test_dataset_path)}'")
+        best_model, models_metrics = evaluate(
+            models_paths=str(checkpoint_directory),
+            images_path=str(test_dataset_path),
+            batch_size=1,
+            classes=classes,
+            one_hot_encoded=one_hot_encoded,
+            input_shape=(1920, 2560, 3), # TODO: Update to be the same value specified in the arguments.
+            loss_function=loss_function,
+            model_name=model_name)
 
-    if best_model is not None or models_metrics is not None:
-        train_config = update_best_model_and_metrics(train_config, best_model, models_metrics)
+        if best_model is not None or models_metrics is not None:
+            train_config = update_best_model_and_metrics(train_config, best_model, models_metrics)
 
-        with open(train_config_path, "w") as config_file:
-            json.dump(train_config, config_file, indent=4)
+            with open(train_config_path, "w") as config_file:
+                json.dump(train_config, config_file, indent=4)
 
-        plot_metrics(train_config_path)
+            plot_metrics(train_config_path)
+    else:
+        print(f"\nSkipping evaluation, no models were found at `{str(checkpoint_directory)}`.")
 
 
 def main():
