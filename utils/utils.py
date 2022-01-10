@@ -1,287 +1,408 @@
+import datetime
 import json
-import os
+import re
 import shutil
 import time
+from io import BytesIO
 from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
 import cv2
+import imgviz
 import numpy as np
 import pandas as pd
+import PIL.Image
 import segmentation_models as sm
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
-from utils import losses
-from utils.data_io import load_dataset
-from utils.post_process import post_process
+from utils import contour_analysis
+from utils.data import list_files, load_dataset, load_image
+from utils.model import METRICS, get_model_input_shape, load_model
 
 
-CUSTOM_OBJECTS = {
-    "dice_coef": losses.dice_coef,
-    "dice_coef_loss": losses.dice_coef_loss,
-    "jaccard_index": losses.jaccard_index,
-    "jaccard_index_loss": losses.jaccard_index_loss,
-    "weighted_categorical_crossentropy": losses.weighted_categorical_crossentropy,
-    "categorical_focal_loss": losses.categorical_focal_loss,
-    "unified_focal_loss": losses.unified_focal_loss,
-    "categorical_crossentropy": sm.losses.categorical_crossentropy,
-    "categorical_crossentropy_plus_dice_loss": sm.losses.cce_dice_loss,
-    "focal_loss_plus_dice_loss": sm.losses.categorical_focal_dice_loss,
-    "focal_loss": sm.losses.categorical_focal_loss,
-    "f1-score": sm.metrics.f1_score,
-    "iou_score": sm.metrics.iou_score,
-}
-
-METRICS = [
-    sm.metrics.f1_score,
-    sm.metrics.iou_score
+COLORS = [
+    np.array([127,   0,   0]), # Red
+    np.array([  0, 127,   0]), # Green
+    np.array([  0,   0, 127]), # Blue
+    np.array([255, 127,  14]), # Orange
+    np.array([148, 103, 189]), # Violet
+    np.array([ 23, 190, 207]), # Cyan
+    np.array([188, 189,  34]), # Olive
+    np.array([127, 127, 127]), # Gray
+    np.array([277, 119, 194]), # Pink
+    np.array([140,  86,  75]), # Brown
 ]
 
-def update_model(model, input_shape):
-    model_weights = model.get_weights()
-    model_json = json.loads(model.to_json())
+def evaluate(
+    models_paths: List[str],
+    images_path: str,
+    batch_size: Optional[int] = 1,
+    classes: Optional[int] = 3,
+    one_hot_encoded: Optional[bool] = True,
+    input_shape: Optional[tuple] = None,
+    loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
+    model_name: Optional[str] = "AgNOR") -> Tuple[dict, dict]:
+    """Evaluates a list of `tf.keras.Model` objects.
 
-    model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
-    model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *input_shape]
+    Args:
+        models_paths (List[str]): A list of paths of `tf.keras.Models` to be evaluated.
+        images_path (str): The path to the directory containing the `images` and `masks` subdirectories.
+        batch_size (Optional[int], optional): The number of images per batch. Defaults to 1.
+        classes (Optional[int], optional): The number of classes. Affects the one hot encoding. Defaults to 3.
+        one_hot_encoded (Optional[bool], optional): Whether or not to one hot encode the masks. Defaults to True.
+        input_shape (Optional[tuple], optional): The input shape to use to evaluate the model. If `None`, uses the model's default input shape. In the format `(HEIGHT, WIDTH, CHANNELS)`. Defaults to None.
+        loss_function (Optional[sm.losses.Loss], optional): The loss function to be used to evaluate the mode. Defaults to sm.losses.cce_dice_loss.
+        model_name (Optional[str]): The name of the model. Defaults to AgNOR.
 
-    updated_model = tf.keras.models.model_from_json(json.dumps(model_json))
-    updated_model.set_weights(model_weights)
-    return updated_model
-
-
-def evaluate(model, images_path, batch_size=1, input_shape=None, loss_function=None, classes=1, one_hot_encoded=False):
-    if not loss_function:
-        loss_function = sm.losses.cce_dice_loss
-
-    if Path(model).is_file():
-        loaded_model = tf.keras.models.load_model(model, custom_objects=CUSTOM_OBJECTS)
-
-        if input_shape:
-            loaded_model = update_model(loaded_model, input_shape)
-
-        loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=loss_function, metrics=[METRICS])
-
-        input_shape = loaded_model.input_shape[1:]
-        height, width, channels = input_shape
-
-        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=(height, width), classes=classes, one_hot_encoded=one_hot_encoded)
-        evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
-
-        print(f"Model {str(model)}")
-        print("  - Loss: %.4f" % evaluation_metrics[0])
-
-        model = Path(model)
-        model_metrics = {}
-        model_metrics["model"] = str(model)
-        model_metrics["loss"] = evaluation_metrics[0]
-
-        for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
-            metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-            print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
-            model_metrics[metric] = evaluation_metric
-
-        return model_metrics
+    Returns:
+        Tuple[dict, dict]: A tuple of dictionaries where the first contain the evaluation of the best model, and the second the evaluation of all models.
+    """
+    if Path(models_paths).is_file():
+        models_paths = [models_paths]
+    elif Path(models_paths).is_dir():
+        models_paths = [str(path) for path in Path(models_paths).glob("*.h5")]
     else:
-        models = [model_path for model_path in Path(model).glob("*.h5")]
-        models.sort()
+        raise FileNotFoundError("No file models were found at `{models_paths}`.")
 
-        if len(models) == 0:
-            print("No models found")
-            return None, None
+    models_paths.sort()
+    evaluate_dataset = load_dataset(
+        images_path, batch_size=batch_size, shape=input_shape[:2], classes=classes, mask_one_hot_encoded=one_hot_encoded)
 
-        evaluate_dataset = load_dataset(images_path, batch_size=batch_size, target_shape=input_shape[:2], classes=classes, one_hot_encoded=one_hot_encoded)
+    config_file_path = f"train_config_{Path(models_paths[0]).parent.name}.json"
+    if Path(models_paths[0]).parent.joinpath(config_file_path).is_file():
+        with open(str(Path(models_paths[0]).parent.joinpath(config_file_path)), "r") as config_file:
+            epochs = json.load(config_file)["epochs"]
+    else:
+        epochs = re.search("_e\d{3}", models_paths[-1]).group()
+        epochs = int(re.search("\d{3}", epochs).group())
 
-        if models[0].parent.joinpath("train_config.json").is_file():
-            with open(str(models[0].parent.joinpath("train_config.json")), "r") as config_file:
-                epochs = json.load(config_file)["epochs"]
+    best_model = {}
+    models_metrics = {}
+    models_metrics["test_loss"] = [0] * epochs
+    for i in range(len(METRICS)):
+        metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
+        models_metrics[f"test_{metric}"] = [0] * len(models_metrics["test_loss"])
+
+    for i, model_path in enumerate(models_paths):
+        model = load_model(model_path=model_path, input_shape=input_shape, loss_function=loss_function)
+        evaluation_metrics = model.evaluate(evaluate_dataset, return_dict=True)
+
+        print(f"Model {str(model_path)}")
+        print(f"  - Loss: {np.round(evaluation_metrics['loss'], 4)}")
+
+        for metric, value in evaluation_metrics.items():
+            if metric != "loss":
+                print(f"  - {metric}: {np.round(value, 4)}")
+
+        # Add model metrics to dict
+        if len(model_path.split(model_name)[1].split("_")[1:]) > 0:
+            models_metrics["test_loss"][int(model_path.split(model_name)[1].split("_")[1][1:])-1] = evaluation_metrics["loss"]
         else:
-            epochs = int(str(models[-1]).split("AgNOR")[1].split("_")[1][1:])
+            models_metrics["test_loss"][-1] = evaluation_metrics["loss"]
 
-        best_model = {}
-        models_metrics = {}
-        models_metrics["test_loss"] = [0] * epochs
-        for i in range(len(METRICS)):
-            metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-            models_metrics[f"test_{metric}"] = [0] * len(models_metrics["test_loss"])
-
-        for i, model_path in enumerate(models):
-            loaded_model = tf.keras.models.load_model(str(model_path), custom_objects=CUSTOM_OBJECTS)
-
-            if input_shape:
-                loaded_model = update_model(loaded_model, input_shape)
-
-            loaded_model.compile(optimizer=Adam(learning_rate=1e-5), loss=loss_function, metrics=[METRICS])
-            evaluation_metrics = loaded_model.evaluate(evaluate_dataset)
-            print(f"Model {str(model_path)}")
-            print(f"  - Loss: {np.round(evaluation_metrics[0], 4)}")
-            for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
-                metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                print(f"  - {metric}: {np.round(evaluation_metric, 4)}")
-
-            # Add model metrics to dict
-            if len(str(model_path).split("AgNOR")[1].split("_")[1:]) > 0:
-                models_metrics["test_loss"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metrics[0]
-            else:
-                models_metrics["test_loss"][-1] = evaluation_metrics[0]
-            for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
-                metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                if len(str(model_path).split("AgNOR")[1].split("_")[1:]) > 0:
-                    models_metrics[f"test_{metric}"][int(str(model_path).split("AgNOR")[1].split("_")[1][1:])-1] = evaluation_metric
+        for metric, value in evaluation_metrics.items():
+            if metric != "loss":
+                if len(model_path.split(model_name)[1].split("_")[1:]) > 0:
+                    models_metrics[f"test_{metric}"][int(str(model_path).split(model_name)[1].split("_")[1][1:])-1] = value
                 else:
-                    models_metrics[f"test_{metric}"][-1] = evaluation_metric
+                    models_metrics[f"test_{metric}"][-1] = value
 
-            # Check for the best model
-            if "model" in best_model:
-                if evaluation_metrics[1] > best_model["f1-score"]:
-                    best_model["model"] = model_path.name
-                    best_model["loss"] = evaluation_metrics[0]
-                    for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
-                        metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                        best_model[metric] = evaluation_metric
-            else:
-                best_model["model"] = model_path.name
-                best_model["loss"] = evaluation_metrics[0]
-                for i, evaluation_metric in enumerate(evaluation_metrics[1:]):
-                    metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
-                    best_model[metric] = evaluation_metric
+        # Check for the best model
+        if "model" in best_model:
+            if evaluation_metrics["f1-score"] > best_model["f1-score"]:
+                best_model["model"] = Path(model_path).name
+                best_model["loss"] = evaluation_metrics["loss"]
+                for metric, value in evaluation_metrics.items():
+                    if metric != "loss":
+                        best_model[metric] = value
+        else:
+            best_model["model"] = Path(model_path).name
+            best_model["loss"] = evaluation_metrics["loss"]
+            for metric, value in evaluation_metrics.items():
+                if metric != "loss":
+                    best_model[metric] = value
 
-            tf.keras.backend.clear_session()
-
+    if len(models_paths) > 1:
         print(f"\nBest model: {best_model['model']}")
         print(f"  - Loss: {np.round(best_model['loss'], 4)}")
         for metric, value in list(best_model.items())[2:]:
             print(f"  - {metric}: {np.round(value, 4)}")
 
-        return best_model, models_metrics
+    return best_model, models_metrics
+
+
+def collapse_probabilities(
+    prediction: Union[np.ndarray, tf.Tensor],
+    pixel_intensity: Optional[int] = 127) -> Union[np.ndarray, tf.Tensor]:
+    """Converts the Softmax probability of each each pixel class to the class with the highest probability.
+
+    Args:
+        prediction (Union[np.ndarray, tf.Tensor]): A prediction in the format `(HEIGHT, WIDTH, CLASSES)`.
+        pixel_intensity (Optional[int], optional): The intensity each pixel class will be assigned. Defaults to 127.
+
+    Returns:
+        Union[np.ndarray, tf.Tensor]: The prediction with the collapsed probabilities into the classes.
+    """
+    classes = prediction.shape[-1]
+    for i in range(classes):
+        prediction[:, :, i] = np.where(
+            np.logical_and.reduce(
+                np.array([prediction[:, :, i] > prediction[:, :, j] for j in range(classes) if j != i])), pixel_intensity, 0)
+
+    return prediction
+
+
+def color_classes(prediction: np.ndarray) -> np.ndarray:
+    """Color a n-dimensional array of one-hot-encoded semantic segmentation image.
+
+    Args:
+        prediction (np.ndarray): The one-hot-encoded array image.
+
+    Returns:
+        np.ndarray: A RGB image with colored pixels per class.
+    """
+    prediction = PIL.Image.fromarray(prediction.astype(np.uint8), mode="P")
+
+    colormap = imgviz.label_colormap()
+    prediction.putpalette(colormap.flatten())
+
+    prediction = np.asarray(prediction.convert())
+
+    # n_classes = prediction.shape[-1]
+    # classes =  np.unique(prediction.reshape(-1, n_classes), axis=0)[::-1]
+
+    # rgb_image = np.zeros(prediction.shape[:2] + (3,), dtype=np.uint8)
+
+    # color_index = -1
+    # for class_code in classes:
+    #     if color_index > len(COLORS):
+    #         color_index = 0
+    #     else:
+    #         color_index += 1
+
+    #     mask = np.sum(prediction == class_code, axis=-1)
+    #     mask = np.where(mask == n_classes, 1, 0)
+
+    #     for i in range(3):
+    #         rgb_image[:, :, i] = np.where(mask, COLORS[color_index][i], rgb_image[:, :, i])
+
+    return prediction
 
 
 def predict(
-    model,
-    images_path,
-    batch_size,
-    output_path="predictions",
-    copy_images=False,
-    new_input_shape=None,
-    normalize=False,
-    single_dir=False,
-    postprocess=False,
-    measurements_id="ABC123",
-    verbose=1):
-    if isinstance(model, str) or isinstance(model, Path):
-        model = Path(model)
-        if model.is_file():
-            loaded_model = tf.keras.models.load_model(str(model), custom_objects=CUSTOM_OBJECTS)
-        elif model.is_dir():
-            models = [model_path for model_path in model.glob("*.h5")]
-            if len(models) > 0:
-                print(f"No model(s) found at {str(model)}")
-                for model_path in tqdm(models):
-                    predict(
-                        model_path,
-                        images_path,
-                        batch_size,
-                        output_path=str(Path(output_path)) if single_dir else str(Path(output_path).joinpath(model_path.name)),
-                        copy_images=copy_images,
-                        new_input_shape=new_input_shape,
-                        normalize=normalize,
-                        single_dir=single_dir,
-                        postprocess=postprocess,
-                        verbose=0)
-            return
-    elif model != None:
-        loaded_model = model
-    else:
-        print("No model(s) found")
-        return
+    model: Union[str, tf.keras.Model],
+    images: str,
+    normalize: Optional[bool] = True,
+    input_shape: Optional[Tuple[int, int]] = None,
+    copy_images: Optional[bool] = False,
+    analyze_contours: Optional[bool] = False,
+    output_predictions: Optional[str] = "predictions",
+    output_contour_analysis: Optional[str] = None,
+    record_id: Optional[str] = None,
+    record_class: Optional[str] = None,
+    measures_only: Optional[bool] = False,
+    current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S')) -> None:
+    """Predicts the segmentation mask of the input image(s).
 
-    if new_input_shape:
-        loaded_model = update_model(loaded_model, new_input_shape)
+    Args:
+        model (Union[str, tf.keras.Model]): The model to be used to perform the prediction(s).
+        images (str): A path to an image file, or a path to a directory containing images, or a path to a directory containing subdirectories of classes.
+        normalize (Optional[bool], optional): Whether or not to put the image values between zero and one ([0,1]). Defaults to True.
+        input_shape (Optional[Tuple[int, int]], optional): The input shape the loaded model and images should have, in format `(HEIGHT, WIDTH, CHANNELS)`. If `model` is a `tf.keras.model` with an input shape different from `input_shape`, then its input shape will be changed to `input_shape`. Defaults to None.
+        copy_images (Optional[bool], optional): Whether or not to copy the input images to the predictions output directory. Defaults to False.
+        analyze_contours (Optional[bool], optional): Whether or not to apply the contour analysis algorithm. If `True`, it will also write the contour measurements to a `.csv` file. Defaults to False.
+        output_predictions (Optional[str], optional): The path where to save the predicted segmentation masks. Defaults to "predictions".
+        output_contour_analysis (Optional[str], optional): The path where to save the `.csv` file containing the contour measurements. Only effective if `analyze_contour` is `True`. Defaults to None.
+        record_id (Optional[str], optional): An ID that will identify the contour measurements. Defaults to None.
+        record_class (Optional[str], optional): The class the contour measurements belong to. Defaults to None.
+        measures_only (Optional[bool], optional): Do not save the predicted images or copy the input images to the output path. If `True`, it will override the effect of `output_predictions`. Defaults to False.
+        current_time (Optional[str], optional): A timestamp to be added to the contour measurements, in the format `YYYYMMDDHHMMSS`. Defaults to time.strftime('%Y%m%d%H%M%S').
 
-    input_shape = loaded_model.input_shape[1:]
-    height, width, channels = input_shape
-
-    supported_types = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
-    if Path(images_path).is_dir():
-        images = [image_path for image_path in Path(images_path).glob("*.*") if image_path.suffix.lower() in supported_types and not image_path.stem.endswith("_prediction")]
-    elif Path(images_path).is_file():
-        images = [Path(images_path)]
-
-    if len(images) == 0:
-        print(f"No images found at '{images_path}'.")
-        return
-
-    images_tensor = np.empty((1, height, width, channels))
-    Path(output_path).mkdir(exist_ok=True, parents=True)
-
-    current_time = time.strftime('%Y%m%d%H%M%S')
-
-    for i, image_path in enumerate(images):
-        image = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        original_shape = image.shape[:2]
-        image = tf.image.resize(image, (height, width), method="nearest")
-
-        if normalize:
-            image = tf.cast(image, dtype=tf.float32)
-            image = image / 255.
-
-        images_tensor[0, :, :, :] = image
-
-        prediction = loaded_model.predict(images_tensor, batch_size=batch_size, verbose=verbose)
-        prediction = tf.image.resize(prediction[0], original_shape, method="nearest").numpy()
-
-        pixel_intensity = 127
-        prediction[:, :, 0] = np.where(
-            np.logical_and(prediction[:, :, 0] > prediction[:, :, 1], prediction[:, :, 0] > prediction[:, :, 2]), pixel_intensity, 0)
-        prediction[:, :, 1] = np.where(
-            np.logical_and(prediction[:, :, 1] > prediction[:, :, 0], prediction[:, :, 1] > prediction[:, :, 2]), pixel_intensity, 0)
-        prediction[:, :, 2] = np.where(
-            np.logical_and(prediction[:, :, 2] > prediction[:, :, 0], prediction[:, :, 2] > prediction[:, :, 1]), pixel_intensity, 0)
-
-        if prediction.shape[-1] == 2:
-            prediction_reshaped = np.zeros(tuple(prediction.shape[:2]) + (3,), dtype=np.uint8)
-            prediction_reshaped[:, :, :2] = prediction
-            prediction = prediction_reshaped
-
-        if postprocess:
-            prediction, measurement = post_process(prediction, measurements_id, image_path.name)
-
-            nucleus_columns = ["id", "source_image", "nucleus", "flag", "nucleus_pixel_count"]
-            nor_columns = ["id", "source_image", "nucleus", "nor", "nor_pixel_count"]
-
-            df_nuclei = pd.DataFrame(measurement[0], columns=nucleus_columns)
-            df_nor = pd.DataFrame(measurement[1], columns=nor_columns)
-
-            df_nuclei["datetime"] = current_time
-            df_nor["datetime"] = current_time
-
-            nucleus_measurements_output = Path(output_path).joinpath("nuclei_measurements_raw.csv")
-            nor_measurements_output = Path(output_path).joinpath("nor_measurements_raw.csv")
-
-            if Path(nucleus_measurements_output).is_file():
-                df_nuclei.to_csv(str(nucleus_measurements_output), mode="a", header=False, index=False)
-            else:
-                df_nuclei.to_csv(str(nucleus_measurements_output), mode="w", header=True, index=False)
-            if Path(nor_measurements_output).is_file():
-                df_nor.to_csv(str(nor_measurements_output), mode="a", header=False, index=False)
-            else:
-                df_nor.to_csv(str(nor_measurements_output), mode="w", header=True, index=False)
-
-        if single_dir:
-            output_image_path = os.path.join(output_path, f"{model.stem.split('_l')[0]}_{image_path.stem}_prediction.png")
+    Raises:
+        FileNotFoundError: If `images` is not a path to file or a directory that exist.
+        ValueError: If `images` is not a `str`.
+        ValueError: If `model` is not a path to a file.
+    """
+    if isinstance(images, str):
+        if Path(images).is_dir():
+            files = list_files(images, as_numpy=True)
+        elif Path(images).is_file():
+            files = [images]
         else:
-            output_image_path = os.path.join(output_path, f"{image_path.stem}_{loaded_model.name}_prediction.png")
+            raise FileNotFoundError(F"The directory or file was not found at `{images}`.")
+    elif not isinstance(images, np.ndarray):
+        raise ValueError(f"`images` must be a `str`. Given `{type(images)}`.")
 
-        cv2.imwrite(output_image_path, cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
+    if isinstance(model, str):
+        model = load_model(model_path=model, input_shape=input_shape)
+    elif not isinstance(model, tf.keras.Model):
+        raise ValueError(f"`model` must be a `str` or `tf.keras.Model`. Given `{type(model)}`.")
 
-        if copy_images:
-            shutil.copyfile(str(image_path), Path(output_path).joinpath(image_path.name))
-        tf.keras.backend.clear_session()
+    if not input_shape:
+        input_shape = get_model_input_shape(model)
+
+    if not output_contour_analysis:
+        output_contour_analysis = output_predictions
+
+    output_predictions = Path(output_predictions)
+    output_predictions.mkdir(exist_ok=True, parents=True)
+    batch = np.empty((1,) + input_shape)
+
+    for file in tqdm(files, desc=record_id):
+        batch[0, :, :, :] = load_image(
+            image_path=file,
+            shape=input_shape[:2],
+            normalize=normalize)
+
+        prediction = model(batch, training=False)[0].numpy()
+        prediction = collapse_probabilities(prediction=prediction)
+
+        if prediction.shape[-1] > 3:
+            prediction = color_classes(prediction)
+
+        file = Path(file)
+        if analyze_contours:
+            prediction, detail = contour_analysis.analyze_contours(mask=prediction)
+            prediction, parent_contours, child_contours = prediction
+            detail, discarded_parent_contours, discarded_child_contours = detail
+
+            if record_id:
+                parent_measurements, child_measurements = contour_analysis.get_contour_measurements(
+                    parent_contours=parent_contours,
+                    child_contours=child_contours,
+                    shape=input_shape[:2],
+                    mask_name=Path(file).name,
+                    record_id=record_id,
+                    record_class=record_class)
+
+                contour_analysis.write_contour_measurements(
+                    parent_measurements=parent_measurements,
+                    child_measurements=child_measurements,
+                    output_path=output_contour_analysis,
+                    datetime=current_time)
+
+                if detail is not None:
+                    discarded_parent_measurements, discarded_child_measurements = contour_analysis.get_contour_measurements(
+                        parent_contours=discarded_parent_contours,
+                        child_contours=discarded_child_contours,
+                        shape=input_shape[:2],
+                        mask_name=Path(file).name,
+                        record_id=record_id,
+                        record_class=record_class,
+                        start_index=len(parent_measurements),
+                        contours_flag="invalid")
+
+                    contour_analysis.write_contour_measurements(
+                        parent_measurements=discarded_parent_measurements,
+                        child_measurements=discarded_child_measurements,
+                        output_path=output_contour_analysis,
+                        datetime=current_time)
+
+            if detail is not None and not measures_only:
+                filtered_objects = output_predictions.joinpath("filtered_objects")
+                filtered_objects.mkdir(exist_ok=True, parents=True)
+
+                cv2.imwrite(
+                    str(filtered_objects.joinpath(f"{file.stem}_detail.png")), cv2.cvtColor(detail, cv2.COLOR_BGR2RGB))
+                if copy_images:
+                    shutil.copyfile(str(file), filtered_objects.joinpath(file.name))
+
+        if not measures_only:
+            cv2.imwrite(str(output_predictions.joinpath(f"{file.stem}_prediction.png")), cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
+            if copy_images:
+                shutil.copyfile(str(file), output_predictions.joinpath(file.name))
 
 
-def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10), output=".", get_as_weights=False, classes=["Background", "Nucleus", "NOR"]):
-    class_occurence = []
+def plot_metrics(
+    metrics_file_path: str,
+    output: Optional[str] = None,
+    figsize: Optional[Tuple[int, int]] = (15, 15)) -> None:
+    """Generates graphs displaying the training, validation, and test metrics.
+
+    Args:
+        metrics (str): The path to the `train_config.json` file.
+        output (Optional[str], optional): The path where to save the graphs. If `None`, it will save in the same location as `metrics_file_path`. Defaults to None.
+        figsize (Optional[Tuple[int, int]], optional): The dimensions of the graphs. Defaults to (15, 15).
+    """
+    metrics = Path(metrics_file_path)
+    if metrics.is_file():
+        with metrics.open() as f:
+            metrics_file = json.load(f)
+
+        metrics_data = {
+            "Training metrics": {
+                "loss": metrics_file["train_metrics"]["loss"],
+                "f1-score": metrics_file["train_metrics"]["f1-score"],
+                "iou-score": metrics_file["train_metrics"]["iou_score"]
+            },
+            "Validation metrics": {
+                "val_loss": metrics_file["train_metrics"]["val_loss"],
+                "val_f1-score": metrics_file["train_metrics"]["val_f1-score"],
+                "val_iou-score": metrics_file["train_metrics"]["val_iou_score"]
+            },
+            "Test metrics": {
+                "test_loss": metrics_file["test_metrics"]["test_loss"],
+                "test_f1-score": metrics_file["test_metrics"]["test_f1-score"],
+                "test_iou-score": metrics_file["test_metrics"]["test_iou_score"]
+            },
+            "Learning rage": {
+                "lr": metrics_file["train_metrics"]["lr"]
+            }
+        }
+
+        if output:
+            output_path = Path(output)
+        else:
+            output_path = Path(metrics.parent)
+        output_path.mkdir(exist_ok=True, parents=True)
+
+        for i, (title, data) in enumerate(metrics_data.items()):
+            df = pd.DataFrame(data)
+            df.index = range(1, len(df.index) + 1)
+
+            image = df.plot(grid=True, figsize=figsize)
+            image.set(xlabel="Epoch", title=title)
+            image.set_ylim(ymin=0)
+
+            for column in df.columns:
+                if "loss" in column:
+                    text = f"e{np.argmin(list(df[column])) + 1}"
+                    value = (np.argmin(list(df[column])) + 1, df[column].min())
+                else:
+                    text = f"e{np.argmax(list(df[column])) + 1}"
+                    value = (np.argmax(list(df[column])) + 1, df[column].max())
+
+                if column != "lr":
+                    image.annotate(text, value, arrowprops=dict(facecolor='black', shrink=0.05))
+
+            image = image.get_figure()
+            image.savefig(str(output_path.joinpath(f"0{i+1}_{title.lower().replace('', '')}.png")))
+
+
+def compute_classes_distribution(
+    dataset: tf.data.Dataset,
+    batches: Optional[int] = 1,
+    plot: Optional[bool] = True,
+    figsize: Optional[Tuple[int, int]] = (20, 10),
+    output: Optional[str] = ".",
+    get_as_weights: Optional[bool] = False,
+    classes: Optional[list] = ["Background", "Nucleus", "NOR"]) -> dict:
+    """Computes the class distribution in a `tf.data.Dataset` considering the number of pixels.
+
+    Args:
+        dataset (tf.data.Dataset): A `tf.data.Dataset` containing the images and segmentation masks.
+        batches (Optional[int], optional): The number of batches the dataset contains. Defaults to 1.
+        plot (Optional[bool], optional): Whether or not to plot and save a Matplotlib bars graph with the classes distribution. Defaults to True.
+        figsize (Optional[Tuple[int, int]], optional): The size of the figure to be ploted. Defaults to (20, 10).
+        output (Optional[str], optional): The path where to save the figure. Defaults to ".".
+        get_as_weights (Optional[bool], optional): Converts the number of pixels per class to percentage over all classes. Defaults to False.
+        classes (Optional[list], optional): The name of the classes. Defaults to ["Background", "Nucleus", "NOR"].
+
+    Returns:
+        dict: A dictionary with an entry per class containing the class distribution.
+    """
+    class_occurrence = []
     batch_size = None
 
     for i, batch in enumerate(dataset):
@@ -293,10 +414,10 @@ def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10)
             class_count = []
             for class_index in range(mask.shape[-1]):
                 class_count.append(tf.math.reduce_sum(mask[:, :, class_index]))
-            class_occurence.append(class_count)
+            class_occurrence.append(class_count)
 
-    class_occurence = tf.convert_to_tensor(class_occurence, dtype=tf.int64)
-    class_distribution = tf.reduce_sum(class_occurence, axis=0) / (batches * batch_size)
+    class_occurrence = tf.convert_to_tensor(class_occurrence, dtype=tf.int64)
+    class_distribution = tf.reduce_sum(class_occurrence, axis=0) / (batches * batch_size)
     class_distribution = class_distribution.numpy()
     class_distribution = class_distribution * 100 / (dataset.element_spec[0].shape[1] * dataset.element_spec[0].shape[2])
     if get_as_weights:
@@ -304,15 +425,15 @@ def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10)
         class_distribution = np.round(class_distribution, 2)
 
     distribution = {}
-    for occurence, class_name in zip(class_distribution, classes):
-        distribution[class_name] = float(occurence)
+    for occurrence, class_name in zip(class_distribution, classes):
+        distribution[class_name] = float(occurrence)
 
     if plot:
         output_path = Path(output)
         output_path.mkdir(exist_ok=True, parents=True)
 
-        class_occurence = class_occurence.numpy()
-        df = pd.DataFrame(class_occurence, columns=classes)
+        class_occurrence = class_occurrence.numpy()
+        df = pd.DataFrame(class_occurrence, columns=classes)
         class_weights_figure = df.plot.bar(stacked=True, figsize=figsize)
         class_weights_figure.set(xlabel="Image instance", ylabel="Number of pixels per class", title="Image class distribution")
         class_weights_figure.axes.set_xticks([])
@@ -327,3 +448,40 @@ def compute_classes_distribution(dataset, batches=1, plot=True, figsize=(20, 10)
         class_weights_figure.savefig(output_path.joinpath("classes_distribution_dataset.png"))
 
     return distribution
+
+
+def get_duration(start: float, end: float) -> str:
+    """Calculates the time delta between a starting time and a ending time from `time.time()`.
+
+    Args:
+        start (float): The starting time.
+        end (float): The ending time.
+
+    Returns:
+        str: The time delta in format `HH:MM:SS`.
+    """
+    hours, rem = divmod(end - start, 3600)
+    minutes, seconds = divmod(rem, 60)
+    duration = "{:0>2}:{:0>2}:{:02.0f}".format(int(hours), int(minutes), seconds)
+    return duration
+
+
+def add_time_delta(duration1: str, duration2: str) -> str:
+    """Adds a duration to another duration.
+
+    Args:
+        duration1 (str): The duration to be summed to another one, in format `HH:MM:SS`.
+        duration2 (str): The other duration to be summed, in format `HH:MM:SS`.
+
+    Returns:
+        str: The duration sum of `duration1` and `duration2`, in format `HH:MM:SS`.
+    """
+    hours, minutes, seconds = duration1.split(":")
+    duration1 = datetime.timedelta(hours=int(hours), minutes=int(minutes), seconds=int(seconds))
+
+    hours, minutes, seconds = duration2.split(":")
+    duration2 = datetime.timedelta(hours=int(hours), minutes=int(minutes), seconds=int(seconds))
+
+    total_seconds = (duration1 + duration2).total_seconds()
+    duration = "%d:%02d:%02d" % (total_seconds / 3600, total_seconds / 60 % 60, total_seconds % 60)
+    return duration

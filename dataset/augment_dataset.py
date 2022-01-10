@@ -7,20 +7,26 @@ import random
 import sys
 import time
 from pathlib import Path
+from typing import List, Optional
 
 import albumentations as A
-import cv2
-import numpy as np
+from skimage.io import imsave
 from tqdm import tqdm
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from utils.data_io import list_files
+from utils.data import list_files, load_image
+from utils.utils import color_classes
 
 
-def get_transformations():
+def get_transformations() -> List:
+    """Creates and returns a list of image augmentation transformations.
+
+    Returns:
+        List: A list containing the transformation pipeline.
+    """
     transformations = [
         A.RandomBrightness(p=0.5),
         A.RandomContrast(p=0.5),
@@ -49,7 +55,23 @@ def get_transformations():
 
 
 class ImageAugmentation:
-    def __init__(self, transformation_pipeline, output_dir, suffix, specs=None) -> None:
+    """A class that performs image augmentation in parallel."""
+    def __init__(
+        self,
+        transformation_pipeline: List,
+        output_dir: str,
+        suffix: str,
+        specs: Optional[dict] = None,
+        color: Optional[bool] = False) -> None:
+        """Initialize the a `ImageAugmentation` instance.
+
+        Args:
+            transformation_pipeline (List): The list of transformations to be applied.
+            output_dir (str): Where to save the augmented images.
+            suffix (str): A suffix to be added to the augmented images.
+            specs (Optional[dict], optional): A dictionary containing the specification of the transformations applied.. Defaults to None.
+            color (Optional[bool], optional): Whether or not to color the segmentation masks.
+        """
         self.transformations = transformation_pipeline
         self.output_dir = output_dir
         self.suffix = suffix
@@ -63,34 +85,66 @@ class ImageAugmentation:
         self.masks_output = output_dir.joinpath("masks")
         self.masks_output.mkdir(exist_ok=True, parents=True)
 
+        self.color = color
+
         if specs:
             with open(str(output_dir.joinpath("augmented_dataset_specs.json")), "w") as augmented_dataset_specs:
                 json.dump(specs, augmented_dataset_specs, indent=4)
 
 
     def __call__(self, image_path, mask_path):
+        """The callable function that will perform the image transformation.
+
+        Args:
+            image_path (str): The path to the image to augment.
+            mask_path (str): The path to the respective segmentation mask to augment.
+        """
         image_path = Path(image_path)
         mask_path = Path(mask_path)
-        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        image = load_image(str(image_path), as_numpy=True)
+        mask = load_image(str(mask_path), as_gray=True, as_numpy=True)
 
-        cv2.imwrite(str(self.images_output.joinpath(f"{image_path.name}")), image)
-        cv2.imwrite(str(self.masks_output.joinpath(f"{mask_path.name}")), mask)
+        imsave(str(self.images_output.joinpath(f"{image_path.name}")), image)
+        if self.color:
+            mask = color_classes(mask)
+        imsave(str(self.masks_output.joinpath(f"{mask_path.name}")), mask, check_contrast=False)
 
         for j, tranformation in enumerate(self.transformations):
-            transormed = tranformation(image=image, mask=mask)
-            transformed_image = transormed["image"]
-            transformed_mask = transormed["mask"]
+            transformed = tranformation(image=image, mask=mask)
+            transformed_image = transformed["image"]
+            transformed_mask = transformed["mask"]
 
-            cv2.imwrite(str(self.images_output.joinpath(f"{image_path.stem}_t{j}{self.suffix}{image_path.suffix}")), transformed_image)
-            cv2.imwrite(str(self.masks_output.joinpath(f"{mask_path.stem}_t{j}{self.suffix}{mask_path.suffix}")), transformed_mask)
+            imsave(str(self.images_output.joinpath(f"{image_path.stem}_t{j}{self.suffix}{image_path.suffix}")), transformed_image)
+
+            if self.color:
+                imsave(
+                    str(self.masks_output.joinpath(f"{mask_path.stem}_t{j}{self.suffix}{mask_path.suffix}")),
+                    transformed_mask,
+                    check_contrast=False)
+
+            imsave(
+                str(self.masks_output.joinpath(f"{mask_path.stem}_t{j}{self.suffix}{mask_path.suffix}")),
+                transformed_mask,
+                check_contrast=False)
 
 
-def augment_dataset(input_dir, output_dir, suffix="", name=None, seed=None, validate=False):
-    if seed:
-        np.random.seed(seed)
+def augment_dataset(
+    input_dir: str,
+    output_dir: str,
+    suffix: Optional[str] = "",
+    name: Optional[str] = None,
+    color: Optional[bool] = False) -> None:
+    """A function that will instantiate a `ImageAugmentation` class object and use it to apply image augmentation in pararel to a dataset.
 
-    images_paths, masks_paths = list_files(input_dir, validate_masks=validate)
+    Args:
+        input_dir (str): The path to the images to augment. Should be a path to a directory containing an `images` subdirectory and `masks` subdirectory.
+        output_dir (str): Where to save the augmented images.
+        suffix (str): A suffix to be added to the augmented images.
+        name (Optional[str], optional): A name to be added to the augmented dataset specs. Defaults to None.
+        color (Optional[bool], optional): Whether or not to color the segmentation masks.
+    """
+    images_paths = list_files(str(Path(input_dir).joinpath("images")), as_numpy=True)
+    masks_paths = list_files(str(Path(input_dir).joinpath("masks")), as_numpy=True)
     transformations = get_transformations()
 
     print("\nAugmented dataset specs:")
@@ -108,7 +162,7 @@ def augment_dataset(input_dir, output_dir, suffix="", name=None, seed=None, vali
         "transformations": [", ".join([str(t) for t in transformation]) for transformation in transformations]
     }
 
-    process = ImageAugmentation(transformations, output_dir, suffix, specs)
+    process = ImageAugmentation(transformations, output_dir, suffix, specs, color)
     pool = multiprocessing.Pool()
     pool.starmap(process, tqdm(zip(images_paths, masks_paths), total=len(images_paths)), chunksize=1)
 
@@ -143,10 +197,10 @@ def main():
         help="A name for the dataset. If not specified, will be equal to the outputdir.",
         default="",
         type=str)
-    
+
     parser.add_argument(
-        "--validate",
-        help="Whether or not to validate if images and masks names match.",
+        "--color",
+        help="Whether or not to color the segmentation masks.",
         default=False,
         action="store_true")
 
@@ -158,7 +212,7 @@ def main():
     if not args.name:
         args.name = Path(args.output_dir).name
 
-    augment_dataset(args.input_dir, args.output_dir, args.suffix, args.name, args.validate)
+    augment_dataset(args.input_dir, args.output_dir, args.suffix, args.name, args.color)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,6 @@
 import argparse
 import os
 
-import tensorflow as tf
-
 from utils.utils import evaluate
 
 
@@ -19,13 +17,13 @@ def main():
     parser.add_argument(
         "-i",
         "--images",
-        help="Path to the directory containing the images to predict or to a single image file.",
-        default="dataset/test/",
+        help="Path to the directory containing `images` and `masks` directories.",
+        required=True,
         type=str)
 
     parser.add_argument(
         "--input-shape",
-        help="Whether to replace the model's input shape with the given input shape. Expects input shape in the following format: `HEIGHTxWIDTH`.",
+        help="Whether to replace the model's input shape with the given input shape. Expects input shape in the following format: `HEIGHTxWIDTHxCHANNELS`.",
         type=str)
 
     parser.add_argument(
@@ -38,46 +36,40 @@ def main():
     parser.add_argument(
         "-c",
         "--classes",
-        help="Number of classes.",
-        default=1,
+        help="Number of classes. Affects the one hot encoding of the masks.",
+        default=3,
         type=int)
 
     parser.add_argument(
         "--ohe",
-        help="Whether or not to convert masks to one-hot-encoded.",
-        default=False,
+        help="Whether or not to convert masks to one hot encoded.",
+        default=True,
         action="store_true")
 
     parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
-        default=0)
-
-    parser.add_argument(
-        "--seed",
-        help="Seed for reproducibility.",
-        default=1145,
-        type=int)
+        default="0")
 
     args = parser.parse_args()
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    tf.random.set_seed(args.seed)
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     if args.input_shape:
         input_shape = args.input_shape.lower().split("x")
-        input_shape = (int(input_shape[0]), int(input_shape[1]), (3))
+        input_shape = (int(input_shape[0]), int(input_shape[1]), int(input_shape[2]))
     else:
         input_shape = None
 
     evaluate(
-        model=args.model,
+        models_paths=args.model,
         images_path=args.images,
         batch_size=args.batch_size,
-        input_shape=input_shape,
         classes=args.classes,
-        one_hot_encoded=args.ohe)
+        one_hot_encoded=args.ohe,
+        input_shape=input_shape
+    )
 
 
 if __name__ == "__main__":

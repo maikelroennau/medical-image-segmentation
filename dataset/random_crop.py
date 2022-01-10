@@ -3,6 +3,7 @@ import os
 import random
 import sys
 from pathlib import Path
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -12,11 +13,19 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from utils.data_io import list_files, load_image, load_mask
+from utils.data import list_files, load_image
+from utils.utils import color_classes
 
 
-def get_masks_properties(masks_paths):
-    # Obtain all contours from all masks
+def get_masks_properties(masks_paths: List) -> Tuple[dict, dict]:
+    """Obtains the parent contours of all masks.
+
+    Args:
+        masks_paths (List): A list of segmentation masks.
+
+    Returns:
+        Tuple[dict, dict]: A tuple containing the contour objects, and the bounding rectangle of the contours.
+    """
     polygons = {}
     rects = {}
 
@@ -39,13 +48,38 @@ def get_masks_properties(masks_paths):
     return polygons, rects
 
 
-def contains_rectangle(cropping_rect, bounding_rect):
+def contains_rectangle(cropping_rect: np.ndarray, bounding_rect: np.ndarray) -> bool:
+    """Verifies if a rectangle that will be used to crop pixels from an image contains the entirety of the contour bounding rectangle.
+
+    Args:
+        cropping_rect (np.ndarray): The greater contour that will be used to crop pixels from the image.
+        bounding_rect (np.ndarray): The rectangle bounding the contour.
+
+    Returns:
+        bool: Whether or not `cropping_rect` contains `bounding_rect`.
+    """
     return (cropping_rect["x"] <= bounding_rect["x"]) and (cropping_rect["y"] <= bounding_rect["y"]) \
         and (cropping_rect["xx"] >= bounding_rect["xx"]) and (cropping_rect["yy"] >= bounding_rect["yy"])
 
 
-def random_crop(input_dir, output_dir, side, gamma, suffix):
-    images_paths, masks_paths = list_files(input_dir, validate_masks=True)
+def random_crop(
+    input_dir: str,
+    output_dir: str,
+    side: int,
+    gamma: Optional[float] = 1.5,
+    color: Optional[bool] = False) -> None:
+    """Crops a rectangle randomly positoned over the bounding rectangle of a segmentation contour.
+
+    Args:
+        input_dir (str): Path to the directory containing the images and masks to crop.
+        output_dir (str): Path to the output directory.
+        side (int): Side of the crop in pixels. (e.g., `100` will crop a 100x100 box). If not specified will used the biggest found in the data + gamma.
+        gamma (int): Percentage factor used to rescale the size of the crop retangle. Defaults to 50 percent (1.5).
+        color (Optional[bool], optional): Whether or not to color the segmentation masks.
+    """
+    input_path = Path(input_dir)
+    images_paths = list_files(str(input_path.joinpath("images")), as_numpy=True)
+    masks_paths = list_files(str(input_path.joinpath("masks")), as_numpy=True)
 
     output = Path(output_dir)
     images_output = output.joinpath("images")
@@ -53,7 +87,7 @@ def random_crop(input_dir, output_dir, side, gamma, suffix):
     images_output.mkdir(exist_ok=True, parents=True)
     masks_output.mkdir(exist_ok=True, parents=True)
 
-    polygons, rects = get_masks_properties(masks_paths)
+    _, rects = get_masks_properties(masks_paths)
 
     if not side:
         biggest_area = 0
@@ -73,8 +107,8 @@ def random_crop(input_dir, output_dir, side, gamma, suffix):
     half_side = side // 2
 
     for image_path, mask_path in tqdm(zip(images_paths, masks_paths), total=len(images_paths), desc="Random crop"):
-        image = load_image(image_path)
-        mask = load_mask(mask_path)
+        image = load_image(image_path, as_numpy=True)
+        mask = load_image(mask_path, as_gray=True, as_numpy=True)
 
         rectangles = [key for key in rects.keys() if key.startswith(Path(image_path).stem)]
         for rectangle in rectangles:
@@ -112,12 +146,20 @@ def random_crop(input_dir, output_dir, side, gamma, suffix):
 
             cropped_image = image[new_y:new_y+side, new_x:new_x+side, :]
             cropped_mask = mask[new_y:new_y+side, new_x:new_x+side, :]
-            cv2.imwrite(str(Path(images_output).joinpath(rectangle + ".png")), cv2.cvtColor(cropped_image, cv2.COLOR_BGR2RGB))
-            cv2.imwrite(str(Path(masks_output).joinpath(rectangle + ".png")), cv2.cvtColor(cropped_mask, cv2.COLOR_BGR2RGB))
+
+            cv2.imwrite(
+                str(Path(images_output).joinpath(rectangle + ".png")), cv2.cvtColor(cropped_image, cv2.COLOR_BGR2RGB))
+
+            if color:
+                cropped_mask = color_classes(cropped_mask)
+            else:
+                cropped_mask = cv2.cvtColor(cropped_mask, cv2.COLOR_BGR2RGB)
+
+            cv2.imwrite(str(Path(masks_output).joinpath(rectangle + ".png")), cropped_mask)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Randomly crops a fix sized bounding box around the bounding rect of segmetned objects.")
+    parser = argparse.ArgumentParser(description="Randomly crops a fix sized bounding box around the bounding rect of segmented objects.")
 
     parser.add_argument(
         "-i",
@@ -145,16 +187,16 @@ def main():
         type=float)
 
     parser.add_argument(
-        "--suffix",
-        help="Suffix for the generated images.",
-        default="",
-        type=str)
-
-    parser.add_argument(
         "-s",
         "--seed",
         help="Seed for reproducibility.",
         type=int)
+
+    parser.add_argument(
+        "--color",
+        help="Whether or not to color the segmentation masks.",
+        default=False,
+        action="store_true")
 
     args = parser.parse_args()
 
@@ -169,10 +211,7 @@ def main():
     if not args.output_dir:
         args.output_dir = "cropped"
 
-    if len(args.suffix) > 0:
-        args.suffix = f"_{args.suffix}"
-
-    random_crop(args.input_dir, args.output_dir, args.side, args.gamma, args.suffix)
+    random_crop(args.input_dir, args.output_dir, args.side, args.gamma, args.color)
 
 
 if __name__ == "__main__":
