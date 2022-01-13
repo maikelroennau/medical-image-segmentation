@@ -112,7 +112,9 @@ def main():
     if args.multi_measurements:
         directories = [
             directory
-            for directory in Path(args.images).rglob("*") if directory.is_dir() and directory.parent.name != args.images]
+            for directory in Path(args.images).rglob("*") 
+            if directory.is_dir() and directory.parent.name != args.images
+        ]
 
         for directory in directories:
             predict(

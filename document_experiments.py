@@ -33,6 +33,7 @@ EXPERIMENT_DATA = {
     "test_loss": None,
     "test_f1-score": None,
     "test_iou_score": None,
+    "description": None
 }
 
 MODEL_METRIC_KEYS = [

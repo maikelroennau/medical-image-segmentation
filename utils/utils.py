@@ -3,7 +3,6 @@ import json
 import re
 import shutil
 import time
-from io import BytesIO
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
@@ -20,19 +19,6 @@ from utils import contour_analysis
 from utils.data import list_files, load_dataset, load_image
 from utils.model import METRICS, get_model_input_shape, load_model
 
-
-COLORS = [
-    np.array([127,   0,   0]), # Red
-    np.array([  0, 127,   0]), # Green
-    np.array([  0,   0, 127]), # Blue
-    np.array([255, 127,  14]), # Orange
-    np.array([148, 103, 189]), # Violet
-    np.array([ 23, 190, 207]), # Cyan
-    np.array([188, 189,  34]), # Olive
-    np.array([127, 127, 127]), # Gray
-    np.array([277, 119, 194]), # Pink
-    np.array([140,  86,  75]), # Brown
-]
 
 def evaluate(
     models_paths: List[str],
@@ -168,25 +154,6 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     prediction.putpalette(colormap.flatten())
 
     prediction = np.asarray(prediction.convert())
-
-    # n_classes = prediction.shape[-1]
-    # classes =  np.unique(prediction.reshape(-1, n_classes), axis=0)[::-1]
-
-    # rgb_image = np.zeros(prediction.shape[:2] + (3,), dtype=np.uint8)
-
-    # color_index = -1
-    # for class_code in classes:
-    #     if color_index > len(COLORS):
-    #         color_index = 0
-    #     else:
-    #         color_index += 1
-
-    #     mask = np.sum(prediction == class_code, axis=-1)
-    #     mask = np.where(mask == n_classes, 1, 0)
-
-    #     for i in range(3):
-    #         rgb_image[:, :, i] = np.where(mask, COLORS[color_index][i], rgb_image[:, :, i])
-
     return prediction
 
 
