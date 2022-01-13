@@ -5,7 +5,6 @@ import os
 import time
 import types
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import segmentation_models as sm
@@ -19,9 +18,9 @@ from utils.utils import add_time_delta, evaluate, get_duration, plot_metrics
 
 def show_train_config(
     train_config: dict,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    duration: Optional[str] = None) -> None:
+    start_time: str,
+    end_time: str,
+    duration: str) -> None:
     """Shows the training configuration details, and starting, ending and duration times.
 
     Args:
@@ -98,22 +97,51 @@ def train(
     decoder: str,
     dataset: str,
     loss: str,
-    learning_rate: str,
-    learning_rate_factor: str,
-    classes: str,
-    epochs: str,
-    batch_size: str,
-    steps_per_epoch: str,
-    height: str,
-    width: str,
-    rgb: str,
-    save_all: str,
+    learning_rate: int,
+    learning_rate_factor: float,
+    classes: int,
+    epochs: int,
+    batch_size: int,
+    steps_per_epoch: int,
+    height: int,
+    width: int,
+    rgb: bool,
+    save_all: bool,
     gpu: str,
     model_name: str,
-    seed: str,
+    description: str,
+    seed: int,
     resume: str,
-    resume_epoch: str) -> None:
+    resume_epoch: int) -> None:
+    """Trains a segmentation model using the specified architecture and hyperparameters.
 
+    This function will train a segmentation model using the specified backbone and decoder and hyperparameters.
+    The trained model is saved to a directory named `checkpoints`, in a subdirectory with named after the date and time the training started, following this pattern: `YYYYMMDDHHMMSS`.
+    A `JSON` file is also saved containing all specifications used to train the model, including paths to the dataset and number of samples in each subset.
+    The `JSON` file can be used as an argument to te `document_experiments.py` script to produce a `.csv` file summarizing the experiment. Multiple `JSON` files from different experiments can be processed and be saved to a single `.csv` file.
+
+    Args:
+        backbone (str): The backbone to be used in the model's architecture. See the available backbones at `https://github.com/qubvel/segmentation_models`.
+        decoder (str): The decoder to be used in the model's architecture. Must be one of `U-Net`, `Linknet`, `FPN`, or `PSPNet`.
+        dataset (str): The path to the directory containing the images. It must contain three subdirectories: `train`, `validation`, and `test`. And each subdirectory must contain other two subdirectories: `images`, and `masks`.
+        loss (str): The loss function to be used to train the model. Must be one of `dice`, `focal`, or `categorical`.
+        learning_rate (str): The learning rate to train the model.
+        learning_rate_factor (float): A value to multiple to the learning rate and decrease it during the training.
+        classes (int): The number of classes to segment.
+        epochs (int): The number of epochs to train the model for.
+        batch_size (int): The number of images per batch.
+        steps_per_epoch (int): The number of steps per epoch (number of batches per epoch).
+        height (int): The height of the images.
+        width (int): The width of the images.
+        rgb (bool): Whether or not the dataset images are RGB.
+        save_all (bool): Whether or not to save the model weights after each epoch. If `False`, overrites the previous model with the new one if it scores better given a metric.
+        gpu (str): What GPUs to use during training. For multi-GPU, use the format `GPU0,GPU1,GPU2,...`. For CPU, pass `-1`.
+        model_name (str): The name of the model file.
+        description (str): A description describing the trained model.
+        seed (int): A seed for reproducibility.
+        resume (str): The path to the model to be loaded to continue training.
+        resume_epoch (int): The number of the epoch the model was last trained to.
+    """
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     if seed:
@@ -195,6 +223,7 @@ def train(
         "test_samples": len(list_files(test_dataset_path.joinpath("images"), as_numpy=True)),
         "save_all": save_all,
         "model_name": model_name,
+        "description": description,
         "seed": seed,
         "resume": resume,
         "resume_epoch": resume_epoch,
@@ -416,6 +445,12 @@ def main():
         type=str)
 
     parser.add_argument(
+        "--description",
+        required=False,
+        default="",
+        type=str)
+
+    parser.add_argument(
         "--seed",
         default=None,
         type=int)
@@ -451,6 +486,7 @@ def main():
         save_all=args.save_all,
         gpu=args.gpu,
         model_name=args.name,
+        description=args.description,
         seed=args.seed,
         resume=args.resume,
         resume_epoch=args.resume_epoch,
