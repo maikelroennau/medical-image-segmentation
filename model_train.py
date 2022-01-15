@@ -5,6 +5,7 @@ import os
 import time
 import types
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import segmentation_models as sm
@@ -18,9 +19,9 @@ from utils.utils import add_time_delta, evaluate, get_duration, plot_metrics
 
 def show_train_config(
     train_config: dict,
-    start_time: str,
-    end_time: str,
-    duration: str) -> None:
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    duration: Optional[str] = None) -> None:
     """Shows the training configuration details, and starting, ending and duration times.
 
     Args:
