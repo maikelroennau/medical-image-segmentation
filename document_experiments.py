@@ -1,7 +1,7 @@
 import argparse
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -33,6 +33,15 @@ EXPERIMENT_DATA = {
     "test_loss": None,
     "test_f1-score": None,
     "test_iou_score": None,
+    "train_loss_trip_epoch": None,
+    "train_f1-score_trip_epoch": None,
+    "train_iou_score_trip_epoch": None,
+    "val_loss_trip_epoch": None,
+    "val_f1-score_trip_epoch": None,
+    "val_iou_score_trip_epoch": None,
+    "test_loss_trip_epoch": None,
+    "test_f1-score_trip_epoch": None,
+    "test_iou_score_trip_epoch": None,
     "description": None
 }
 
@@ -55,7 +64,11 @@ RENAME_KEYS = {
 }
 
 
-def document(experiment_file: str, file_pattern: Optional[str] = "*train_config.json", output: Optional[str] = "."):
+def is_nan(number: Union[int, float]) -> bool:
+    return number != number
+
+
+def document(experiment_file: str, file_pattern: Optional[str] = "*train_config*.json", output: Optional[str] = "."):
     """Extract model information like metrics and hyperparameters from `train_config.json` files.
 
     Args:
@@ -100,12 +113,21 @@ def document(experiment_file: str, file_pattern: Optional[str] = "*train_config.
                             continue
                         if "loss" in key:
                             if key == "train_loss" or key == "val_loss":
+                                experiment[f"{key}_trip_epoch"] = np.argmin(experiment[key]) + 1
+                                if is_nan(np.sum(experiment[key])):
+                                    experiment[f"{key}_trip_epoch"] = None
                                 experiment[key] = np.min(experiment[key])
                             elif key == "test_loss":
                                 test_loss = np.array(experiment[key])
                                 test_loss = test_loss[test_loss > 0]
+                                experiment[f"{key}_trip_epoch"] = np.argmin(test_loss) + 1
+                                if is_nan(np.sum(experiment[key])):
+                                    experiment[f"{key}_trip_epoch"] = None
                                 experiment[key] = np.min(test_loss)
                         else:
+                            experiment[f"{key}_trip_epoch"] = np.argmax(experiment[key]) + 1
+                            if is_nan(np.sum(experiment[key])):
+                                experiment[f"{key}_trip_epoch"] = None
                             experiment[key] = np.max(experiment[key])
 
                 experiment["directory"] = Path(experiment["directory"]).name
@@ -147,7 +169,7 @@ def main():
             "-p",
             "--pattern",
             help="Patter of the JSON files to be searched. Only effective if '-e' is a dir.",
-            default="*train_config.json",
+            default="*train_config*.json",
             type=str)
 
     parser.add_argument(
