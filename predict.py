@@ -2,6 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
+from utils.data import SUPPORTED_IMAGE_TYPES
 from utils.utils import predict
 
 
@@ -110,11 +111,11 @@ def main():
         output = Path(args.model).joinpath("predictions")
 
     if args.multi_measurements:
-        directories = [
-            directory
-            for directory in Path(args.images).rglob("*") 
-            if directory.is_dir() and directory.parent.name != args.images
-        ]
+        directories = set([
+            file.parent 
+            for file in Path(args.images).rglob("*") 
+            if file.is_file() and file.suffix in SUPPORTED_IMAGE_TYPES
+        ])
 
         for directory in directories:
             predict(
