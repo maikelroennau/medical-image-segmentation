@@ -122,7 +122,6 @@ def convert_annotations_to_masks(
     Raises:
         FileNotFoundError: If the input directory is not found.
     """
-
     input_dir = Path(input_dir)
 
     if input_dir.is_dir():
@@ -164,7 +163,6 @@ def convert_annotations_to_masks(
                 if save_as_tif:
                     tifffile.imwrite(image_file_path, image, photometric="rgb")
                 else:
-                    imsave(image_file_path, image)
                     cv2.imwrite(image_file_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
                 label_file = filter_shapes(label_file)
@@ -181,7 +179,7 @@ def convert_annotations_to_masks(
                     colored_mask = color_classes(mask)
                     imsave(mask_file_path, colored_mask, check_contrast=False)
                 else:
-                    imsave(mask_file_path, mask, check_contrast=False)
+                    cv2.imwrite(mask_file_path, mask)
 
                 if overlay:
                     overlay_file_path = str(overlay_dir.joinpath(annotation.stem + "_overlay.png"))
@@ -191,7 +189,7 @@ def convert_annotations_to_masks(
                         font_size=20,
                         label_names=class_names,
                         loc="rb")
-                    imsave(overlay_file_path, overlay_mask)
+                    cv2.imwrite(overlay_file_path, cv2.cvtColor(overlay_mask, cv2.COLOR_BGR2RGB))
             except Exception as e:
                 print(e)
     else:
