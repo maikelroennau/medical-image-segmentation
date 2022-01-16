@@ -143,6 +143,8 @@ def augment_dataset(
         name (Optional[str], optional): A name to be added to the augmented dataset specs. Defaults to None.
         color (Optional[bool], optional): Whether or not to color the segmentation masks.
     """
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    
     images_paths = list_files(str(Path(input_dir).joinpath("images")), as_numpy=True)
     masks_paths = list_files(str(Path(input_dir).joinpath("masks")), as_numpy=True)
     transformations = get_transformations()
