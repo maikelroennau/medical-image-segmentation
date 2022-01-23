@@ -157,11 +157,51 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     return prediction
 
 
+def patch_predict(
+    model: tf.keras.Model,
+    image: Union[np.ndarray, tf.Tensor],
+    patch_shape: Tuple[int, int, int]) -> Union[np.ndarray, tf.Tensor]:
+    """Performs image prediction in patches of the original image for reduced GPU memory usage.
+
+    This function will slice down the `image` and perform predictions in smaller portions of it (`patches`).
+    The predicted `patches` are put back together in the same shape as the `image`.
+
+    Args:
+        model (tf.keras.Model): The model to be used for prediction.
+        image (Union[np.ndarray, tf.Tensor]): The image to be predicted.
+        patch_shape (Tuple[int, int, int]): The shape of the patch to be used for the predictions.
+
+    Raises:
+        ValueError: If the model's input shape an the patch shape do not match.
+
+    Returns:
+        Union[np.ndarray, tf.Tensor]: The predicted image constructed from the patch predictions.
+    """
+    input_shape = get_model_input_shape(model)
+    if input_shape != patch_shape:
+        raise ValueError("The model's input shape does not match the patch shape: model '{input_shape}' != patch '{patch_shape}'.")
+    else:
+        height = image.shape[0]
+        width = image.shape[1]
+        x_range = range(0, height, patch_shape[0])
+        y_range = range(0, width, patch_shape[1])
+
+        patch_prediction = np.zeros(image.shape)
+
+        for x in x_range:
+            for y in y_range:
+                slice = image[x:x+patch_shape[0], y:y+patch_shape[1]]
+                batch = slice.reshape((1,) + slice.shape)
+                patch_prediction[x:x+patch_shape[0], y:y+patch_shape[1]] = model(batch, training=False)[0].numpy()
+
+        return patch_prediction
+
+
 def predict(
     model: Union[str, tf.keras.Model],
     images: str,
     normalize: Optional[bool] = True,
-    input_shape: Optional[Tuple[int, int]] = None,
+    input_shape: Optional[Tuple[int, int, int]] = None,
     copy_images: Optional[bool] = False,
     analyze_contours: Optional[bool] = False,
     output_predictions: Optional[str] = "predictions",
@@ -176,7 +216,7 @@ def predict(
         model (Union[str, tf.keras.Model]): The model to be used to perform the prediction(s).
         images (str): A path to an image file, or a path to a directory containing images, or a path to a directory containing subdirectories of classes.
         normalize (Optional[bool], optional): Whether or not to put the image values between zero and one ([0,1]). Defaults to True.
-        input_shape (Optional[Tuple[int, int]], optional): The input shape the loaded model and images should have, in format `(HEIGHT, WIDTH, CHANNELS)`. If `model` is a `tf.keras.model` with an input shape different from `input_shape`, then its input shape will be changed to `input_shape`. Defaults to None.
+        input_shape (Optional[Tuple[int, int, int]], optional): The input shape the loaded model and images should have, in format `(HEIGHT, WIDTH, CHANNELS)`. If `model` is a `tf.keras.model` with an input shape different from `input_shape`, then its input shape will be changed to `input_shape`. Defaults to None.
         copy_images (Optional[bool], optional): Whether or not to copy the input images to the predictions output directory. Defaults to False.
         analyze_contours (Optional[bool], optional): Whether or not to apply the contour analysis algorithm. If `True`, it will also write the contour measurements to a `.csv` file. Defaults to False.
         output_predictions (Optional[str], optional): The path where to save the predicted segmentation masks. Defaults to "predictions".
@@ -214,15 +254,16 @@ def predict(
 
     output_predictions = Path(output_predictions)
     output_predictions.mkdir(exist_ok=True, parents=True)
-    batch = np.empty((1,) + input_shape)
 
     for file in tqdm(files, desc=record_id):
-        batch[0, :, :, :] = load_image(
-            image_path=file,
-            shape=input_shape[:2],
-            normalize=normalize)
+        image = load_image(image_path=file, normalize=normalize, as_numpy=True)
 
-        prediction = model(batch, training=False)[0].numpy()
+        if image.shape != input_shape:
+            prediction = patch_predict(model, image, input_shape)
+        else:
+            batch = image.reshape((1,) + image.shape)
+            prediction = model(batch, training=False)[0].numpy()
+
         prediction = collapse_probabilities(prediction=prediction)
 
         if prediction.shape[-1] > 3:
