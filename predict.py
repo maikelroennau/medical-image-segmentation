@@ -112,8 +112,8 @@ def main():
 
     if args.multi_measurements:
         directories = set([
-            file.parent 
-            for file in Path(args.images).rglob("*") 
+            file.parent
+            for file in Path(args.images).rglob("*")
             if file.is_file() and file.suffix in SUPPORTED_IMAGE_TYPES
         ])
 

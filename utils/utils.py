@@ -16,7 +16,7 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from utils import contour_analysis
-from utils.data import list_files, load_dataset, load_image
+from utils.data import list_files, load_dataset, load_image, one_hot_encode
 from utils.model import METRICS, get_model_input_shape, load_model
 
 
@@ -237,7 +237,7 @@ def predict(
         elif Path(images).is_file():
             files = [images]
         else:
-            raise FileNotFoundError(F"The directory or file was not found at `{images}`.")
+            raise FileNotFoundError(f"The directory or file was not found at `{images}`.")
     elif not isinstance(images, np.ndarray):
         raise ValueError(f"`images` must be a `str`. Given `{type(images)}`.")
 
@@ -258,13 +258,17 @@ def predict(
     for file in tqdm(files, desc=record_id):
         image = load_image(image_path=file, normalize=normalize, as_numpy=True)
 
-        if image.shape != input_shape:
-            prediction = patch_predict(model, image, input_shape)
-        else:
+        mask_file = Path(file).parent.parent.joinpath("masks").joinpath(f"{Path(file).stem}_mask.png")
+        mask = load_image(image_path=str(mask_file), normalize=False, as_gray=True, as_numpy=True)
+        mask = one_hot_encode(mask, classes=3, as_numpy=True)
+
+        if image.shape == input_shape:
             batch = image.reshape((1,) + image.shape)
             prediction = model(batch, training=False)[0].numpy()
+        else:
+            prediction = patch_predict(model, image, input_shape)
 
-        prediction = collapse_probabilities(prediction=prediction)
+        prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
 
         if prediction.shape[-1] > 3:
             prediction = color_classes(prediction)
