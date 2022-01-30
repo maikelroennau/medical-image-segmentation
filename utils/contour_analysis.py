@@ -217,36 +217,45 @@ def discard_overlapping_deformed_contours(
     return kept, discarded
 
 
-def draw_contour_lines(image: np.ndarray, contours: List[np.ndarray]) -> np.ndarray:
+def draw_contour_lines(image: np.ndarray, contours: List[np.ndarray], type: Optional[str] = "multiple") -> np.ndarray:
     """Draw the line of contours.
 
     Args:
         image (np.ndarray): The image to draw the contours on.
         contours (List[np.ndarray]): The list of the contours to be drawn.
+        type (Optional[str]): The type of contorus to draw. If `multiple`, draws the segmented contour, the convex hull contour and the overlapp between the segmented and convex contours. If `single`, draws only the segmented contour. Defaults to "multiple".
+
+    Raises:
+        ValueError: If `type` is not in [`multiple`, `single`].
 
     Returns:
         np.ndarray: The image with the contours drawn on it.
     """
-    for discarded_contour in contours:
-        contour = np.zeros(image.shape, dtype=np.uint8)
-        contour_convex = np.zeros(image.shape, dtype=np.uint8)
+    if type == "multiple":
+        for discarded_contour in contours:
+            contour = np.zeros(image.shape, dtype=np.uint8)
+            contour_convex = np.zeros(image.shape, dtype=np.uint8)
 
-        cv2.drawContours(contour, contours=[discarded_contour], contourIdx=-1, color=[1, 1, 1], thickness=1)
-        cv2.drawContours(
-            contour_convex, contours=[cv2.convexHull(discarded_contour)], contourIdx=-1, color=[1, 1, 1], thickness=1)
+            cv2.drawContours(contour, contours=[discarded_contour], contourIdx=-1, color=[1, 1, 1], thickness=1)
+            cv2.drawContours(
+                contour_convex, contours=[cv2.convexHull(discarded_contour)], contourIdx=-1, color=[1, 1, 1], thickness=1)
 
-        diff = contour + contour_convex
-        diff[diff < 2] = 0
-        diff[diff == 2] = 1
+            diff = contour + contour_convex
+            diff[diff < 2] = 0
+            diff[diff == 2] = 1
 
-        # Yellow = Smoothed contour
-        cv2.drawContours(image, contours=[discarded_contour], contourIdx=-1, color=[255, 255, 0], thickness=1)
-        # Cyan = Convex hull of the smoothed contour
-        cv2.drawContours(
-            image, contours=[cv2.convexHull(discarded_contour)], contourIdx=-1, color=[0, 255, 255], thickness=1)
+            # Yellow = Smoothed contour
+            cv2.drawContours(image, contours=[discarded_contour], contourIdx=-1, color=[255, 255, 0], thickness=1)
+            # Cyan = Convex hull of the smoothed contour
+            cv2.drawContours(
+                image, contours=[cv2.convexHull(discarded_contour)], contourIdx=-1, color=[0, 255, 255], thickness=1)
 
-        # Orange = Smoothed contour equals to Convex hull of the smoothed contour
-        image = np.where(diff > 0, [255, 128, 0], image)
+            # Orange = Smoothed contour equals to Convex hull of the smoothed contour
+            image = np.where(diff > 0, [255, 128, 0], image)
+    elif type == "single":
+        image = cv2.drawContours(image, contours=contours, contourIdx=-1, color=[255, 255, 255], thickness=1)
+    else:
+        raise ValueError("Argument `type` must be either `multiple` or `single`.")
 
     return image.astype(np.uint8)
 
@@ -266,7 +275,7 @@ def analyze_contours(
     """
     # Obtain and filter nuclei and NORs contours
     nuclei_contours = get_contours(mask[:, :, 1])
-    nuclei_contours, _ = discard_contours_by_size(nuclei_contours, shape=mask.shape[:2])
+    nuclei_contours, nuclei_size_discarded = discard_contours_by_size(nuclei_contours, shape=mask.shape[:2])
 
     nors_contours = get_contours(mask[:, :, 2])
     # nors_contours, _ = discard_contours_by_size(nors_contours, shape=mask.shape[:2])
@@ -275,7 +284,7 @@ def analyze_contours(
         nuclei_contours = smooth_contours(nuclei_contours, points=40)
         nors_contours = smooth_contours(nors_contours, 16)
 
-    nuclei_with_nors, _ = discard_contours_without_contours(nuclei_contours, nors_contours)
+    nuclei_with_nors, nuclei_without_nors = discard_contours_without_contours(nuclei_contours, nors_contours)
     nuclei_contours_adequate, nuclei_overlapping_deformed = discard_overlapping_deformed_contours(
         nuclei_with_nors, shape=mask.shape[:2])
 
@@ -295,10 +304,20 @@ def analyze_contours(
     background = np.where(np.logical_and(nucleus == 0, nor == 0), pixel_intensity, 0)
     updated_mask = np.stack([background, nucleus, nor], axis=2).astype(np.uint8)
 
+    contour_detail = mask.copy()
+
+    if len(nuclei_size_discarded) > 0:
+        contour_detail = draw_contour_lines(mask.copy(), nuclei_size_discarded, type="single")
+
+    if len(nuclei_without_nors) > 0:
+        contour_detail = draw_contour_lines(mask.copy(), nuclei_without_nors, type="single")
+    
     if len(nuclei_overlapping_deformed) > 0:
         contour_detail = draw_contour_lines(mask.copy(), nuclei_overlapping_deformed)
     else:
-        contour_detail, nuclei_overlapping_deformed, nors_in_overlapping_deformed = None, None, None
+        nuclei_overlapping_deformed, nors_in_overlapping_deformed = None, None
+        if len(nuclei_size_discarded) == 0 and len(nuclei_without_nors) == 0:
+            contour_detail = None
 
     return (updated_mask, nuclei_contours_adequate, nors_in_adequate_nuclei),\
         (contour_detail, nuclei_overlapping_deformed, nors_in_overlapping_deformed)
