@@ -1,4 +1,5 @@
 import argparse
+from cProfile import label
 import json
 import os
 import sys
@@ -98,6 +99,31 @@ def merge_classes(label_file: labelme.LabelFile, stand_class: str, mergin_class:
     return label_file
 
 
+def sort_shapes(label_file: labelme.LabelFile, classes_order: list) -> labelme.LabelFile:
+    """Sort shapes accordingly to the given order.
+
+    Args:
+        label_file (labelme.LabelFile): The label file containing the shapes to be sorted.
+        classes_order (list): The order the shapes must be sorted into.
+
+    Returns:
+        labelme.LabelFile: The label file with the sorted shapes
+    """
+    shapes = {}
+    for shape in label_file.shapes:
+        if shape["label"] not in shapes.keys():
+            shapes[shape["label"]] = []
+        shapes[shape["label"]].append(shape)
+
+    sorted_shapes = []
+    for class_name in classes_order:
+        if class_name in shapes.keys():
+            sorted_shapes.extend(shapes[class_name])
+
+    label_file.shapes = sorted_shapes
+    return label_file
+
+
 def convert_annotations_to_masks(
     input_dir: str,
     output_dir: str,
@@ -168,6 +194,7 @@ def convert_annotations_to_masks(
                 label_file = filter_shapes(label_file)
                 label_file = merge_classes(label_file, "nucleus", "discarded_nucleus")
                 label_file = merge_classes(label_file, "nor", "discarded_nor")
+                label_file = sort_shapes(label_file, classes_order=class_names)
                 class_names = tuple(class_name for class_name in class_names if class_name not in ["discarded_nucleus", "discarded_nor"])
 
                 mask, _ = labelme.utils.shapes_to_label(
