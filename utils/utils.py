@@ -290,7 +290,7 @@ def predict(
                     output_path=output_contour_analysis,
                     datetime=current_time)
 
-                if detail is not None:
+                if len(discarded_parent_contours) > 0 or len(discarded_child_contours) > 0:
                     discarded_parent_measurements, discarded_child_measurements = contour_analysis.get_contour_measurements(
                         parent_contours=discarded_parent_contours,
                         child_contours=discarded_child_contours,
