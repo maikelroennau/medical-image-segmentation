@@ -258,15 +258,11 @@ def predict(
     for file in tqdm(files, desc=record_id):
         image = load_image(image_path=file, normalize=normalize, as_numpy=True)
 
-        mask_file = Path(file).parent.parent.joinpath("masks").joinpath(f"{Path(file).stem}_mask.png")
-        mask = load_image(image_path=str(mask_file), normalize=False, as_gray=True, as_numpy=True)
-        mask = one_hot_encode(mask, classes=3, as_numpy=True)
-
-        if image.shape == input_shape:
+        if image.shape != input_shape:
+            prediction = patch_predict(model, image, input_shape)
+        else:
             batch = image.reshape((1,) + image.shape)
             prediction = model(batch, training=False)[0].numpy()
-        else:
-            prediction = patch_predict(model, image, input_shape)
 
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
 
