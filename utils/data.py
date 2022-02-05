@@ -98,7 +98,7 @@ def load_image(
 
                 return image
         else:
-            raise FileNotFoundError("The file `{image_path}` was not found.")
+            raise FileNotFoundError(f"The file `{image_path}` was not found.")
     elif isinstance(image_path, tf.Tensor):
         channels = 1 if as_gray else 3
         image = tf.io.read_file(image_path)
