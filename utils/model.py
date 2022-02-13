@@ -52,7 +52,6 @@ def replace_model_input_shape(model: tf.keras.Model, new_input_shape: Tuple[int,
     model_json = json.loads(model.to_json())
 
     model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *new_input_shape]
-    model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *new_input_shape]
 
     updated_model = tf.keras.models.model_from_json(json.dumps(model_json))
     updated_model.set_weights(model_weights)
