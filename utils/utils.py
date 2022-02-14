@@ -16,8 +16,56 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from utils import contour_analysis
-from utils.data import list_files, load_dataset, load_image, one_hot_encode
+from utils.data import list_files, load_dataset, load_image, reset_class_values
 from utils.model import METRICS, get_model_input_shape, load_model
+
+
+def evaluate_from_files(
+    ground_truth_path: str,
+    predictions_path: str) -> dict:
+    """Evaluate prediction using the metrics defined in `utils.model.METRICS`.
+
+    Args:
+        predictions_path (str): The path to the directory containing the predicted masks.
+        ground_truth_path (str): The path to the directory containing the ground truth masks.
+
+    Raises:
+        FileNotFoundError: In case the `predictions_path` does not exists.
+        FileNotFoundError: In case the `ground_truth_path` does not exists.
+        ValueError: If the number of predictions does not match the number of ground truth masks.
+
+    Returns:
+        dict: A dictionary with the metrics score for every evaluation.
+    """
+    predictions = list_files(predictions_path, as_numpy=True)
+    ground_truth = list_files(ground_truth_path, as_numpy=True)
+
+    if len(predictions) == 0:
+        raise FileNotFoundError(f"No prediction files were found at `{predictions}`.")
+    if len(ground_truth) == 0:
+        raise FileNotFoundError(f"No ground truth files were found at `{ground_truth}`.")
+    if len(predictions) != len(ground_truth):
+        raise ValueError(
+            f"The number of prediction and ground truth files do not not match: Predictions: '{len(predictions)}' != '{len(ground_truth)}'.")
+
+    metrics = { metric.name: [] for metric in METRICS }
+    for prediction_file_path, ground_truth_file_path in tqdm(zip(predictions, ground_truth), total=len(predictions)):
+        prediction = load_image(prediction_file_path)
+        prediction = tf.cast(prediction, tf.float32)
+        ground_truth = load_image(ground_truth_file_path)
+        ground_truth = tf.cast(ground_truth, tf.float32)
+
+        for metric in METRICS:
+            metrics[metric.name].append(metric(ground_truth, prediction).numpy())
+
+    print("Evaluation results:")
+    print(f"  - Number of images: {len(predictions)}")
+    for metric in METRICS:
+        print(f"  - {metric.name}")
+        print(f"    - Mean: {np.mean(metrics[metric.name])}")
+        print(f"    - STD.: {np.std(metrics[metric.name])}")
+
+    return metrics
 
 
 def evaluate(
@@ -49,7 +97,7 @@ def evaluate(
     elif Path(models_paths).is_dir():
         models_paths = [str(path) for path in Path(models_paths).glob("*.h5")]
     else:
-        raise FileNotFoundError("No file models were found at `{models_paths}`.")
+        raise FileNotFoundError(f"No file models were found at `{models_paths}`.")
 
     models_paths.sort()
     evaluate_dataset = load_dataset(
@@ -203,6 +251,7 @@ def predict(
     normalize: Optional[bool] = True,
     input_shape: Optional[Tuple[int, int, int]] = None,
     copy_images: Optional[bool] = False,
+    grayscale: Optional[bool] = False,
     analyze_contours: Optional[bool] = False,
     output_predictions: Optional[str] = "predictions",
     output_contour_analysis: Optional[str] = None,
@@ -218,6 +267,7 @@ def predict(
         normalize (Optional[bool], optional): Whether or not to put the image values between zero and one ([0,1]). Defaults to True.
         input_shape (Optional[Tuple[int, int, int]], optional): The input shape the loaded model and images should have, in format `(HEIGHT, WIDTH, CHANNELS)`. If `model` is a `tf.keras.model` with an input shape different from `input_shape`, then its input shape will be changed to `input_shape`. Defaults to None.
         copy_images (Optional[bool], optional): Whether or not to copy the input images to the predictions output directory. Defaults to False.
+        grayscale (Optional[bool], optional): Whether or not to save the predicted masks as grayscale images with values for classes starting from zero. Defaults to `False`.
         analyze_contours (Optional[bool], optional): Whether or not to apply the contour analysis algorithm. If `True`, it will also write the contour measurements to a `.csv` file. Defaults to False.
         output_predictions (Optional[str], optional): The path where to save the predicted segmentation masks. Defaults to "predictions".
         output_contour_analysis (Optional[str], optional): The path where to save the `.csv` file containing the contour measurements. Only effective if `analyze_contour` is `True`. Defaults to None.
@@ -317,7 +367,12 @@ def predict(
                     shutil.copyfile(str(file), filtered_objects.joinpath(file.name))
 
         if not measures_only:
-            cv2.imwrite(str(output_predictions.joinpath(f"{file.stem}_prediction.png")), cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB))
+            if grayscale:
+                prediction = reset_class_values(prediction)
+            else:
+                prediction = cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB)
+
+            cv2.imwrite(str(output_predictions.joinpath(f"{file.stem}_prediction.png")), prediction)
             if copy_images:
                 shutil.copyfile(str(file), output_predictions.joinpath(file.name))
 
