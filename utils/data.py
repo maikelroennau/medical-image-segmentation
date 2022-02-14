@@ -9,6 +9,23 @@ from tqdm import tqdm
 
 SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
 
+
+def reset_class_values(mask: np.ndarray) -> np.ndarray:
+    """Reset the mask values corresponding to classes to start from zero.
+
+    Args:
+        mask (np.ndarray): The mask to have its values reset.
+
+    Returns:
+        np.ndarray: The reset mask.
+    """
+    reset_image = np.zeros(mask.shape[:2], dtype=np.uint8)
+    for i in range(mask.shape[-1]):
+        reset_image[:, :][mask[:, :, i] > 0] = i
+
+    return reset_image
+
+
 def one_hot_encode(image: Union[np.ndarray, tf.Tensor], classes: int, as_numpy: Optional[bool] = False) -> tf.Tensor:
     """Converts an image to the one-hot-encode format.
 
@@ -36,7 +53,7 @@ def one_hot_encode(image: Union[np.ndarray, tf.Tensor], classes: int, as_numpy: 
 
         if as_numpy:
             image = image.numpy()
-        
+
         return image
     else:
         raise TypeError(f"Argument `image` should be `np.ndarray` or `tf.Tensor. Given `{type(image)}`.")
@@ -142,7 +159,7 @@ def list_files(files_path: str, as_numpy: Optional[bool] = False, seed: Optional
         if as_numpy:
             files_list = [file.numpy().decode("utf-8") for file in files_list]
             files_list.sort()
-        
+
         return files_list
     else:
         raise FileNotFoundError(f"The directory `{files_path}` does not exist.")

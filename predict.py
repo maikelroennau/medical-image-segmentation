@@ -44,6 +44,13 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "-g",
+        "--grayscale",
+        help="Whether or not to save predictions as gayscale masks.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-a",
         "--analyze-contours",
         help="Whether or not to apply the contour analysis algorithm. If `True`, it will also write the contour measurements to a `.csv` file.",
@@ -124,6 +131,7 @@ def main():
                 normalize=args.normalize,
                 input_shape=input_shape,
                 copy_images=args.copy_images,
+                grayscale=args.grayscale,
                 analyze_contours=args.analyze_contours,
                 output_predictions=str(Path(output).joinpath(directory.parent.name).joinpath(directory.name)),
                 output_contour_analysis=output,
@@ -138,6 +146,7 @@ def main():
             normalize=args.normalize,
             input_shape=input_shape,
             copy_images=args.copy_images,
+            grayscale=args.grayscale,
             analyze_contours=args.analyze_contours,
             output_predictions=output,
             output_contour_analysis=args.analysis_output,

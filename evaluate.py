@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from utils.utils import evaluate
+from utils.utils import evaluate, evaluate_from_files
 
 
 def main():
@@ -11,14 +11,28 @@ def main():
         "-m",
         "--model",
         help="Path to the model to evaluate. If path is a directory, will evaluate all models within it.",
-        required=True,
+        required=False,
         type=str)
 
     parser.add_argument(
         "-i",
         "--images",
         help="Path to the directory containing `images` and `masks` directories.",
-        required=True,
+        required=False,
+        type=str)
+
+    parser.add_argument(
+        "-g",
+        "--ground-truth",
+        help="Path to the directory containing the ground truth.",
+        required=False,
+        type=str)
+
+    parser.add_argument(
+        "-p",
+        "--predictions",
+        help="Path to the directory containing the predictions.",
+        required=False,
         type=str)
 
     parser.add_argument(
@@ -62,14 +76,20 @@ def main():
     else:
         input_shape = None
 
-    evaluate(
-        models_paths=args.model,
-        images_path=args.images,
-        batch_size=args.batch_size,
-        classes=args.classes,
-        one_hot_encoded=args.ohe,
-        input_shape=input_shape
-    )
+    if args.images is not None:
+        evaluate(
+            models_paths=args.model,
+            images_path=args.images,
+            batch_size=args.batch_size,
+            classes=args.classes,
+            one_hot_encoded=args.ohe,
+            input_shape=input_shape
+        )
+    elif args.predictions is not None and args.ground_truth is not None:
+        evaluate_from_files(
+            ground_truth_path=args.ground_truth,
+            predictions_path=args.predictions
+        )
 
 
 if __name__ == "__main__":
