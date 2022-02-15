@@ -88,7 +88,8 @@ def main():
     elif args.predictions is not None and args.ground_truth is not None:
         evaluate_from_files(
             ground_truth_path=args.ground_truth,
-            predictions_path=args.predictions
+            predictions_path=args.predictions,
+            classes=args.classes
         )
 
 
