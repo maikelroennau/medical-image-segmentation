@@ -23,12 +23,14 @@ from utils.model import METRICS, get_model_input_shape, load_model
 
 def evaluate_from_files(
     ground_truth_path: str,
-    predictions_path: str) -> dict:
+    predictions_path: str,
+    classes: Optional[int] = None) -> dict:
     """Evaluate prediction using the metrics defined in `utils.model.METRICS`.
 
     Args:
         ground_truth_path (str): The path to the directory containing the ground truth masks.
         predictions_path (str): The path to the directory containing the predicted masks.
+        classes (Optional[int], optional): The number of classes in the data. If `None`, will infer from the ground truth data on an instance basis.
 
     Raises:
         FileNotFoundError: In case the `predictions_path` does not exists.
@@ -49,21 +51,20 @@ def evaluate_from_files(
         raise ValueError(
             f"The number of ground truth and prediction files do not not match: '{len(ground_truth)}' != '{len(predictions)}'")
 
+    classes_undefined = True if classes is None else False
     metrics = { metric.name: [] for metric in METRICS }
+    
     for ground_truth_file_path, prediction_file_path in tqdm(zip(ground_truth, predictions), total=len(ground_truth)):
         ground_truth = load_image(ground_truth_file_path, as_gray=True)
         prediction = load_image(prediction_file_path, as_gray=True)
 
-        classes_ground_truth = np.unique(ground_truth).size
-        classes_prediction = np.unique(prediction).size
-        if classes_ground_truth != classes_prediction:
-            raise ValueError(f"""The number of classes in the ground truth does not match the number of classes in the predictions:
-                `{classes_ground_truth}` != `{classes_prediction}`.""")
+        if classes_undefined:
+            classes = np.unique(ground_truth).size
 
-        ground_truth = one_hot_encode(ground_truth, classes=classes_ground_truth, as_numpy=True)
+        ground_truth = one_hot_encode(ground_truth, classes=classes, as_numpy=True)
         ground_truth = ground_truth.reshape((1,) + ground_truth.shape).astype(np.float32)
 
-        prediction = one_hot_encode(prediction, classes=classes_prediction, as_numpy=True)
+        prediction = one_hot_encode(prediction, classes=classes, as_numpy=True)
         prediction = prediction.reshape((1,) + prediction.shape).astype(np.float32)
 
         for metric in METRICS:
@@ -73,8 +74,8 @@ def evaluate_from_files(
     print(f"  - Number of images: {len(predictions)}")
     for metric in METRICS:
         print(f"  - {metric.name}")
-        print(f"    - Mean: {np.mean(metrics[metric.name])}")
-        print(f"    - STD.: {np.std(metrics[metric.name])}")
+        print(f"    - Mean: " + str(np.round(np.mean(metrics[metric.name]), 4)))
+        print(f"    - STD.: " + str(np.round(np.std(metrics[metric.name]), 4)))
 
     return metrics
 
@@ -378,7 +379,6 @@ def predict(
                     shutil.copyfile(str(file), filtered_objects.joinpath(file.name))
 
         if not measures_only:
-            # prediction = prediction[:1200, :1600, :]
             if grayscale:
                 prediction = reset_class_values(prediction)
             else:
