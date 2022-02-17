@@ -63,7 +63,7 @@ def show_train_config(
 
     print(f"  - Dataset:")
     print(f"    - Train: {train_config['train_dataset']} ({train_config['train_samples']} samples)")
-    print(f"    - Validation: {train_config['validation_dataset']} ({train_config['validation_samples']} samples)")
+    # print(f"    - Validation: {train_config['validation_dataset']} ({train_config['validation_samples']} samples)")
     print(f"    - Test: {train_config['test_dataset']} ({train_config['test_samples']} samples)\n")
 
 
@@ -177,7 +177,7 @@ def train(
         checkpoint_model = str(checkpoint_directory.joinpath(model_name + ".h5"))
 
     train_dataset_path = Path(dataset).joinpath('train')
-    validation_dataset_path = Path(dataset).joinpath('validation')
+    # validation_dataset_path = Path(dataset).joinpath('validation')
     test_dataset_path = Path(dataset).joinpath('test')
 
     train_dataset = load_dataset(
@@ -190,15 +190,15 @@ def train(
         shuffle=True
     )
 
-    validation_dataset = load_dataset(
-        dataset_path=str(validation_dataset_path),
-        batch_size=1,
-        shape=(height, width),
-        classes=classes,
-        mask_one_hot_encoded=one_hot_encoded,
-        repeat=False,
-        shuffle=True
-    )
+    # validation_dataset = load_dataset(
+    #     dataset_path=str(validation_dataset_path),
+    #     batch_size=1,
+    #     shape=(height, width),
+    #     classes=classes,
+    #     mask_one_hot_encoded=one_hot_encoded,
+    #     repeat=False,
+    #     shuffle=True
+    # )
 
     train_config_path = str(checkpoint_directory.joinpath(f"train_config_{checkpoint_directory.name}.json"))
     train_config = {
@@ -217,10 +217,10 @@ def train(
         "gpu": str(gpu),
         "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
         "train_dataset": str(train_dataset_path),
-        "validation_dataset": str(validation_dataset_path),
+        # "validation_dataset": str(validation_dataset_path),
         "test_dataset": str(test_dataset_path),
         "train_samples": len(list_files(train_dataset_path.joinpath("images"), as_numpy=True)),
-        "validation_samples": len(list_files(validation_dataset_path.joinpath("images"), as_numpy=True)),
+        # "validation_samples": len(list_files(validation_dataset_path.joinpath("images"), as_numpy=True)),
         "test_samples": len(list_files(test_dataset_path.joinpath("images"), as_numpy=True)),
         "save_all": save_all,
         "model_name": model_name,
@@ -267,7 +267,7 @@ def train(
                         train_dataset,
                         epochs=epochs,
                         steps_per_epoch=steps_per_epoch,
-                        validation_data=validation_dataset,
+                        # validation_data=validation_dataset,
                         initial_epoch=int(resume_epoch),
                         callbacks=callbacks)
                 else:
@@ -279,7 +279,7 @@ def train(
                         train_dataset,
                         epochs=epochs,
                         steps_per_epoch=steps_per_epoch,
-                        validation_data=validation_dataset,
+                        # validation_data=validation_dataset,
                         callbacks=callbacks)
         else:
             if resume:
@@ -295,7 +295,7 @@ def train(
                     train_dataset,
                     epochs=epochs,
                     steps_per_epoch=steps_per_epoch,
-                    validation_data=validation_dataset,
+                    # validation_data=validation_dataset,
                     initial_epoch=int(resume_epoch),
                     callbacks=callbacks)
             else:
@@ -307,7 +307,7 @@ def train(
                     train_dataset,
                     epochs=epochs,
                     steps_per_epoch=steps_per_epoch,
-                    validation_data=validation_dataset,
+                    # validation_data=validation_dataset,
                     callbacks=callbacks)
     except Exception as e:
         print(f"\nThere was an error during training that caused it to stop: \n{e}")
