@@ -178,7 +178,7 @@ def convert_annotations_to_masks(
                 label_file = labelme.LabelFile(filename=annotation)
 
                 if filter_labels:
-                    label_file.shapes = [shape for shape in label_file.shapes if shape["label"] not in class_names]
+                    label_file.shapes = [shape for shape in label_file.shapes if shape["label"] in class_names]
 
                 image_type = ".tif" if save_as_tif else ".png"
                 image_file_path = str(images_dir.joinpath(annotation.stem + image_type))
