@@ -172,7 +172,7 @@ def train(
         checkpoint_directory.mkdir(exist_ok=True, parents=True)
 
     if save_all:
-        checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"))
+        checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}.h5"))
     else:
         checkpoint_model = str(checkpoint_directory.joinpath(model_name + ".h5"))
 
@@ -240,9 +240,9 @@ def train(
 
     callbacks = [
         tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
+            monitor="f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
         tf.keras.callbacks.ModelCheckpoint(
-            checkpoint_model, monitor="val_f1-score", mode="max", save_best_only=False if save_all else True),
+            checkpoint_model, monitor="f1-score", mode="max", save_best_only=False if save_all else True),
         # tf.keras.callbacks.TensorBoard(
         #     log_dir=str(checkpoint_directory.joinpath("logs")), histogram_freq=1, update_freq="batch", write_images=False)
     ]
