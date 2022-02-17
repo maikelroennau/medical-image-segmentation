@@ -53,7 +53,7 @@ def evaluate_from_files(
 
     classes_undefined = True if classes is None else False
     metrics = { metric.name: [] for metric in METRICS }
-    
+
     for ground_truth_file_path, prediction_file_path in tqdm(zip(ground_truth, predictions), total=len(ground_truth)):
         ground_truth = load_image(ground_truth_file_path, as_gray=True)
         prediction = load_image(prediction_file_path, as_gray=True)
