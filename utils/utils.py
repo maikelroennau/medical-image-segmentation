@@ -411,11 +411,11 @@ def plot_metrics(
                 "f1-score": metrics_file["train_metrics"]["f1-score"],
                 "iou-score": metrics_file["train_metrics"]["iou_score"]
             },
-            "Validation metrics": {
-                "val_loss": metrics_file["train_metrics"]["val_loss"],
-                "val_f1-score": metrics_file["train_metrics"]["val_f1-score"],
-                "val_iou-score": metrics_file["train_metrics"]["val_iou_score"]
-            },
+            # "Validation metrics": {
+            #     "val_loss": metrics_file["train_metrics"]["val_loss"],
+            #     "val_f1-score": metrics_file["train_metrics"]["val_f1-score"],
+            #     "val_iou-score": metrics_file["train_metrics"]["val_iou_score"]
+            # },
             "Test metrics": {
                 "test_loss": metrics_file["test_metrics"]["test_loss"],
                 "test_f1-score": metrics_file["test_metrics"]["test_f1-score"],
