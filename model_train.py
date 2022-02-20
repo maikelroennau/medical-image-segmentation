@@ -63,8 +63,8 @@ def show_train_config(
 
     print(f"  - Dataset:")
     print(f"    - Train: {train_config['train_dataset']} ({train_config['train_samples']} samples)")
-    print(f"    - Validation: {train_config['validation_dataset']} ({train_config['validation_samples']} samples)")
-    print(f"    - Test: {train_config['test_dataset']} ({train_config['test_samples']} samples)\n")
+    # print(f"    - Validation: {train_config['validation_dataset']} ({train_config['validation_samples']} samples)")
+    # print(f"    - Test: {train_config['test_dataset']} ({train_config['test_samples']} samples)\n")
 
 
 def update_best_model_and_metrics(train_config: dict, best_model: dict, models_metrics: dict) -> dict:
@@ -172,13 +172,13 @@ def train(
         checkpoint_directory.mkdir(exist_ok=True, parents=True)
 
     if save_all:
-        checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"))
+        checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}.h5"))
     else:
         checkpoint_model = str(checkpoint_directory.joinpath(model_name + ".h5"))
 
     train_dataset_path = Path(dataset).joinpath('train')
-    validation_dataset_path = Path(dataset).joinpath('validation')
-    test_dataset_path = Path(dataset).joinpath('test')
+    # validation_dataset_path = Path(dataset).joinpath('validation')
+    # test_dataset_path = Path(dataset).joinpath('test')
 
     train_dataset = load_dataset(
         dataset_path=str(train_dataset_path),
@@ -190,15 +190,15 @@ def train(
         shuffle=True
     )
 
-    validation_dataset = load_dataset(
-        dataset_path=str(validation_dataset_path),
-        batch_size=1,
-        shape=(height, width),
-        classes=classes,
-        mask_one_hot_encoded=one_hot_encoded,
-        repeat=False,
-        shuffle=True
-    )
+    # validation_dataset = load_dataset(
+    #     dataset_path=str(validation_dataset_path),
+    #     batch_size=1,
+    #     shape=(height, width),
+    #     classes=classes,
+    #     mask_one_hot_encoded=one_hot_encoded,
+    #     repeat=False,
+    #     shuffle=True
+    # )
 
     train_config_path = str(checkpoint_directory.joinpath(f"train_config_{checkpoint_directory.name}.json"))
     train_config = {
@@ -217,11 +217,11 @@ def train(
         "gpu": str(gpu),
         "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
         "train_dataset": str(train_dataset_path),
-        "validation_dataset": str(validation_dataset_path),
-        "test_dataset": str(test_dataset_path),
+        # "validation_dataset": str(validation_dataset_path),
+        # "test_dataset": str(test_dataset_path),
         "train_samples": len(list_files(train_dataset_path.joinpath("images"), as_numpy=True)),
-        "validation_samples": len(list_files(validation_dataset_path.joinpath("images"), as_numpy=True)),
-        "test_samples": len(list_files(test_dataset_path.joinpath("images"), as_numpy=True)),
+        # "validation_samples": len(list_files(validation_dataset_path.joinpath("images"), as_numpy=True)),
+        # "test_samples": len(list_files(test_dataset_path.joinpath("images"), as_numpy=True)),
         "save_all": save_all,
         "model_name": model_name,
         "description": description,
@@ -240,9 +240,9 @@ def train(
 
     callbacks = [
         tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
+            monitor="f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
         tf.keras.callbacks.ModelCheckpoint(
-            checkpoint_model, monitor="val_f1-score", mode="max", save_best_only=False if save_all else True),
+            checkpoint_model, monitor="f1-score", mode="max", save_best_only=False if save_all else True),
         # tf.keras.callbacks.TensorBoard(
         #     log_dir=str(checkpoint_directory.joinpath("logs")), histogram_freq=1, update_freq="batch", write_images=False)
     ]
@@ -267,7 +267,7 @@ def train(
                         train_dataset,
                         epochs=epochs,
                         steps_per_epoch=steps_per_epoch,
-                        validation_data=validation_dataset,
+                        # validation_data=validation_dataset,
                         initial_epoch=int(resume_epoch),
                         callbacks=callbacks)
                 else:
@@ -279,7 +279,7 @@ def train(
                         train_dataset,
                         epochs=epochs,
                         steps_per_epoch=steps_per_epoch,
-                        validation_data=validation_dataset,
+                        # validation_data=validation_dataset,
                         callbacks=callbacks)
         else:
             if resume:
@@ -295,7 +295,7 @@ def train(
                     train_dataset,
                     epochs=epochs,
                     steps_per_epoch=steps_per_epoch,
-                    validation_data=validation_dataset,
+                    # validation_data=validation_dataset,
                     initial_epoch=int(resume_epoch),
                     callbacks=callbacks)
             else:
@@ -307,7 +307,7 @@ def train(
                     train_dataset,
                     epochs=epochs,
                     steps_per_epoch=steps_per_epoch,
-                    validation_data=validation_dataset,
+                    # validation_data=validation_dataset,
                     callbacks=callbacks)
     except Exception as e:
         print(f"\nThere was an error during training that caused it to stop: \n{e}")
@@ -341,26 +341,26 @@ def train(
         json.dump(train_config, config_file, indent=4)
 
     if len(glob.glob(str(checkpoint_directory.joinpath("*.h5")))) > 0:
-        print(f"\nEvaluate all saved models on test data '{str(test_dataset_path)}'")
-        best_model, models_metrics = evaluate(
-            models_paths=str(checkpoint_directory),
-            images_path=str(test_dataset_path),
-            batch_size=1,
-            classes=classes,
-            one_hot_encoded=one_hot_encoded,
-            input_shape=(1920, 2560, 3), # TODO: Update to be the same value specified in the arguments.
-            loss_function=loss_function,
-            model_name=model_name)
+    #     print(f"\nEvaluate all saved models on test data '{str(test_dataset_path)}'")
+    #     best_model, models_metrics = evaluate(
+    #         models_paths=str(checkpoint_directory),
+    #         images_path=str(test_dataset_path),
+    #         batch_size=1,
+    #         classes=classes,
+    #         one_hot_encoded=one_hot_encoded,
+    #         input_shape=(1920, 2560, 3), # TODO: Update to be the same value specified in the arguments.
+    #         loss_function=loss_function,
+    #         model_name=model_name)
 
-        if best_model is not None or models_metrics is not None:
-            train_config = update_best_model_and_metrics(train_config, best_model, models_metrics)
+    #     if best_model is not None or models_metrics is not None:
+    #         train_config = update_best_model_and_metrics(train_config, best_model, models_metrics)
 
-            with open(train_config_path, "w") as config_file:
-                json.dump(train_config, config_file, indent=4)
+    #         with open(train_config_path, "w") as config_file:
+    #             json.dump(train_config, config_file, indent=4)
 
             plot_metrics(train_config_path)
-    else:
-        print(f"\nSkipping evaluation, no models were found at `{str(checkpoint_directory)}`.")
+    # else:
+    #     print(f"\nSkipping evaluation, no models were found at `{str(checkpoint_directory)}`.")
 
 
 def main():
