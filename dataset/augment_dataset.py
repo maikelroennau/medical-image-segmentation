@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import albumentations as A
-from skimage.io import imsave
+import cv2
 from tqdm import tqdm
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -104,28 +104,28 @@ class ImageAugmentation:
         image = load_image(str(image_path), as_numpy=True)
         mask = load_image(str(mask_path), as_gray=True, as_numpy=True)
 
-        imsave(str(self.images_output.joinpath(f"{image_path.name}")), image)
+        cv2.imwrite(str(self.images_output.joinpath(f"{image_path.name}")), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         if self.color:
             mask = color_classes(mask)
-        imsave(str(self.masks_output.joinpath(f"{mask_path.name}")), mask, check_contrast=False)
+        cv2.imwrite(str(self.masks_output.joinpath(f"{mask_path.name}")), mask)
 
         for j, tranformation in enumerate(self.transformations):
             transformed = tranformation(image=image, mask=mask)
             transformed_image = transformed["image"]
             transformed_mask = transformed["mask"]
 
-            imsave(str(self.images_output.joinpath(f"{image_path.stem}_t{j}{self.suffix}{image_path.suffix}")), transformed_image)
+            cv2.imwrite(
+                str(self.images_output.joinpath(f"{image_path.stem}_t{j}{self.suffix}{image_path.suffix}")),
+                cv2.cvtColor(transformed_image, cv2.COLOR_BGR2RGB))
 
             if self.color:
-                imsave(
+                cv2.imwrite(
                     str(self.masks_output.joinpath(f"{mask_path.stem}_t{j}{self.suffix}{mask_path.suffix}")),
-                    transformed_mask,
-                    check_contrast=False)
+                    cv2.cvtColor(transformed_mask, cv2.COLOR_BGR2RGB))
 
-            imsave(
+            cv2.imwrite(
                 str(self.masks_output.joinpath(f"{mask_path.stem}_t{j}{self.suffix}{mask_path.suffix}")),
-                transformed_mask,
-                check_contrast=False)
+                 cv2.cvtColor(transformed_mask, cv2.COLOR_BGR2RGB))
 
 
 def augment_dataset(
@@ -144,7 +144,7 @@ def augment_dataset(
         color (Optional[bool], optional): Whether or not to color the segmentation masks.
     """
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-    
+
     images_paths = list_files(str(Path(input_dir).joinpath("images")), as_numpy=True)
     masks_paths = list_files(str(Path(input_dir).joinpath("masks")), as_numpy=True)
     transformations = get_transformations()
