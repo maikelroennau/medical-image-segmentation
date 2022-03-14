@@ -307,13 +307,13 @@ def analyze_contours(
     contour_detail = mask.copy()
 
     if len(nuclei_size_discarded) > 0:
-        contour_detail = draw_contour_lines(mask.copy(), nuclei_size_discarded, type="single")
+        contour_detail = draw_contour_lines(contour_detail, nuclei_size_discarded, type="single")
 
     if len(nuclei_without_nors) > 0:
-        contour_detail = draw_contour_lines(mask.copy(), nuclei_without_nors, type="single")
+        contour_detail = draw_contour_lines(contour_detail, nuclei_without_nors, type="single")
     
     if len(nuclei_overlapping_deformed) > 0:
-        contour_detail = draw_contour_lines(mask.copy(), nuclei_overlapping_deformed)
+        contour_detail = draw_contour_lines(contour_detail, nuclei_overlapping_deformed)
     else:
         nuclei_overlapping_deformed, nors_in_overlapping_deformed = [], []
         if len(nuclei_size_discarded) == 0 and len(nuclei_without_nors) == 0:
