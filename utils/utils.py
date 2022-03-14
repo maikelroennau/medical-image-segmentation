@@ -373,10 +373,12 @@ def predict(
                 filtered_objects = output_predictions.joinpath("filtered_objects")
                 filtered_objects.mkdir(exist_ok=True, parents=True)
 
-                cv2.imwrite(
-                    str(filtered_objects.joinpath(f"{file.stem}_detail.png")), cv2.cvtColor(detail, cv2.COLOR_BGR2RGB))
+                cv2.imwrite(str(filtered_objects.joinpath(f"{file.stem}_detail.png")), cv2.cvtColor(detail, cv2.COLOR_BGR2RGB))
                 if copy_images:
-                    shutil.copyfile(str(file), filtered_objects.joinpath(file.name))
+                    image = contour_analysis.draw_contour_lines(
+                        load_image(image_path=str(file), normalize=False, as_numpy=True),
+                        discarded_parent_contours)
+                    cv2.imwrite(str(filtered_objects.joinpath(f"{file.stem}_image.png")), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
         if not measures_only:
             if grayscale:
