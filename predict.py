@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 from utils.data import SUPPORTED_IMAGE_TYPES
-from utils.utils import predict
+from utils.predict import predict
 
 
 def main():
