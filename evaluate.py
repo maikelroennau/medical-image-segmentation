@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from utils.utils import evaluate, evaluate_from_files
+from utils.evaluate import evaluate, evaluate_from_files
 
 
 def main():
