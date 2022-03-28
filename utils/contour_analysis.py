@@ -8,6 +8,8 @@ import pandas as pd
 import tensorflow as tf
 from scipy.interpolate import splev, splprep
 
+from utils.utils import color_classes
+
 
 NUCLEUS_COLUMNS = [
     "patient_id",
@@ -250,8 +252,8 @@ def draw_contour_lines(image: np.ndarray, contours: List[np.ndarray], type: Opti
             cv2.drawContours(
                 image, contours=[cv2.convexHull(discarded_contour)], contourIdx=-1, color=[0, 255, 255], thickness=1)
 
-            # Orange = Smoothed contour equals to Convex hull of the smoothed contour
-            image = np.where(diff > 0, [255, 128, 0], image)
+            # White = Smoothed contour equals to Convex hull of the smoothed contour
+            image = np.where(diff > 0, [255, 255, 255], image)
     elif type == "single":
         image = cv2.drawContours(image, contours=contours, contourIdx=-1, color=[255, 255, 255], thickness=1)
     else:
@@ -305,6 +307,7 @@ def analyze_contours(
     updated_mask = np.stack([background, nucleus, nor], axis=2).astype(np.uint8)
 
     contour_detail = mask.copy()
+    contour_detail = color_classes(contour_detail)
 
     if len(nuclei_size_discarded) > 0:
         contour_detail = draw_contour_lines(contour_detail, nuclei_size_discarded, type="single")
@@ -359,7 +362,7 @@ def get_contour_measurements(
         for child_contour in child_contours:
             for child_point in child_contour:
                 if cv2.pointPolygonTest(parent_contour, tuple(child_point[0]), False) >= 0:
-                    child_pixel_count = get_contour_pixel_count(child_point, shape)
+                    child_pixel_count = get_contour_pixel_count(child_contour, shape)
                     child_features = [
                         record_id, mask_name, record_class, contours_flag, parent_id, child_id, child_pixel_count
                     ]
