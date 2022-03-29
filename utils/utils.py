@@ -235,3 +235,26 @@ def add_time_delta(duration1: str, duration2: str) -> str:
     total_seconds = (duration1 + duration2).total_seconds()
     duration = "%d:%02d:%02d" % (total_seconds / 3600, total_seconds / 60 % 60, total_seconds % 60)
     return duration
+
+
+def pad_along_axis(array: np.ndarray, size: int, axis: int = 0, mode="reflect"):
+    """Pad an image along a specific axis.
+
+    Args:
+        array (np.ndarray): The image to be padded.
+        size (int): The size the padded axis must have.
+        axis (int, optional): Which axis to apply the padding. Defaults to 0.
+        mode (str, optional): How to fill the padded pixels. Defaults to "reflect".
+
+    Returns:
+        np.ndarray: The padded image.
+    """
+    pad_size = size - array.shape[axis]
+
+    if pad_size <= 0:
+        return array
+
+    npad = [(0, 0)] * array.ndim
+    npad[axis] = (0, pad_size)
+
+    return np.pad(array, pad_width=npad, mode="reflect")
