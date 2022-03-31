@@ -193,8 +193,7 @@ def discard_contours_without_contours(
 
 def discard_contours_outside_contours(
     parent_contours: List[np.ndarray],
-    child_contours: List[np.ndarray],
-    shape: Optional[Tuple[int, int]] = None) -> Union[List[np.ndarray], List[np.ndarray]]:
+    child_contours: List[np.ndarray]) -> Union[List[np.ndarray], List[np.ndarray]]:
     """Discards contours that are outside other contours.
 
     This function iterates over all child contours and checks if at least one point is inside of at least one parent contour.
@@ -202,7 +201,6 @@ def discard_contours_outside_contours(
     Args:
         parent_contours (List[np.ndarray]): The list of contours to be considered as the parent contours.
         child_contours (List[np.ndarray]): The list of contours to be considered as child contours of the parent contours.
-        shape (Optional[Tuple[int, int]], optional): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
 
     Returns:
         Union[List[np.ndarray], List[np.ndarray]]: The `kept` array contains the child contours that are within a parent contour. The `discarded` array contains the child contours that are not in any parent contour.
@@ -221,22 +219,7 @@ def discard_contours_outside_contours(
         if keep_child:
             kept.append(child)
         else:
-            dilated_contour = dilate_contours([child], shape=shape)
-            child_contour = get_contours(dilated_contour)
-
-            if len(child_contour) == 1:
-                child_contour = child_contour[0]
-                for parent in parent_contours:
-                    for child_point in child_contour:
-                        if cv2.pointPolygonTest(parent, tuple(child_point[0]), False) >= 0:
-                            keep_child = True
-                            break
-                    if keep_child:
-                        break
-            if keep_child:
-                kept.append(child)
-            else:
-                discarded.append(child)
+            discarded.append(child)
     return kept, discarded
 
 
@@ -342,8 +325,8 @@ def analyze_contours(
     nuclei_contours_adequate, nuclei_overlapping_deformed = discard_overlapping_deformed_contours(
         nuclei_with_nors, shape=mask.shape[:2])
 
-    nors_in_adequate_nuclei, _ = discard_contours_outside_contours(nuclei_contours_adequate, nors_contours, shape=mask.shape[:2])
-    nors_in_overlapping_deformed, _ = discard_contours_outside_contours(nuclei_overlapping_deformed, nors_contours, shape=mask.shape[:2])
+    nors_in_adequate_nuclei, _ = discard_contours_outside_contours(nuclei_contours_adequate, nors_contours)
+    nors_in_overlapping_deformed, _ = discard_contours_outside_contours(nuclei_overlapping_deformed, nors_contours)
 
     # Create a new mask with the filtered nuclei and NORs
     pixel_intensity = int(np.max(np.unique(mask)))
