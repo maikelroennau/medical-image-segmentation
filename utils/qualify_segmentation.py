@@ -58,32 +58,51 @@ def get_intersection(
 def count_intersect_contours(
     ground_truth_contours: List[np.ndarray],
     predicted_contours: List[np.ndarray],
-    shape: Tuple[int, int]) -> Union[int, int]:
+    shape: Tuple[int, int],
+    drop: bool = False) -> Union[int, int]:
     """Count the number of contours that intersect with the ground truth contours.
 
     Args:
         ground_truth_contours (List[np.ndarray]): The list of ground truth contours.
         predicted_contours (List[np.ndarray]): The list of predicted contours.
         shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
+        drop (bool): Whether to drop contours from `ground_truth_contours` after evaluation. Defaults to False.
 
     Returns:
         Union[int, int]: A tuple where the first element is the number of predicted contours intersecting with the ground truth contours (true positives), and the second number is the number of contours that were predicted but are not in the ground truth (false positives).
     """
-    intersect_contours = 0
-    for predicted_contour in predicted_contours:
-        intersected = False
-        for ground_truth_contour in ground_truth_contours:
-            intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
-            if np.round(intersection, 2) > 0.:
-                intersected = True
+    if drop:
+        intersecting_contours = 0
+        ground_truth_contours = { str(key): value for key, value in enumerate(ground_truth_contours) }
+        
+        for predicted_contour in predicted_contours:
+            if len(ground_truth_contours) == 0:
                 break
 
-        if intersected:
-            intersect_contours += 1
+            intersected = False
+            for key, ground_truth_contour in ground_truth_contours.items():
+                intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
+                if np.round(intersection, 2) > 0.:
+                    intersected = True
+                    ground_truth_contours.pop(key)
+                    break
 
-    false_positives = len(predicted_contours) - intersect_contours
+            if intersected:
+                intersecting_contours += 1
+    else:
+        intersecting_contours = 0
+        for predicted_contour in predicted_contours:
+            intersected = False
+            for ground_truth_contour in ground_truth_contours:
+                intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
+                if np.round(intersection, 2) > 0.:
+                    intersected = True
+                    break
 
-    return intersect_contours, false_positives
+            if intersected:
+                intersecting_contours += 1
+    
+    return intersecting_contours
 
 
 def qualify_segmentation(
@@ -138,18 +157,23 @@ def qualify_segmentation(
         predicted_nuclei = get_contours(prediction[:, :, 1] + prediction[:, :, 2])
         predicted_nors = get_contours(prediction[:, :, 2])
 
-        false_negative_nuclei = max(0, len(expected_nuclei) - len(predicted_nuclei))
-        false_negative_nors = max(0, len(expected_nors) - len(predicted_nors))
-
-        true_positive_nuclei, false_positive_nuclei = count_intersect_contours(
+        true_positive_nuclei = count_intersect_contours(
             expected_nuclei,
             predicted_nuclei,
-            shape=ground_truth.shape[:2])
+            shape=ground_truth.shape[:2],
+            drop=True)
 
-        true_positive_nors, false_positive_nors = count_intersect_contours(
+        true_positive_nors = count_intersect_contours(
             expected_nors,
             predicted_nors,
-            shape=ground_truth.shape[:2])
+            shape=ground_truth.shape[:2],
+            drop=False)
+
+        false_positive_nuclei = len(predicted_nuclei) - true_positive_nuclei
+        false_positive_nors = len(predicted_nors) - true_positive_nors
+        
+        false_negative_nuclei = len(expected_nuclei) - true_positive_nuclei
+        false_negative_nors = len(expected_nors) - true_positive_nors
 
         data = [{
             "source_image": Path(ground_truth_file_path).name,
