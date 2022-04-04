@@ -46,37 +46,36 @@ def run(
         prediction, parent_contours, child_contours = prediction
         detail, discarded_parent_contours, discarded_child_contours = detail
 
-        if record_id:
-            parent_measurements, child_measurements = contour_analysis.get_contour_measurements(
-                parent_contours=parent_contours,
-                child_contours=child_contours,
+        parent_measurements, child_measurements = contour_analysis.get_contour_measurements(
+            parent_contours=parent_contours,
+            child_contours=child_contours,
+            shape=mask.shape[:2],
+            mask_name=Path(file).name,
+            record_id=record_id,
+            record_class=record_class)
+
+        contour_analysis.write_contour_measurements(
+            parent_measurements=parent_measurements,
+            child_measurements=child_measurements,
+            output_path=output_contour_analysis,
+            datetime=current_time)
+
+        if len(discarded_parent_contours) > 0 or len(discarded_child_contours) > 0:
+            discarded_parent_measurements, discarded_child_measurements = contour_analysis.get_contour_measurements(
+                parent_contours=discarded_parent_contours,
+                child_contours=discarded_child_contours,
                 shape=mask.shape[:2],
                 mask_name=Path(file).name,
                 record_id=record_id,
-                record_class=record_class)
+                record_class=record_class,
+                start_index=len(parent_measurements),
+                contours_flag="invalid")
 
             contour_analysis.write_contour_measurements(
-                parent_measurements=parent_measurements,
-                child_measurements=child_measurements,
+                parent_measurements=discarded_parent_measurements,
+                child_measurements=discarded_child_measurements,
                 output_path=output_contour_analysis,
                 datetime=current_time)
-
-            if len(discarded_parent_contours) > 0 or len(discarded_child_contours) > 0:
-                discarded_parent_measurements, discarded_child_measurements = contour_analysis.get_contour_measurements(
-                    parent_contours=discarded_parent_contours,
-                    child_contours=discarded_child_contours,
-                    shape=mask.shape[:2],
-                    mask_name=Path(file).name,
-                    record_id=record_id,
-                    record_class=record_class,
-                    start_index=len(parent_measurements),
-                    contours_flag="invalid")
-
-                contour_analysis.write_contour_measurements(
-                    parent_measurements=discarded_parent_measurements,
-                    child_measurements=discarded_child_measurements,
-                    output_path=output_contour_analysis,
-                    datetime=current_time)
 
 
 def main():
