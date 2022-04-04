@@ -139,8 +139,8 @@ def dilate_contours(
 def discard_contours_by_size(
     contours: List[np.ndarray],
     shape: Tuple[int, int],
-    min_pixel_count: Optional[int] = 5000,
-    max_pixel_count: Optional[int] = 40000) -> Union[List[np.ndarray], List[np.ndarray]]:
+    min_pixel_count: Optional[int] = 3700,
+    max_pixel_count: Optional[int] = 67000) -> Union[List[np.ndarray], List[np.ndarray]]:
     """Discards contours smaller or bigger than the given thresholds.
 
     Args:
