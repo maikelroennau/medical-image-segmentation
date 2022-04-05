@@ -38,7 +38,7 @@ MAX_NUCLEUS_PIXEL_COUNT = 67000
 MIN_NUCLEUS_PERCENT_PIXEL_COUNT = 5.5
 
 MAX_NOR_PIXEL_COUNT = 2000
-MIN_NOR_PERCENT_PIXIEL_COUNT = 50.0
+MIN_NOR_PERCENT_PIXEL_COUNT = 5.0
 
 MAX_CONTOUR_PERCENT_DIFF = 5.0
 
@@ -325,7 +325,7 @@ def analyze_contours(
 
     nors_contours = get_contours(mask[:, :, 2])
     nors_contours, _ = discard_contours_by_size(
-        nors_contours, shape=mask.shape[:2], max_pixel_count=MAX_NOR_PIXEL_COUNT, min_percent_size=MAX_NOR_PIXEL_COUNT)
+        nors_contours, shape=mask.shape[:2], max_pixel_count=MAX_NOR_PIXEL_COUNT, min_percent_size=MIN_NOR_PERCENT_PIXEL_COUNT)
 
     if smooth:
         nuclei_contours = smooth_contours(nuclei_contours, points=40)
