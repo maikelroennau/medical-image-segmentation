@@ -35,10 +35,10 @@ CLASSES = [
     "unknown"]
 
 MAX_NUCLEUS_PIXEL_COUNT = 67000
-MIN_NUCLEUS_PERCENT_PIXEL_COUNT = 5.5
+MIN_NUCLEUS_PERCENT_PIXEL_COUNT = 5.5 # 3700
 
 MAX_NOR_PIXEL_COUNT = 2000
-MIN_NOR_PERCENT_PIXEL_COUNT = 5.0
+MIN_NOR_PERCENT_PIXEL_COUNT = 0.5 # 10
 
 MAX_CONTOUR_PERCENT_DIFF = 5.0
 
@@ -148,24 +148,24 @@ def discard_contours_by_size(
     contours: List[np.ndarray],
     shape: Tuple[int, int],
     max_pixel_count: Optional[int] = MAX_NUCLEUS_PIXEL_COUNT,
-    min_percent_size: Optional[float] = MIN_NUCLEUS_PERCENT_PIXEL_COUNT) -> Union[List[np.ndarray], List[np.ndarray]]:
+    min_relative_pixel_count: Optional[float] = MIN_NUCLEUS_PERCENT_PIXEL_COUNT) -> Union[List[np.ndarray], List[np.ndarray]]:
     """Discards contours smaller or bigger than the given thresholds.
 
     Args:
         contours (List[np.ndarray]): The contours to be evaluated.
         shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
         max_pixel_count (Optional[int], optional): The maximum number of pixels the contour must have. Defaults to `MAX_NUCLEUS_PIXEL_COUNT`.
-        min_percent_size (Optional[float], optional): The minimal percent of pixels the contour must have in range `[0, 100]`. Defaults to `MIN_NUCLEUS_PERCENT_PIXEL_COUNT`.
-        
+        min_relative_pixel_count (Optional[float], optional): The minimal percent of pixels the contour must have in range `[0, 100]`. Defaults to `MIN_NUCLEUS_PERCENT_PIXEL_COUNT`.
+
     Returns:
         Union[List[np.ndarray], List[np.ndarray]]: The `kept` array contains the contours that are withing the size specification. The `discarded` array contains the contours that are not withing the size specification.
     """
     kept = []
     discarded = []
     for contour in contours:
-        contour_area = get_contour_pixel_count(contour, shape=shape)
-        min_pixel_count = int((min_percent_size * max_pixel_count) / 100)
-        if min_pixel_count <= contour_area and contour_area <= max_pixel_count:
+        contour_pixel_count = get_contour_pixel_count(contour, shape=shape)
+        mim_pixel_count = int((min_relative_pixel_count * max_pixel_count) / 100)
+        if mim_pixel_count <= contour_pixel_count and contour_pixel_count <= max_pixel_count:
             kept.append(contour)
         else:
             discarded.append(contour)
@@ -324,8 +324,8 @@ def analyze_contours(
     nuclei_contours, nuclei_size_discarded = discard_contours_by_size(nuclei_contours, shape=mask.shape[:2])
 
     nors_contours = get_contours(mask[:, :, 2])
-    nors_contours, _ = discard_contours_by_size(
-        nors_contours, shape=mask.shape[:2], max_pixel_count=MAX_NOR_PIXEL_COUNT, min_percent_size=MIN_NOR_PERCENT_PIXEL_COUNT)
+    nors_contours, nors_size_discarded = discard_contours_by_size(
+        nors_contours, shape=mask.shape[:2], max_pixel_count=MAX_NOR_PIXEL_COUNT, min_relative_pixel_count=MIN_NOR_PERCENT_PIXEL_COUNT)
 
     if smooth:
         nuclei_contours = smooth_contours(nuclei_contours, points=40)
@@ -359,6 +359,9 @@ def analyze_contours(
 
     if len(nuclei_without_nors) > 0:
         contour_detail = draw_contour_lines(contour_detail, nuclei_without_nors, type="single")
+
+    if len(nors_size_discarded) > 0:
+        contour_detail = draw_contour_lines(contour_detail, nors_size_discarded, type="single")
 
     if len(nuclei_overlapping_deformed) > 0:
         contour_detail = draw_contour_lines(contour_detail, nuclei_overlapping_deformed)
