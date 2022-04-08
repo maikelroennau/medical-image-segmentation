@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from utils.contour_analysis import get_contours
 from utils.data import list_files, load_image, one_hot_encode
+from utils.predict import collapse_probabilities, color_classes
 
 
 COLUMNS = [
@@ -74,7 +75,7 @@ def count_intersect_contours(
     if drop:
         intersecting_contours = 0
         ground_truth_contours = { str(key): value for key, value in enumerate(ground_truth_contours) }
-        
+
         for predicted_contour in predicted_contours:
             if len(ground_truth_contours) == 0:
                 break
@@ -101,7 +102,7 @@ def count_intersect_contours(
 
             if intersected:
                 intersecting_contours += 1
-    
+
     return intersecting_contours
 
 
@@ -109,7 +110,8 @@ def qualify_segmentation(
     ground_truth_path: str,
     predictions_path: str,
     output_qualification: Optional[str] = "qualification.csv",
-    classes: Optional[int] = None) -> list:
+    classes: Optional[int] = None,
+    visualization: Optional[bool] = False) -> list:
     """Qualifies the predicted contours against the ground truth contours.
 
     This function works by checking if the segmented nuclei and NORs match to nuclei and NORs in the ground truth.
@@ -119,6 +121,7 @@ def qualify_segmentation(
         predictions_path (str): The path to the predicted masks.
         output_qualification (Optional[str], optional): The path were to save the qualification information. Defaults to "qualification.csv".
         classes (Optional[int], optional): The number of classes in the data. Defaults to None.
+        visualization (Optional[bool], optional). Whether or not to create a visualization showing the differences in respect to the ground truth.
 
     Raises:
         FileNotFoundError: If the ground truth masks are not found.
@@ -169,9 +172,30 @@ def qualify_segmentation(
             shape=ground_truth.shape[:2],
             drop=False)
 
+        if visualization:
+            ground_truth = collapse_probabilities(ground_truth, 255)
+            ground_truth = color_classes(ground_truth)
+
+            pred_nuclei = np.zeros_like(ground_truth)
+            pred_nuclei = cv2.drawContours(pred_nuclei, contours=predicted_nuclei, contourIdx=-1, color=[255, 0, 0], thickness=cv2.FILLED)
+
+            pred_nors = np.zeros_like(ground_truth)
+            pred_nors = cv2.drawContours(pred_nors, contours=predicted_nors, contourIdx=-1, color=[0, 255, 0], thickness=cv2.FILLED)
+
+            beta = 0.7
+            gamma = 1.0
+            ground_truth_viz = cv2.addWeighted(ground_truth.copy(), 0.7, pred_nuclei, beta, gamma)
+            ground_truth_viz = cv2.addWeighted(ground_truth_viz, 0.5, pred_nors, beta, gamma)
+
+            output_viz = Path(output_qualification)
+            output_viz = Path(output_viz.parent.joinpath(output_viz.stem))
+            output_viz.mkdir(exist_ok=True, parents=True)
+
+            cv2.imwrite(str(output_viz.joinpath(Path(ground_truth_file_path).name)), cv2.cvtColor(ground_truth_viz, cv2.COLOR_BGR2RGB))
+
         false_positive_nuclei = len(predicted_nuclei) - true_positive_nuclei
         false_positive_nors = len(predicted_nors) - true_positive_nors
-        
+
         false_negative_nuclei = len(expected_nuclei) - true_positive_nuclei
         false_negative_nors = len(expected_nors) - true_positive_nors
 

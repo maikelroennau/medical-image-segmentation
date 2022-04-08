@@ -36,6 +36,13 @@ def main():
         type=int)
 
     parser.add_argument(
+        "-v",
+        "--visualization",
+        help="Whether or not to create a visualization showing the differences in respect to the ground truth.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -49,7 +56,8 @@ def main():
         ground_truth_path=args.ground_truth,
         predictions_path=args.predictions,
         output_qualification=args.output,
-        classes=args.classes
+        classes=args.classes,
+        visualization=args.visualization
     )
 
 
