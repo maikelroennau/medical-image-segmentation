@@ -1,14 +1,18 @@
 import argparse
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import Optional
 
+import cv2
 import numpy as np
 from tqdm import tqdm
 
 from utils import contour_analysis
-from utils.data import list_files, load_image, one_hot_encode
+from utils.data import (list_files, load_image, one_hot_encode,
+                        reset_class_values)
+from utils.predict import color_classes
 
 
 def run(
@@ -17,7 +21,10 @@ def run(
     classes: Optional[int] = None,
     record_id: Optional[str] = None,
     record_class: Optional[str] = None,
-    current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S')) -> None:
+    current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S'),
+    copy_images: Optional[bool] = False,
+    grayscale: Optional[bool] = False,
+    measures_only: Optional[bool] = True) -> None:
 
     if isinstance(images, str):
         if Path(images).is_dir():
@@ -30,7 +37,7 @@ def run(
         raise ValueError(f"`images` must be a `str`. Given `{type(images)}`.")
 
     classes_undefined = True if classes is None else False
-    
+
     output_contour_analysis = Path(output_contour_analysis)
     output_contour_analysis.mkdir(exist_ok=True, parents=True)
 
@@ -77,6 +84,37 @@ def run(
                 output_path=output_contour_analysis,
                 datetime=current_time)
 
+        if detail is not None and not measures_only:
+            filtered_objects = output_contour_analysis.joinpath("filtered_objects")
+            filtered_objects.mkdir(exist_ok=True, parents=True)
+
+            cv2.imwrite(str(filtered_objects.joinpath(f"{Path(file).stem}_image_detail.png")), cv2.cvtColor(detail, cv2.COLOR_BGR2RGB))
+
+            if copy_images:
+                image = load_image(image_path=str(file), normalize=False, as_numpy=True, as_gray=True)
+                image = one_hot_encode(image, classes=classes, as_numpy=True)
+                if not grayscale:
+                    image = color_classes(image)
+                image = contour_analysis.draw_contour_lines(image, discarded_parent_contours)
+                cv2.imwrite(str(filtered_objects.joinpath(f"{Path(file).stem}_image.png")), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+        if not measures_only:
+            if grayscale:
+                prediction = reset_class_values(prediction)
+            else:
+                prediction = color_classes(prediction)
+                prediction = cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB)
+
+            cv2.imwrite(str(output_contour_analysis.joinpath(f"{Path(file).stem}_prediction.png")), prediction)
+            if copy_images:
+                if grayscale:
+                    shutil.copyfile(str(file), output_contour_analysis.joinpath(Path(file).name))
+                else:
+                    image = load_image(image_path=str(file), normalize=False, as_numpy=True, as_gray=True)
+                    image = one_hot_encode(image, classes=classes, as_numpy=True)
+                    image = color_classes(image)
+                    cv2.imwrite(str(output_contour_analysis.joinpath(Path(file).name)), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze the contours one or more segmentation masks.")
@@ -96,7 +134,6 @@ def main():
         type=str)
 
     parser.add_argument(
-        "-c",
         "--classes",
         help="Number of classes. Affects the one hot encoding of the masks.",
         default=3,
@@ -113,6 +150,26 @@ def main():
         help="The class the contour measurements belong to.",
         default=None,
         type=str)
+
+    parser.add_argument(
+        "-c",
+        "--copy-images",
+        help="Whether or not to copy the input images to the predictions output directory.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
+        "-g",
+        "--grayscale",
+        help="Whether or not to save predictions as gayscale masks.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
+        "--measures-only",
+        help="Do not save the predicted images or copy the input images to the output path. If `True`, it will override the effect of `output`.",
+        default=False,
+        action="store_true")
 
     parser.add_argument(
         "--multi-measurements",
@@ -136,17 +193,25 @@ def main():
         for directory in directories:
             run(
                 directory,
-                args.output,
-                args.classes,
-                args.record_id,
-                args.record_class)
+                output_contour_analysis=args.output,
+                classes=args.classes,
+                record_id=args.record_id,
+                record_class=args.record_class,
+                copy_images=args.copy_images,
+                grayscale=args.grayscale,
+                measures_only=args.measures_only
+            )
     else:
         run(
-            args.images,
-            args.output,
-            args.classes,
-            args.record_id,
-            args.record_class)
+            images=args.images,
+            output_contour_analysis=args.output,
+            classes=args.classes,
+            record_id=args.record_id,
+            record_class=args.record_class,
+            copy_images=args.copy_images,
+            grayscale=args.grayscale,
+            measures_only=args.measures_only
+        )
 
 
 if __name__ == "__main__":
