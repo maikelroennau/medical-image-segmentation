@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 
 from utils.qualify_segmentation import qualify_segmentation
 
@@ -22,13 +23,6 @@ def main():
         type=str)
 
     parser.add_argument(
-        "-o",
-        "--output",
-        help="The path where to save the qualification information.",
-        default="qualification.csv",
-        type=str)
-
-    parser.add_argument(
         "-c",
         "--classes",
         help="Number of classes. Affects the one hot encoding of the masks.",
@@ -36,28 +30,38 @@ def main():
         type=int)
 
     parser.add_argument(
+        "-o",
+        "--output",
+        help="The path where to save the qualification information.",
+        default="qualification.csv",
+        type=str)
+
+    parser.add_argument(
         "-v",
         "--visualization",
-        help="Whether or not to create a visualization showing the differences in respect to the ground truth.",
-        default=False,
-        action="store_true")
+        help="Path where to save the visualization showing the differences in respect to the ground truth. Does not generate visualization if `None`.",
+        default=None,
+        type=str)
 
     parser.add_argument(
         "-gpu",
         "--gpu",
-        help="What GPU to use. Pass `-1` to use CPU.",
-        default="0")
+        help="What GPU to use. Pass the GPU id to use GPU.",
+        default="-1")
 
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
+    if args.output == "qualification.csv":
+        args.output = Path(args.predictions).joinpath(args.output)
+
     qualify_segmentation(
         ground_truth_path=args.ground_truth,
         predictions_path=args.predictions,
-        output_qualification=args.output,
         classes=args.classes,
-        visualization=args.visualization
+        output_qualification=args.output,
+        output_visualization=args.visualization
     )
 
 
