@@ -278,26 +278,25 @@ def draw_contour_lines(image: np.ndarray, contours: List[np.ndarray], type: Opti
         np.ndarray: The image with the contours drawn on it.
     """
     if type == "multiple":
-        for discarded_contour in contours:
-            contour = np.zeros(image.shape, dtype=np.uint8)
-            contour_convex = np.zeros(image.shape, dtype=np.uint8)
+        contour = np.zeros(image.shape, dtype=np.uint8)
+        contour_convex = np.zeros(image.shape, dtype=np.uint8)
 
-            cv2.drawContours(contour, contours=[discarded_contour], contourIdx=-1, color=[1, 1, 1], thickness=1)
-            cv2.drawContours(
-                contour_convex, contours=[cv2.convexHull(discarded_contour)], contourIdx=-1, color=[1, 1, 1], thickness=1)
+        cv2.drawContours(contour, contours=contours, contourIdx=-1, color=[1, 1, 1], thickness=1)
+        cv2.drawContours(
+            contour_convex, contours=[cv2.convexHull(discarded_contour) for discarded_contour in contours], contourIdx=-1, color=[1, 1, 1], thickness=1)
 
-            diff = contour + contour_convex
-            diff[diff < 2] = 0
-            diff[diff == 2] = 1
+        diff = contour + contour_convex
+        diff[diff < 2] = 0
+        diff[diff == 2] = 1
 
-            # Yellow = Smoothed contour
-            cv2.drawContours(image, contours=[discarded_contour], contourIdx=-1, color=[255, 255, 0], thickness=1)
-            # Cyan = Convex hull of the smoothed contour
-            cv2.drawContours(
-                image, contours=[cv2.convexHull(discarded_contour)], contourIdx=-1, color=[0, 255, 255], thickness=1)
+        # Yellow = Smoothed contour
+        cv2.drawContours(image, contours=contours, contourIdx=-1, color=[255, 255, 0], thickness=1)
+        # Cyan = Convex hull of the smoothed contour
+        cv2.drawContours(
+            image, contours=[cv2.convexHull(discarded_contour) for discarded_contour in contours], contourIdx=-1, color=[0, 255, 255], thickness=1)
 
-            # White = Smoothed contour equals to Convex hull of the smoothed contour
-            image = np.where(diff > 0, [255, 255, 255], image)
+        # White = Smoothed contour equals to Convex hull of the smoothed contour
+        image = np.where(diff > 0, [255, 255, 255], image)
     elif type == "single":
         image = cv2.drawContours(image, contours=contours, contourIdx=-1, color=[255, 255, 255], thickness=1)
     else:
