@@ -56,6 +56,57 @@ def get_intersection(
     return iou
 
 
+def get_false_positive_contours(
+    ground_truth_contours: List[np.ndarray],
+    predicted_contours: List[np.ndarray],
+    shape: Tuple[int, int],
+    drop: bool = False) -> Union[list, list]:
+    """Gets the false positive contours based on the ground truth contours.
+
+    Args:
+        ground_truth_contours (List[np.ndarray]): List containing the ground truth contours.
+        predicted_contours (List[np.ndarray]): List containing the predicted contours.
+        shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
+        drop (bool): Whether to drop contours from `ground_truth_contours` after evaluation. Defaults to False.
+
+    Returns:
+        Union[list, list]: The false positive contorus.
+    """
+
+    false_positives = []
+
+    if drop:
+        ground_truth_contours = { str(key): value for key, value in enumerate(ground_truth_contours) }
+
+        for predicted_contour in predicted_contours:
+            if len(ground_truth_contours) == 0:
+                break
+
+            intersected = False
+            for key, ground_truth_contour in ground_truth_contours.items():
+                intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
+                if np.round(intersection, 2) > 0.:
+                    intersected = True
+                    ground_truth_contours.pop(key)
+                    break
+
+            if not intersected:
+                false_positives.append(predicted_contour)
+    else:
+        for predicted_contour in predicted_contours:
+            intersected = False
+            for ground_truth_contour in ground_truth_contours:
+                intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
+                if np.round(intersection, 2) > 0.:
+                    intersected = True
+                    break
+
+            if not intersected:
+                false_positives.append(predicted_contour)
+
+    return false_positives
+
+
 def count_intersect_contours(
     ground_truth_contours: List[np.ndarray],
     predicted_contours: List[np.ndarray],
@@ -72,8 +123,8 @@ def count_intersect_contours(
     Returns:
         Union[int, int]: A tuple where the first element is the number of predicted contours intersecting with the ground truth contours (true positives), and the second number is the number of contours that were predicted but are not in the ground truth (false positives).
     """
+    intersecting_contours = 0
     if drop:
-        intersecting_contours = 0
         ground_truth_contours = { str(key): value for key, value in enumerate(ground_truth_contours) }
 
         for predicted_contour in predicted_contours:
@@ -91,7 +142,6 @@ def count_intersect_contours(
             if intersected:
                 intersecting_contours += 1
     else:
-        intersecting_contours = 0
         for predicted_contour in predicted_contours:
             intersected = False
             for ground_truth_contour in ground_truth_contours:
@@ -144,8 +194,6 @@ def qualify_segmentation(
 
     classes_undefined = True if classes is None else False
     data = []
-
-    predictions_path = Path(predictions_path)
 
     if output_visualization is not None:
         output_visualization = Path(output_visualization)
