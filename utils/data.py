@@ -6,6 +6,8 @@ import tensorflow as tf
 from skimage.io import imread
 from tqdm import tqdm
 
+from utils.contour_analysis import get_contours
+
 
 SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
 
@@ -42,7 +44,15 @@ def one_hot_encode(image: Union[np.ndarray, tf.Tensor], classes: int, as_numpy: 
     """
     if isinstance(image, np.ndarray):
         one_hot_encoded = np.zeros(image.shape[:2] + (classes,), dtype=np.uint8)
-        for i, unique_value in enumerate(np.unique(image)):
+
+        unique_values = np.unique(image)
+        if len(unique_values) > classes:
+            image = reset_class_values(image)
+            unique_values = np.unique(image)
+            if len(unique_values) > classes:
+                raise ValueError(f"Image contains {len(unique_values)} classes. Argument `classes` specifies {classes} classes.")
+
+        for i, unique_value in enumerate():
             one_hot_encoded[:, :, i][image == unique_value] = 1
         return one_hot_encoded
     elif isinstance(image, tf.Tensor):
@@ -116,13 +126,13 @@ def load_image(
                 return image
         else:
             raise FileNotFoundError(f"The file `{image_path}` was not found.")
-    elif isinstance(image_path, tf.Tensor):
+    elif isinstance(image_path, tf.Tensor) or isinstance(image_path, bytes):
         channels = 1 if as_gray else 3
         image = tf.io.read_file(image_path)
         image = tf.image.decode_png(image, channels=channels)
 
-        if shape:
-            if shape != image.shape[:2]:
+        if shape is not None:
+            if shape[0] != image.shape[0] or shape[1] != image.shape[1]:
                 image = tf.image.resize(image, shape, method="nearest")
 
         if normalize:
@@ -131,7 +141,7 @@ def load_image(
 
         return image
     else:
-        raise TypeError("Object `{image_path}` is not supported.")
+        raise TypeError(f"Object `{image_path}` is not supported.")
 
 
 def list_files(files_path: str, as_numpy: Optional[bool] = False, seed: Optional[int] = 1234) -> tf.raw_ops.ShuffleDataset:
@@ -192,6 +202,18 @@ def load_dataset_files(
     return image, mask
 
 
+def get_object_counts(mask_path, shape, classes):
+    mask = load_image(mask_path, shape=shape, as_gray=True)
+    mask = one_hot_encode(mask, classes=classes, as_numpy=True)
+    n_nuclei = len(get_contours(mask[:, :, 1]))
+    n_nors = len(get_contours(mask[:, :, 2]))
+    return np.array([n_nuclei, n_nors], dtype=np.int32)
+
+
+def map_shape(counts):
+    return tf.ensure_shape(counts, [2])
+
+
 def load_dataset(
     dataset_path: str,
     batch_size: Optional[int] = 1,
@@ -229,10 +251,13 @@ def load_dataset(
         if not masks_path.is_dir():
             raise FileNotFoundError(f"The directory `{str(masks_path)}` does not exist.")
 
-        images_list = list_files(str(images_path))
-        masks_list = list_files(str(masks_path))
+        images_list = list_files(str(images_path), as_numpy=True)
+        masks_list = list_files(str(masks_path), as_numpy=True)
 
-        dataset = tf.data.Dataset.zip((images_list, masks_list))
+        dataset = tf.data.Dataset.zip((
+            tf.data.Dataset.from_tensor_slices(images_list),
+            tf.data.Dataset.from_tensor_slices(masks_list)
+        ))
 
         dataset = dataset.map(
             lambda image_path, mask_path: load_dataset_files(
@@ -244,6 +269,17 @@ def load_dataset(
             )
         )
 
+        count_dataset = tf.data.Dataset.from_tensor_slices(masks_list)
+        count_dataset = count_dataset.map(
+            lambda mask_path: tf.numpy_function(get_object_counts, [mask_path, shape, classes], Tout=tf.int32)
+        )
+        count_dataset = count_dataset.map(map_shape)
+
+        images = dataset.map(lambda x, y: x)
+        masks = dataset.map(lambda x, y: y)
+
+        dataset = tf.data.Dataset.zip((images, {"softmax": masks, "nuclei_nor_counts": count_dataset}))
+
         if shuffle:
             dataset = dataset.shuffle(buffer_size=batch_size * batch_size)
 
@@ -252,6 +288,7 @@ def load_dataset(
 
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(buffer_size=1)
+
         return dataset
     else:
         raise FileNotFoundError(f"The directory `{str(dataset_path)}` does not exist.")

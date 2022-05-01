@@ -13,8 +13,11 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 from utils.data import list_files, load_dataset
-from utils.model import load_model, make_model
-from utils.utils import add_time_delta, evaluate, get_duration, plot_metrics
+from utils.evaluate import evaluate
+from utils.model import METRICS, load_model, make_model
+from utils.utils import add_time_delta, get_duration, plot_metrics
+
+sm.set_framework("tf.keras")
 
 
 def show_train_config(
@@ -63,7 +66,7 @@ def show_train_config(
 
     print(f"  - Dataset:")
     print(f"    - Train: {train_config['train_dataset']} ({train_config['train_samples']} samples)")
-    print(f"    - Validation: {train_config['validation_dataset']} ({train_config['validation_samples']} samples)")
+    # print(f"    - Validation: {train_config['validation_dataset']} ({train_config['validation_samples']} samples)")
     print(f"    - Test: {train_config['test_dataset']} ({train_config['test_samples']} samples)\n")
 
 
@@ -163,7 +166,20 @@ def train(
     elif loss == "categorical":
         loss_function = sm.losses.categorical_crossentropy
 
-    metrics = [sm.metrics.f1_score, sm.metrics.iou_score]
+    losses = {
+        "softmax": loss_function,
+        "nuclei_nor_counts": "mse",
+    }
+
+    loss_weights = {
+        "softmax": 1.0,
+        "nuclei_nor_counts": 1.0
+    }
+
+    metrics = {
+        "softmax": METRICS,
+        "nuclei_nor_counts": "mae"
+    }
 
     if resume:
         checkpoint_directory = Path(resume).parent
@@ -172,12 +188,13 @@ def train(
         checkpoint_directory.mkdir(exist_ok=True, parents=True)
 
     if save_all:
-        checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"))
+        # checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{loss:.4f}_vl{val_loss:.4f}.h5"))
+        checkpoint_model = str(checkpoint_directory.joinpath(model_name + "_e{epoch:03d}_l{softmax_loss:.4f}.h5"))
     else:
         checkpoint_model = str(checkpoint_directory.joinpath(model_name + ".h5"))
 
     train_dataset_path = Path(dataset).joinpath('train')
-    validation_dataset_path = Path(dataset).joinpath('validation')
+    # validation_dataset_path = Path(dataset).joinpath('validation')
     test_dataset_path = Path(dataset).joinpath('test')
 
     train_dataset = load_dataset(
@@ -190,15 +207,15 @@ def train(
         shuffle=True
     )
 
-    validation_dataset = load_dataset(
-        dataset_path=str(validation_dataset_path),
-        batch_size=1,
-        shape=(height, width),
-        classes=classes,
-        mask_one_hot_encoded=one_hot_encoded,
-        repeat=False,
-        shuffle=True
-    )
+    # validation_dataset = load_dataset(
+    #     dataset_path=str(validation_dataset_path),
+    #     batch_size=1,
+    #     shape=(height, width),
+    #     classes=classes,
+    #     mask_one_hot_encoded=one_hot_encoded,
+    #     repeat=False,
+    #     shuffle=True
+    # )
 
     train_config_path = str(checkpoint_directory.joinpath(f"train_config_{checkpoint_directory.name}.json"))
     train_config = {
@@ -217,10 +234,10 @@ def train(
         "gpu": str(gpu),
         "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
         "train_dataset": str(train_dataset_path),
-        "validation_dataset": str(validation_dataset_path),
+        # "validation_dataset": str(validation_dataset_path),
         "test_dataset": str(test_dataset_path),
         "train_samples": len(list_files(train_dataset_path.joinpath("images"), as_numpy=True)),
-        "validation_samples": len(list_files(validation_dataset_path.joinpath("images"), as_numpy=True)),
+        # "validation_samples": len(list_files(validation_dataset_path.joinpath("images"), as_numpy=True)),
         "test_samples": len(list_files(test_dataset_path.joinpath("images"), as_numpy=True)),
         "save_all": save_all,
         "model_name": model_name,
@@ -240,9 +257,9 @@ def train(
 
     callbacks = [
         tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
+            monitor="softmax_f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
         tf.keras.callbacks.ModelCheckpoint(
-            checkpoint_model, monitor="val_f1-score", mode="max", save_best_only=False if save_all else True),
+            checkpoint_model, monitor="softmax_f1-score", mode="max", save_best_only=False if save_all else True),
         # tf.keras.callbacks.TensorBoard(
         #     log_dir=str(checkpoint_directory.joinpath("logs")), histogram_freq=1, update_freq="batch", write_images=False)
     ]
@@ -267,7 +284,7 @@ def train(
                         train_dataset,
                         epochs=epochs,
                         steps_per_epoch=steps_per_epoch,
-                        validation_data=validation_dataset,
+                        # validation_data=validation_dataset,
                         initial_epoch=int(resume_epoch),
                         callbacks=callbacks)
                 else:
@@ -279,7 +296,7 @@ def train(
                         train_dataset,
                         epochs=epochs,
                         steps_per_epoch=steps_per_epoch,
-                        validation_data=validation_dataset,
+                        # validation_data=validation_dataset,
                         callbacks=callbacks)
         else:
             if resume:
@@ -288,6 +305,17 @@ def train(
                     input_shape=input_shape,
                     loss_function=loss_function,
                     optimizer=Adam(learning_rate=learning_rate))
+
+                flatten = tf.keras.layers.Flatten()(model.layers[594].output)
+                count_layer = tf.keras.layers.Dense(2, name="nuclei_nor_counts")(flatten)
+                model = tf.keras.Model(
+                    name=model.name,
+                    inputs=[model.input],
+                    outputs=[model.layers[-1].output, count_layer]
+                )
+
+                model.compile(optimizer=Adam(learning_rate=learning_rate), loss=losses, loss_weights=loss_weights, metrics=metrics)
+
                 model.summary()
                 show_train_config(train_config, start_time)
 
@@ -295,7 +323,7 @@ def train(
                     train_dataset,
                     epochs=epochs,
                     steps_per_epoch=steps_per_epoch,
-                    validation_data=validation_dataset,
+                    # validation_data=validation_dataset,
                     initial_epoch=int(resume_epoch),
                     callbacks=callbacks)
             else:
@@ -307,7 +335,7 @@ def train(
                     train_dataset,
                     epochs=epochs,
                     steps_per_epoch=steps_per_epoch,
-                    validation_data=validation_dataset,
+                    # validation_data=validation_dataset,
                     callbacks=callbacks)
     except Exception as e:
         print(f"\nThere was an error during training that caused it to stop: \n{e}")
@@ -330,7 +358,12 @@ def train(
         if "train_metrics" in train_config.keys():
             for k, v in history_data.items():
                 v = [float(i) for i in v]
-                train_config["train_metrics"][k].extend(v)
+                if k in train_config["train_metrics"].keys():
+                    train_config["train_metrics"][k].extend(v)
+                else:
+                    nan_history = np.zeros(epochs)
+                    nan_history[-len(v):] = v
+                    train_config["train_metrics"][k] = list(nan_history)
         else:
             train_config["train_metrics"] = {}
             for k, v in history_data.items():
@@ -349,7 +382,7 @@ def train(
             classes=classes,
             one_hot_encoded=one_hot_encoded,
             input_shape=(1920, 2560, 3), # TODO: Update to be the same value specified in the arguments.
-            loss_function=loss_function,
+            loss_function=losses,
             model_name=model_name)
 
         if best_model is not None or models_metrics is not None:
