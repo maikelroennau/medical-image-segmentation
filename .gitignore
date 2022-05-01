@@ -136,3 +136,5 @@ dataset/**
 
 # Models
 *.h5
+*_prediction.png
+*_image_detail.png
