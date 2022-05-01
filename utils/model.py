@@ -40,7 +40,7 @@ def replace_model_input_shape(model: tf.keras.Model, new_input_shape: Tuple[int,
 
     Args:
         model (tf.keras.Model): The model to have its input shape replaced.
-        new_input_shape (Tuple[int, int]): The new input shape in the format `(height, width, channels)`.
+        new_input_shape (Tuple[int, int, int]): The new input shape in the format `(height, width, channels)`.
 
     Returns:
         tf.keras.Model: The model with the updated input shape.
@@ -61,7 +61,7 @@ def replace_model_input_shape(model: tf.keras.Model, new_input_shape: Tuple[int,
 def make_model(
     backbone: str,
     decoder: str,
-    input_shape: Tuple[int],
+    input_shape: Tuple[int, int, int],
     classes: int,
     learning_rate: float,
     loss_function: str,
@@ -74,7 +74,7 @@ def make_model(
     Args:
         backbone (str): The backbone of the model.
         decoder (str): The decoder of the model.
-        input_shape (Tuple[int]): The input shape of the model in the format `(HEIGHT, WIDTH, CHANNELS)`.
+        input_shape (Tuple[int, int, int]): The input shape of the model in the format `(HEIGHT, WIDTH, CHANNELS)`.
         classes (int): The number of classes the model must predict.
         learning_rate (float): The learning rate to use to train the model.
         loss_function (str): The loss function to be used by the model. Should be a callable or a string supported by TensorFlow.
@@ -145,7 +145,7 @@ def make_model(
 
 def load_model(
     model_path: str,
-    input_shape: Tuple[int, int] = None,
+    input_shape: Tuple[int, int, int] = None,
     loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
     optimizer: Optional[tf.keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
     compile: Optional[bool] = True) -> tf.keras.Model:
@@ -153,7 +153,7 @@ def load_model(
 
     Args:
         model_path (str): The path to the model file.
-        input_shape (Tuple[int, int], optional): The input shape the loaded model should have. If not `None`, the function `update_model_input_shape` gets called. Defaults to None.
+        input_shape (Tuple[int, int, int], optional): The input shape the loaded model should have in format `(HEIGHT, WIDTH, CHANNELS)`. If not `None`, the function `update_model_input_shape` gets called. Defaults to None.
         loss_function (sm.losses.Loss, optional): The loss function of the model. Defaults to sm.losses.cce_dice_loss.
         optimizer (tf.keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
         compile (bool, optional): If false, does not compile the loaded model before returning it. Defaults to True.
@@ -181,7 +181,7 @@ def load_model(
 
 def load_models(
     model_path: str,
-    input_shape: Tuple[int, int] = None,
+    input_shape: Tuple[int, int, int] = None,
     loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
     optimizer: Optional[tf.keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
     compile: Optional[bool] = True) -> Union[List[tf.keras.Model], List[str]]:
@@ -189,7 +189,7 @@ def load_models(
 
     Args:
         model_path (str): The path to a directory containing one or more `tf.keras.Model` files. If path is a file, it must be a `.h5` model file.
-        input_shape (Tuple[int, int], optional): The input shape the loaded model should have. If not `None`, the function `update_model_input_shape` gets called. Defaults to None.
+        input_shape (Tuple[int, int, int], optional): The input shape the loaded models should have in format `(HEIGHT, WIDTH, CHANNELS)`. If not `None`, the function `update_model_input_shape` gets called. Defaults to None.
         loss_function (sm.losses.Loss, optional): The loss function of the model. Defaults to sm.losses.cce_dice_loss.
         optimizer (tf.keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
         compile (bool, optional): If false, does not compile the loaded model before returning it. Defaults to True.
