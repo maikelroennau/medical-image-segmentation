@@ -44,14 +44,19 @@ def patch_predict(
         y_range = range(0, width, patch_shape[1])
 
         patch_prediction = np.zeros(image.shape)
+        counts = np.zeros((2,))
 
         for x in x_range:
             for y in y_range:
                 slice = image[x:x+patch_shape[0], y:y+patch_shape[1]]
                 batch = slice.reshape((1,) + slice.shape)
-                patch_prediction[x:x+patch_shape[0], y:y+patch_shape[1]] = model(batch, training=False)[0].numpy()
+                prediction = model(batch, training=False)
+                
+                segmentation = prediction[0][0].numpy()              
+                patch_prediction[x:x+patch_shape[0], y:y+patch_shape[1]] = segmentation
+                counts += prediction[1][0].numpy()
 
-        return patch_prediction
+        return patch_prediction, counts.astype(np.int8)
 
 
 def predict(
@@ -105,6 +110,10 @@ def predict(
     elif not isinstance(model, tf.keras.Model):
         raise ValueError(f"`model` must be a `str` or `tf.keras.Model`. Given `{type(model)}`.")
 
+    # model = tf.keras.Model(
+    #     inputs=[model.layers[0].input],
+    #     outputs=[model.layers[-1].output, model.layers[-2].output])
+
     if not input_shape:
         input_shape = get_model_input_shape(model)
 
@@ -118,11 +127,30 @@ def predict(
         image = load_image(image_path=file, normalize=normalize, as_numpy=True)
 
         if image.shape != input_shape:
-            prediction = patch_predict(model, image, input_shape)
+            prediction, counts = patch_predict(model, image, input_shape)
         else:
             batch = image.reshape((1,) + image.shape)
-            prediction = model(batch, training=False)[0].numpy()
+            # prediction = model(batch, training=False)[0].numpy()
+            # prediction = model(batch, training=False)
+            result = model(batch, training=False)
+            prediction = result[0][0].numpy()
+            counts = result[1][0].numpy()
 
+        # file = Path(file)
+        # output_predictions.joinpath("softmax").mkdir(exist_ok=True, parents=True)
+        # output_predictions.joinpath("activations").mkdir(exist_ok=True, parents=True)
+        
+        # softmax = prediction[0][0].numpy()
+        # activation = prediction[1][0].numpy()
+        # activation = (activation - activation.min()) / (activation.max() - activation.min())
+        
+        # softmax = cv2.cvtColor(softmax, cv2.COLOR_BGR2RGB)
+        # activation = cv2.cvtColor(activation, cv2.COLOR_BGR2RGB)
+
+        # cv2.imwrite(str(output_predictions.joinpath("softmax").joinpath(f"{file.stem}_prediction.png")), softmax * 127)
+        # cv2.imwrite(str(output_predictions.joinpath("activations").joinpath(f"{file.stem}_prediction.png")), activation * 255)
+
+        # prediction = collapse_probabilities(prediction=prediction[0][0].numpy(), pixel_intensity=127)
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
 
         file = Path(file)
@@ -182,6 +210,7 @@ def predict(
                 prediction = color_classes(prediction)
                 prediction = cv2.cvtColor(prediction, cv2.COLOR_BGR2RGB)
 
-            cv2.imwrite(str(output_predictions.joinpath(f"{file.stem}_prediction.png")), prediction)
+            cv2.imwrite(str(output_predictions.joinpath(
+                f"{file.stem}_prediction_n_nuclei_{int(np.round(counts[0]))}_n_nors_{int(np.round(counts[1]))}.png")), prediction)
             if copy_images:
                 shutil.copyfile(str(file), output_predictions.joinpath(file.name))

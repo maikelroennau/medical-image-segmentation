@@ -6,9 +6,10 @@ from typing import List, Optional, Tuple
 import numpy as np
 import segmentation_models as sm
 from tqdm import tqdm
+import tensorflow as tf
 
 from utils.data import list_files, load_dataset, load_image, one_hot_encode
-from utils.model import METRICS, load_model
+from utils.model import CUSTOM_OBJECTS, METRICS, load_model
 
 
 def evaluate_from_files(
@@ -122,7 +123,29 @@ def evaluate(
 
     for i, model_path in enumerate(models_paths):
         model = load_model(model_path=model_path, input_shape=input_shape, loss_function=loss_function)
-        evaluation_metrics = model.evaluate(evaluate_dataset, return_dict=True)
+        # evaluation_metrics = model.evaluate(evaluate_dataset, return_dict=True)
+        
+        METRICS.append(CUSTOM_OBJECTS["categorical_crossentropy_plus_dice_loss"])
+        evaluation_metrics = { metric.name: [] for metric in METRICS }
+        evaluation_metrics["mae"] = []
+
+        for input_image, expected_results in evaluate_dataset:
+            prediction = model(input_image, training=False)
+            segmentation = prediction[0]
+
+            for metric in METRICS:
+                evaluation_metrics[metric.name].append(metric(expected_results["softmax"], segmentation).numpy())
+
+            count = prediction[1]
+            mae = tf.keras.metrics.MeanAbsoluteError()
+            mae.update_state(expected_results["nuclei_nor_counts"], count)
+            evaluation_metrics["mae"].append(mae.result().numpy())
+        
+        for key in evaluation_metrics.keys():
+            evaluation_metrics[key] = np.round(np.mean(evaluation_metrics[key]), 4)
+
+        evaluation_metrics["loss"] = evaluation_metrics["categorical_crossentropy_plus_dice_loss"]
+        evaluation_metrics.pop("categorical_crossentropy_plus_dice_loss")
 
         print(f"Model {str(model_path)}")
         print(f"  - Loss: {np.round(evaluation_metrics['loss'], 4)}")
@@ -140,7 +163,8 @@ def evaluate(
         for metric, value in evaluation_metrics.items():
             if metric != "loss":
                 if len(model_path.split(model_name)[1].split("_")[1:]) > 0:
-                    models_metrics[f"test_{metric}"][int(str(model_path).split(model_name)[1].split("_")[1][1:])-1] = value
+                    if f"test_{metric}" in models_metrics:
+                        models_metrics[f"test_{metric}"][int(str(model_path).split(model_name)[1].split("_")[1][1:])-1] = value
                 else:
                     models_metrics[f"test_{metric}"][-1] = value
 

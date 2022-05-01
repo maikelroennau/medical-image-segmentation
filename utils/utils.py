@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import json
 from pathlib import Path
 from typing import Optional, Tuple, Union
@@ -79,22 +80,28 @@ def plot_metrics(
     if metrics.is_file():
         with metrics.open() as f:
             metrics_file = json.load(f)
-
+        print(metrics_file)
         metrics_data = {
             "Training metrics": {
-                "loss": metrics_file["train_metrics"]["loss"],
-                "f1-score": metrics_file["train_metrics"]["f1-score"],
-                "iou-score": metrics_file["train_metrics"]["iou_score"]
+                "segmentation_loss": metrics_file["train_metrics"]["softmax_loss"],
+                "counts_loss": metrics_file["train_metrics"]["nuclei_nor_counts_loss"],
+                "f1-score": metrics_file["train_metrics"]["softmax_f1-score"],
+                "iou-score": metrics_file["train_metrics"]["softmax_iou_score"],
+                "counts_mae": metrics_file["train_metrics"]["nuclei_nor_counts_mae"]
             },
             "Validation metrics": {
-                "val_loss": metrics_file["train_metrics"]["val_loss"],
-                "val_f1-score": metrics_file["train_metrics"]["val_f1-score"],
-                "val_iou-score": metrics_file["train_metrics"]["val_iou_score"]
+                "val_segmentation_loss": metrics_file["validation_metrics"]["val_softmax_loss"],
+                "val_counts_loss": metrics_file["validation_metrics"]["val_nuclei_nor_counts_loss"],
+                "val_f1-score": metrics_file["validation_metrics"]["val_f1-score"],
+                "val_iou-score": metrics_file["validation_metrics"]["val_iou_score"],
+                "val_counts_mae": metrics_file["validation_metrics"]["val_nuclei_nor_counts_mae"]
             },
             "Test metrics": {
-                "test_loss": metrics_file["test_metrics"]["test_loss"],
-                "test_f1-score": metrics_file["test_metrics"]["test_f1-score"],
-                "test_iou-score": metrics_file["test_metrics"]["test_iou_score"]
+                "test_segmentation_loss": metrics_file["test_metrics"]["softmax_test_softmax_loss"],
+                "test_counts_loss": metrics_file["test_metrics"]["softmax_test_nuclei_nor_counts_loss"],
+                "test_f1-score": metrics_file["test_metrics"]["softmax_test_f1-score"],
+                "test_iou-score": metrics_file["test_metrics"]["softmax_test_iou_score"],
+                "test_counts_mae": metrics_file["test_metrics"]["softmax_test_nuclei_nor_counts_mae"]
             },
             "Learning rage": {
                 "lr": metrics_file["train_metrics"]["lr"]
@@ -107,27 +114,32 @@ def plot_metrics(
             output_path = Path(metrics.parent)
         output_path.mkdir(exist_ok=True, parents=True)
 
-        for i, (title, data) in enumerate(metrics_data.items()):
-            df = pd.DataFrame(data)
-            df.index = range(1, len(df.index) + 1)
+        i = 0
+        for title, data in metrics_data.items():
+            try:
+                df = pd.DataFrame(data)
+                df.index = range(1, len(df.index) + 1)
 
-            image = df.plot(grid=True, figsize=figsize)
-            image.set(xlabel="Epoch", title=title)
-            image.set_ylim(ymin=0)
+                image = df.plot(grid=True, figsize=figsize)
+                image.set(xlabel="Epoch", title=title)
+                image.set_ylim(ymin=0)
 
-            for column in df.columns:
-                if "loss" in column:
-                    text = f"e{np.argmin(list(df[column])) + 1}"
-                    value = (np.argmin(list(df[column])) + 1, df[column].min())
-                else:
-                    text = f"e{np.argmax(list(df[column])) + 1}"
-                    value = (np.argmax(list(df[column])) + 1, df[column].max())
+                for column in df.columns:
+                    if "loss" in column:
+                        text = f"e{np.argmin(list(df[column])) + 1}"
+                        value = (np.argmin(list(df[column])) + 1, df[column].min())
+                    else:
+                        text = f"e{np.argmax(list(df[column])) + 1}"
+                        value = (np.argmax(list(df[column])) + 1, df[column].max())
 
-                if column != "lr":
-                    image.annotate(text, value, arrowprops=dict(facecolor='black', shrink=0.05))
+                    if column != "lr":
+                        image.annotate(text, value, arrowprops=dict(facecolor='black', shrink=0.05))
 
-            image = image.get_figure()
-            image.savefig(str(output_path.joinpath(f"0{i+1}_{title.lower().replace('', '')}.png")))
+                image = image.get_figure()
+                image.savefig(str(output_path.joinpath(f"0{i+1}_{title.lower().replace('', '')}.png")))
+                i += 1
+            except:
+                pass
 
 
 def compute_classes_distribution(
@@ -257,4 +269,19 @@ def pad_along_axis(array: np.ndarray, size: int, axis: int = 0, mode="reflect"):
     npad = [(0, 0)] * array.ndim
     npad[axis] = (0, pad_size)
 
-    return np.pad(array, pad_width=npad, mode="reflect")
+    return np.pad(array, pad_width=npad, mode=mode)
+
+
+def get_hash_file(path: str) -> str:
+    """Obtains the hash of the a file.
+
+    Args:
+        path (str): The path to the file.
+
+    Returns:
+        str: The file hash.
+    """
+    with open(path, "rb") as f:
+        bytes = f.read()
+        hash_file = hashlib.sha256(bytes).hexdigest()
+    return hash_file
