@@ -164,8 +164,8 @@ def discard_contours_by_size(
     discarded = []
     for contour in contours:
         contour_pixel_count = get_contour_pixel_count(contour, shape=shape)
-        mim_pixel_count = int((min_relative_pixel_count * max_pixel_count) / 100)
-        if mim_pixel_count <= contour_pixel_count and contour_pixel_count <= max_pixel_count:
+        min_pixel_count = int((min_relative_pixel_count * max_pixel_count) / 100)
+        if min_pixel_count <= contour_pixel_count and contour_pixel_count <= max_pixel_count:
             kept.append(contour)
         else:
             discarded.append(contour)
