@@ -13,8 +13,9 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 from utils.data import list_files, load_dataset
+from utils.evaluate import evaluate
 from utils.model import load_model, make_model
-from utils.utils import add_time_delta, evaluate, get_duration, plot_metrics
+from utils.utils import add_time_delta, get_duration, plot_metrics
 
 
 def show_train_config(
