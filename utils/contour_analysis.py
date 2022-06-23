@@ -17,16 +17,21 @@ NUCLEUS_COLUMNS = [
     "class",
     "flag",
     "nucleus",
-    "nucleus_pixel_count"]
+    "nucleus_pixel_count",
+    "type"]
 
-NOR_COLUMNS = [
+AGNOR_COLUMNS = [
     "patient_id",
     "source_image",
     "class",
     "flag",
     "nucleus",
-    "nor",
-    "nor_pixel_count"]
+    "agnor",
+    "agnor_pixel_count",
+    "agnor_type",
+    "nucleus_ratio",
+    "greatest_cluster_ratio",
+    "smallest_cluster_ratio"]
 
 CLASSES = [
     "control",
@@ -107,7 +112,7 @@ def get_contour_pixel_count(contour: np.ndarray, shape: List[np.ndarray]) -> int
     Returns:
         int: The number of pixels in the contour.
     """
-    image = np.zeros(shape)
+    image = np.zeros(shape, dtype=np.uint8)
     cv2.drawContours(image, contours=[contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
     return int(image.sum())
 
@@ -269,7 +274,7 @@ def draw_contour_lines(image: np.ndarray, contours: List[np.ndarray], type: Opti
     Args:
         image (np.ndarray): The image to draw the contours on.
         contours (List[np.ndarray]): The list of the contours to be drawn.
-        type (Optional[str]): The type of contorus to draw. If `multiple`, draws the segmented contour, the convex hull contour and the overlapp between the segmented and convex contours. If `single`, draws only the segmented contour. Defaults to "multiple".
+        type (Optional[str]): The type of contours to draw. If `multiple`, draws the segmented contour, the convex hull contour and the overlaps between the segmented and convex contours. If `single`, draws only the segmented contour. Defaults to "multiple".
 
     Raises:
         ValueError: If `type` is not in [`multiple`, `single`].
@@ -312,11 +317,10 @@ def analyze_contours(
 
     Args:
         mask (Union[np.ndarray, tf.Tensor]): The mask containing the contours to be analyzed.
-        smooth (Optional[bool], optional): Whether or not to smooth the contours..
+        smooth (Optional[bool], optional): Whether or not to smooth the contours.
 
     Returns:
-        Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray]]: The first tuple contrains the updated mask, and the nuclei and NORs contours. The second one contains mask with the discarded nuclei contours, and the discarded nuclei and NORs contours.
-        and the detail mask showing discarded objects and their contour analysis.
+        Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray]]: The first tuple contains the updated mask, and the nuclei and NORs contours. The second one contains the image with the discarded nuclei contours and AgNORs, and the discarded nuclei and NORs contours.
     """
     # Obtain and filter nuclei and NORs contours
     nuclei_contours = get_contours(mask[:, :, 1] + mask[:, :, 2])
@@ -351,7 +355,7 @@ def analyze_contours(
     updated_mask = np.stack([background, nucleus, nor], axis=2).astype(np.uint8)
 
     contour_detail = mask.copy()
-    contour_detail = color_classes(contour_detail)
+    contour_detail = color_classes(contour_detail).copy()
 
     if len(nuclei_size_discarded) > 0:
         contour_detail = draw_contour_lines(contour_detail, nuclei_size_discarded, type="single")
@@ -378,8 +382,12 @@ def get_contour_measurements(
     child_contours: List[np.ndarray],
     shape: Tuple[int, int],
     mask_name: str,
+    min_contour_size: Optional[int] = None,
+    max_contour_size: Optional[int] = None,
+    parent_type: Optional[str] = "nucleus",
+    child_type: Optional[str] = "cluster",
     record_id: Optional[str] = "unknown",
-    record_class: Optional[str] = "unknown class",
+    record_class: Optional[str] = "unknown",
     start_index: Optional[int] = 0,
     contours_flag: Optional[str] = "valid") -> Union[List[dict], List[dict]]:
     """Calculate the number of pixels per contour and create a record for each of them.
@@ -387,12 +395,16 @@ def get_contour_measurements(
     Args:
         parent_contours (List[np.ndarray]): The parent contours.
         child_contours (List[np.ndarray]): The child contours.
-        shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
-        mask_name (str): The name of the mask from where the contorus were extracted.
-        record_id (Optional[str]): The unique ID of the record. Defaults to "unknown",
+        shape (Tuple[int, int]): The dimensions of the image from where the contours were extracted, in the format `(HEIGHT, WIDTH)`.
+        mask_name (str): The name of the mask from where the contours were extracted.
+        min_contour_size (Optional[int], optional): Pixel count of the smallest `cluster`. Defaults to None.
+        max_contour_size (Optional[int], optional): Pixel count of the greatest `cluster`. Defaults to None.
+        parent_type (Optional[str], optional): The type of the parent contour. Defaults to "nucleus".
+        child_type (Optional[str], optional): The type of the child contour. Usually one of `["cluster", "satellite"]`. Defaults to "cluster".
+        record_id (Optional[str]): The unique ID of the record. Defaults to "unknown".
         record_class (Optional[str]): The class the record belongs to. Must be one of `["control", "leukoplakia", "carcinoma", "unknown"]`. Defaults to "unknown".
         start_index (Optional[int], optional): The index to start the parent contour ID assignment. Usually it will not be `0` when discarded records are being measure for record purposes. Defaults to 0.
-        contours_flag (Optional[str], optional): A string value identifying the characteristis of the record. Usually it will be `valid`, but it can be `discarded` or anything else. Defaults to "valid".
+        contours_flag (Optional[str], optional): A string value identifying the characteristic of the record. Usually it will be `valid`, but it can be `discarded` or anything else. Defaults to "valid".
 
     Returns:
         Union[List[dict], List[dict]]: The parent and child measurements.
@@ -402,28 +414,44 @@ def get_contour_measurements(
 
     for parent_id, parent_contour in enumerate(parent_contours, start=start_index):
         parent_pixel_count = get_contour_pixel_count(parent_contour, shape)
-        parent_features = [record_id, mask_name, record_class, contours_flag, parent_id, parent_pixel_count]
+        parent_features = [record_id, mask_name, record_class, contours_flag, parent_id, parent_pixel_count, parent_type]
         parent_measurements.append({ key: value for key, value in zip(NUCLEUS_COLUMNS, parent_features) })
+
+        contours_size = []
 
         child_id = 0
         for child_contour in child_contours:
             for child_point in child_contour:
                 if cv2.pointPolygonTest(parent_contour, tuple(child_point[0]), False) >= 0:
                     child_pixel_count = get_contour_pixel_count(child_contour, shape)
+                    contours_size.append(child_pixel_count)
                     child_features = [
-                        record_id, mask_name, record_class, contours_flag, parent_id, child_id, child_pixel_count
+                        record_id, mask_name, record_class, contours_flag, parent_id, child_id, child_pixel_count, child_type
                     ]
-                    child_measurements.append({ key: value for key, value in zip(NOR_COLUMNS, child_features) })
+
+                    if min_contour_size is not None and max_contour_size is not None:
+                        child_features.append(child_pixel_count / parent_pixel_count)
+                        child_features.append(child_pixel_count / min_contour_size)
+                        child_features.append(child_pixel_count / max_contour_size)
+                    child_measurements.append({ key: value for key, value in zip(AGNOR_COLUMNS, child_features) })
                     child_id += 1
                     break
 
-    return parent_measurements, child_measurements
+    try:
+        min_contour_size = np.min(contours_size)
+        max_contour_size = np.max(contours_size)
+    except Exception:
+        min_contour_size = None
+        max_contour_size = None
+
+    return parent_measurements, child_measurements, min_contour_size, max_contour_size
 
 
 def write_contour_measurements(
     parent_measurements: List[dict],
     child_measurements: List[dict],
     output_path: str,
+    ignore_parent: Optional[bool] = False,
     datetime: Optional[str] = time.strftime('%Y%m%d%H%M%S')) -> None:
     """Writes contour measurements to `.csv` files.
 
@@ -434,7 +462,7 @@ def write_contour_measurements(
         datetime (Optional[str], optional): A date and time identification for when the files were generated. Defaults to time.strftime('%Y%m%d%H%M%S').
     """
     df_parent = pd.DataFrame(parent_measurements, columns=NUCLEUS_COLUMNS)
-    df_child = pd.DataFrame(child_measurements, columns=NOR_COLUMNS)
+    df_child = pd.DataFrame(child_measurements, columns=AGNOR_COLUMNS)
 
     df_parent["datetime"] = datetime
     df_child["datetime"] = datetime
@@ -442,10 +470,11 @@ def write_contour_measurements(
     parent_measurements_output = Path(output_path).joinpath(f"nuclei_measurements.csv")
     child_measurements_output = Path(output_path).joinpath(f"nor_measurements.csv")
 
-    if Path(parent_measurements_output).is_file():
-        df_parent.to_csv(str(parent_measurements_output), mode="a", header=False, index=False)
-    else:
-        df_parent.to_csv(str(parent_measurements_output), mode="w", header=True, index=False)
+    if not ignore_parent:
+        if Path(parent_measurements_output).is_file():
+            df_parent.to_csv(str(parent_measurements_output), mode="a", header=False, index=False)
+        else:
+            df_parent.to_csv(str(parent_measurements_output), mode="w", header=True, index=False)
 
     if Path(child_measurements_output).is_file():
         df_child.to_csv(str(child_measurements_output), mode="a", header=False, index=False)

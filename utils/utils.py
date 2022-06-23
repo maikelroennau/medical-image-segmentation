@@ -1,12 +1,12 @@
 import datetime
 import json
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
+import cv2
 import imgviz
 import numpy as np
 import pandas as pd
-import PIL.Image
 import tensorflow as tf
 
 
@@ -40,27 +40,28 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: A RGB image with colored pixels per class.
     """
-    if prediction.shape[-1] <= 3:
-        color_map = [
-            [130, 130, 130],
-            [255, 128, 0],
-            [0, 0, 255]
-        ]
+    # Default color map start.
+    color_map = [
+        [130, 130, 130],
+        [255, 128, 0],
+        [0, 0, 255],
+        [128, 0, 64]
+    ]
 
-        map_classes = []
-        for i in range(prediction.shape[-1]):
-            map_classes.append(prediction[:, :, i] > 0)
+    # Extend color map if necessary.
+    n_classes = prediction.shape[-1]
+    if n_classes > len(color_map):
+        color_map.extend(imgviz.label_colormap(n_label=n_classes))
 
-        for i in range(prediction.shape[-1]):
-            for j in range(prediction.shape[-1]):
-                prediction[:, :, j] = np.where(map_classes[i], color_map[i][j], prediction[:, :, j])
-    else:
-        prediction = PIL.Image.fromarray(prediction.astype(np.uint8), mode="P")
+    # Recolor classes.
+    for i in range(prediction.shape[-1]):
+        class_map = prediction[:, :, i] > 0
+        for j in range(3): # 3 color channels
+            prediction[:, :, j] = np.where(class_map, color_map[i][j], prediction[:, :, j])
 
-        colormap = imgviz.label_colormap()
-        prediction.putpalette(colormap.flatten())
+    # Remove extra channels so the array can be saved as an image.
+    prediction = prediction[:, :, :3]
 
-        prediction = np.asarray(prediction.convert())
     return prediction
 
 
@@ -258,3 +259,112 @@ def pad_along_axis(array: np.ndarray, size: int, axis: int = 0, mode="reflect"):
     npad[axis] = (0, pad_size)
 
     return np.pad(array, pad_width=npad, mode="reflect")
+
+
+def get_labelme_shapes(annotation_path: str, shape_types: Optional[List[str]] = None) -> List[dict]:
+    """Get all shapes of the given types from a `labelme` file.
+
+    Args:
+        annotation_path (str): The path to the .json `labelme` annotation file.
+        shape_types (Optional[list], optional): List of shape types to return. Example: `["polygon", "circle"]. Defaults to None.
+
+    Raises:
+        FileNotFoundError: If the annotation file is not found.
+
+    Returns:
+        List[dict]: List containing the shapes in the `annotation_file` that are of any type in `shape_types`.
+    """
+    annotation_path = Path(annotation_path)
+    if not annotation_path.is_file():
+        raise FileNotFoundError(f"The annotation file `{annotation_path}` was not found.")
+    else:
+        with open(str(annotation_path), "r") as annotation_pointer:
+            annotation_file = json.load(annotation_pointer)
+
+        shapes = []
+        for shape in annotation_file["shapes"]:
+            if shape_types is not None:
+                if shape["shape_type"] in shape_types:
+                    shapes.append(shape)
+            else:
+                shapes.append(shape)
+        return shapes
+
+
+def get_labelme_points(annotation_path, shape_types: Optional[list] = None, reshape_for_opencv: Optional[bool] = False) -> List[List[int]]:
+    """Get points from shapes from a `labelme` annotation file.
+
+    Args:
+        annotation_path (str): The path to the .json `labelme` annotation file.
+        shape_types (Optional[list], optional): List of shape types to return. Example: `["polygon", "circle"]. Defaults to None.
+        reshape (Optional[bool], optional): Whether or not to reshape points to be compatible with OpenCV. Defaults to False.
+
+    Returns:
+        List[List[int]]: List containing the points of the shapes in the `annotation_file` that are of any type in `shape_types`.
+    """
+    shapes = get_labelme_shapes(annotation_path, shape_types)
+    points = []
+    for shape in shapes:
+        shape_points = shape["points"]
+        shape_points = np.array(shape_points, dtype=np.int32)
+
+        if reshape_for_opencv:
+            shape_points = shape_points.reshape((shape_points.shape[0], 1, shape_points.shape[1]))
+        if shape_types is not None:
+            if shape["shape_type"] in shape_types:
+                points.append(shape_points)
+        else:
+            points.append(shape_points)
+    return points
+
+
+def convert_bbox_to_contour(bbox: np.ndarray) -> np.array:
+    """Converts a `labelme` bounding box points to a contour.
+
+    Bounding boxes are represented with two points by `labelme`, the top left, and bottom right points.
+    When checking if another contour is within a given `labelme` bounding box, OpenCV assumes the two points represent a line.
+    This function convert the `labelme` bounding box into a proper contour that will be interpreted as a rectangle in OpenCV.
+
+    Args:
+        bbox (np.array): The bounding box points.
+
+    Returns:
+        np.array: The contour in the format of a polygon.
+    """
+    bbox.insert(1, [bbox[1][0], bbox[0][1]])
+    bbox.insert(3, [bbox[0][0], bbox[2][1]])
+    bbox = np.array(bbox, dtype=np.int32)
+    return bbox
+
+
+def get_object_classes(annotation_path):
+    annotation_path = Path(annotation_path)
+    if not annotation_path.is_file():
+        raise FileNotFoundError(f"The annotation file `{annotation_path}` was not found.")
+    else:
+        with open(str(annotation_path), "r") as annotation_pointer:
+            annotation_file = json.load(annotation_pointer)
+
+        classes = []
+        for shape in annotation_file["shapes"]:
+            classes.append(shape["label"])
+        return classes
+
+
+def get_mean_rgb_values(contour: np.ndarray, image: np.ndarray) -> List[Union[float, float, float]]:
+    """Obtains the mean RGB values of a given contour in an image.
+
+    Args:
+        contour (np.ndarray): The contour that delimits the pixels that will be considered.
+        image (np.ndarray): The image from the RGB values will be extracted.
+
+    Returns:
+        List[Union[float, float, float]]: List containing the average RGB value, per channel.
+    """
+    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    mask = cv2.drawContours(mask, contours=[contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
+    total = np.sum(mask)
+    red = np.round(np.sum(mask * image[:, :, 0]) / total, 4)
+    green = np.round(np.sum(mask * image[:, :, 1]) / total, 4)
+    blue = np.round(np.sum(mask * image[:, :, 2]) / total, 4)
+    return red, green, blue

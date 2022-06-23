@@ -134,7 +134,11 @@ def load_image(
         raise TypeError("Object `{image_path}` is not supported.")
 
 
-def list_files(files_path: str, as_numpy: Optional[bool] = False, seed: Optional[int] = 1234) -> tf.raw_ops.ShuffleDataset:
+def list_files(
+    files_path: str,
+    as_numpy: Optional[bool] = False,
+    file_types: Optional[list] = SUPPORTED_IMAGE_TYPES,
+    seed: Optional[int] = 1234) -> tf.raw_ops.ShuffleDataset:
     """Lists files under `files_path`.
 
     Args:
@@ -150,7 +154,7 @@ def list_files(files_path: str, as_numpy: Optional[bool] = False, seed: Optional
         tf.raw_ops.ShuffleDataset: The listed files.
     """
     if Path(files_path).is_dir():
-        patterns = [str(Path(files_path).joinpath(f"*{image_type}")) for image_type in SUPPORTED_IMAGE_TYPES]
+        patterns = [str(Path(files_path).joinpath(f"*{image_type}")) for image_type in file_types]
         files_list = tf.data.Dataset.list_files(patterns, shuffle=True, seed=seed)
 
         if len(files_list) == 0:
