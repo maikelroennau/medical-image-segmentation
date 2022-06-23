@@ -7,10 +7,12 @@ import pandas as pd
 import segmentation_models as sm
 from tqdm import tqdm
 
-from utils.contour_analysis import get_contours
+from utils.contour_analysis import (discard_contours_outside_contours,
+                                    get_contours)
 from utils.data import list_files, load_image, one_hot_encode
 from utils.predict import collapse_probabilities, color_classes
-
+from utils.utils import (convert_bbox_to_contour, get_labelme_points,
+                         get_object_classes)
 
 COLUMNS = [
     "source_image",
@@ -23,7 +25,8 @@ COLUMNS = [
     "false_negative_nuclei",
     "true_positive_nors",
     "false_positive_nors",
-    "false_negative_nors"
+    "false_negative_nors",
+    "bboxes"
 ]
 
 
@@ -161,7 +164,8 @@ def qualify_segmentation(
     predictions_path: str,
     classes: Optional[int] = None,
     output_qualification: Optional[str] = None,
-    output_visualization: Optional[str] = None) -> list:
+    output_visualization: Optional[str] = None,
+    bbox_annotations_path: Optional[str] = None) -> list:
     """Qualifies the predicted contours against the ground truth contours.
 
     This function works by checking if the segmented nuclei and NORs match to nuclei and NORs in the ground truth.
@@ -169,9 +173,10 @@ def qualify_segmentation(
     Args:
         ground_truth_path (str): The path to the ground truth masks.
         predictions_path (str): The path to the predicted masks.
+        classes (Optional[int], optional): The number of classes in the data. Defaults to None.
         output_qualification (Optional[str], optional): The path were to save the qualification information. Defaults to `predictions_path`.
         output_visualization (Optional[bool], optional). Path where to save the visualization showing the differences in respect to the ground truth. Does not generate visualization if `None`.
-        classes (Optional[int], optional): The number of classes in the data. Defaults to None.
+        bbox_annotations_path (Optional[str], optional): Path to the `labelme` annotations containing bounding boxes for the nuclei to be considered.
 
     Raises:
         FileNotFoundError: If the ground truth masks are not found.
@@ -191,6 +196,10 @@ def qualify_segmentation(
     if len(ground_truth) != len(predictions):
         raise ValueError(
             f"The number of ground truth and prediction files do not not match: '{len(ground_truth)}' != '{len(predictions)}'")
+    if bbox_annotations_path is not None:
+        annotations = list_files(bbox_annotations_path, as_numpy=True, file_types=[".json"])
+        if len(annotations) == 0:
+            raise FileNotFoundError(f"No annotation files were found at `{annotations}`.")
 
     classes_undefined = True if classes is None else False
     data = []
@@ -212,6 +221,19 @@ def qualify_segmentation(
         expected_nors = get_contours(ground_truth[:, :, 2])
         predicted_nuclei = get_contours(prediction[:, :, 1] + prediction[:, :, 2])
         predicted_nors = get_contours(prediction[:, :, 2])
+
+        if bbox_annotations_path is not None:
+            annotation = str(Path(bbox_annotations_path).joinpath(f"{Path(ground_truth_file_path).stem.replace('_mask', '')}.json"))
+            bboxes = get_labelme_points(annotation, shape_types=["rectangle"])
+
+            # Convert bboxes into contours with four points.
+            for i in range(len(bboxes)):
+                bboxes[i] = convert_bbox_to_contour(bboxes[i].tolist())
+
+            expected_nuclei, _ = discard_contours_outside_contours(bboxes, expected_nuclei)
+            expected_nors, _ = discard_contours_outside_contours(expected_nuclei, expected_nors)
+            predicted_nuclei, _ = discard_contours_outside_contours(bboxes, predicted_nuclei)
+            predicted_nors, _ = discard_contours_outside_contours(expected_nuclei, predicted_nors)
 
         true_positive_nuclei = count_intersect_contours(
             expected_nuclei,
@@ -244,16 +266,23 @@ def qualify_segmentation(
 
             cv2.imwrite(str(output_visualization.joinpath(Path(ground_truth_file_path).name)), cv2.cvtColor(ground_truth_viz, cv2.COLOR_BGR2RGB))
 
+        if bbox_annotations_path is not None:
+            n_expected_nors = get_object_classes(annotation)
+            n_expected_nors = [1 if n in ["satellite"] else int(n) if n.isnumeric() else 0 for n in n_expected_nors]
+            n_expected_nors = int(np.sum(n_expected_nors))
+        else:
+            n_expected_nors = len(expected_nors)
+
         false_positive_nuclei = len(predicted_nuclei) - true_positive_nuclei
         false_positive_nors = len(predicted_nors) - true_positive_nors
 
         false_negative_nuclei = len(expected_nuclei) - true_positive_nuclei
-        false_negative_nors = len(expected_nors) - true_positive_nors
+        false_negative_nors = n_expected_nors - true_positive_nors
 
         data = [{
             "source_image": Path(ground_truth_file_path).name,
             "expected_nuclei": len(expected_nuclei),
-            "expected_nors": len(expected_nors),
+            "expected_nors": n_expected_nors,
             "predicted_nuclei": len(predicted_nuclei),
             "predicted_nors": len(predicted_nors),
             "true_positive_nuclei": true_positive_nuclei,
@@ -261,7 +290,8 @@ def qualify_segmentation(
             "false_negative_nuclei": false_negative_nuclei,
             "true_positive_nors": true_positive_nors,
             "false_positive_nors": false_positive_nors,
-            "false_negative_nors": false_negative_nors
+            "false_negative_nors": false_negative_nors,
+            "bboxes": True if bbox_annotations_path is not None else False
         }]
 
         df = pd.DataFrame(data, columns=COLUMNS)

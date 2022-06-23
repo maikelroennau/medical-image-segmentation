@@ -44,6 +44,14 @@ def main():
         type=str)
 
     parser.add_argument(
+        "-bbox",
+        "--bbox-annotations",
+        help="Path to the `labelme` annotations containing bounding boxes for the nuclei to be considered.",
+        type=str,
+        required=False,
+        default=None)
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass the GPU id to use GPU.",
@@ -61,8 +69,8 @@ def main():
         predictions_path=args.predictions,
         classes=args.classes,
         output_qualification=args.output,
-        output_visualization=args.visualization
-    )
+        output_visualization=args.visualization,
+        bbox_annotations_path=args.bbox_annotations)
 
 
 if __name__ == "__main__":

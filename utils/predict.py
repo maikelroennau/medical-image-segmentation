@@ -132,7 +132,7 @@ def predict(
             detail, discarded_parent_contours, discarded_child_contours = detail
 
             if record_id:
-                parent_measurements, child_measurements = contour_analysis.get_contour_measurements(
+                parent_measurements, child_measurements, min_contour_size, max_contour_size = contour_analysis.get_contour_measurements(
                     parent_contours=parent_contours,
                     child_contours=child_contours,
                     shape=input_shape[:2],
@@ -147,7 +147,7 @@ def predict(
                     datetime=current_time)
 
                 if len(discarded_parent_contours) > 0 or len(discarded_child_contours) > 0:
-                    discarded_parent_measurements, discarded_child_measurements = contour_analysis.get_contour_measurements(
+                    discarded_parent_measurements, discarded_child_measurements, min_contour_size, max_contour_size = contour_analysis.get_contour_measurements(
                         parent_contours=discarded_parent_contours,
                         child_contours=discarded_child_contours,
                         shape=input_shape[:2],
