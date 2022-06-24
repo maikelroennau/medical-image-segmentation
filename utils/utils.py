@@ -28,7 +28,7 @@ def collapse_probabilities(
             np.logical_and.reduce(
                 np.array([prediction[:, :, i] > prediction[:, :, j] for j in range(classes) if j != i])), pixel_intensity, 0)
 
-    return prediction
+    return prediction.astype(np.uint8)
 
 
 def color_classes(prediction: np.ndarray) -> np.ndarray:
@@ -42,10 +42,10 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     """
     # Default color map start.
     color_map = [
-        [130, 130, 130],
-        [255, 128, 0],
-        [0, 0, 255],
-        [128, 0, 64]
+        [130, 130, 130], # Gray
+        [255, 128,   0], # Orange
+        [  0,   0, 255], # Blue
+        [128,   0,  64]  # Purple
     ]
 
     # Extend color map if necessary.
@@ -53,13 +53,17 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     if n_classes > len(color_map):
         color_map.extend(imgviz.label_colormap(n_label=n_classes))
 
+    # Obtain color map before changing the array.
+    class_maps = []
+    for i in range(prediction.shape[-1]):
+        class_maps.append(prediction[:, :, i] > 0)
+
     # Recolor classes.
     for i in range(prediction.shape[-1]):
-        class_map = prediction[:, :, i] > 0
         for j in range(3): # 3 color channels
-            prediction[:, :, j] = np.where(class_map, color_map[i][j], prediction[:, :, j])
+            prediction[:, :, j] = np.where(class_maps[i], color_map[i][j], prediction[:, :, j])
 
-    # Remove extra channels so the array can be saved as an image.
+    # Remove any extra channels so the array can be saved as an image.
     prediction = prediction[:, :, :3]
 
     return prediction
