@@ -4,15 +4,15 @@ from typing import List, Optional, Tuple, Union
 import cv2
 import numpy as np
 import pandas as pd
-import segmentation_models as sm
 from tqdm import tqdm
 
 from utils.contour_analysis import (discard_contours_outside_contours,
                                     get_contours)
 from utils.data import list_files, load_image, one_hot_encode
 from utils.predict import collapse_probabilities, color_classes
-from utils.utils import (convert_bbox_to_contour, get_labelme_points,
-                         get_object_classes)
+from utils.utils import (convert_bbox_to_contour, get_intersection,
+                         get_labelme_points, get_object_classes)
+
 
 COLUMNS = [
     "source_image",
@@ -28,35 +28,6 @@ COLUMNS = [
     "false_negative_nors",
     "bboxes"
 ]
-
-
-def get_intersection(
-    expected_contour: np.ndarray,
-    predicted_contour: np.ndarray,
-    shape: Tuple[int, int]) -> float:
-    """Get the intersection value for the input contours.
-
-    The function uses the Intersection Over Union (IoU) metric from the `Segmentation Models` library.
-
-    Args:
-        expected_contour (np.ndarray): The first contour.
-        predicted_contour (np.ndarray): The second contour.
-        shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
-
-    Returns:
-        float: The intersection value in range [0, 1].
-    """
-    expected = np.zeros(shape, dtype=np.uint8)
-    predicted = np.zeros(shape, dtype=np.uint8)
-
-    expected = cv2.drawContours(expected, contours=[expected_contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
-    predicted = cv2.drawContours(predicted, contours=[predicted_contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
-
-    expected = expected.reshape((1,) + expected.shape).astype(np.float32)
-    predicted = predicted.reshape((1,) + predicted.shape).astype(np.float32)
-
-    iou = sm.metrics.iou_score(expected, predicted).numpy()
-    return iou
 
 
 def get_false_positive_contours(
