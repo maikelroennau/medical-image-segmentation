@@ -7,6 +7,7 @@ import cv2
 import imgviz
 import numpy as np
 import pandas as pd
+import segmentation_models as sm
 import tensorflow as tf
 
 
@@ -69,6 +70,35 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     return prediction
 
 
+def get_intersection(
+    expected_contour: np.ndarray,
+    predicted_contour: np.ndarray,
+    shape: Tuple[int, int]) -> float:
+    """Get the intersection value for the input contours.
+
+    The function uses the Intersection Over Union (IoU) metric from the `Segmentation Models` library.
+
+    Args:
+        expected_contour (np.ndarray): The first contour.
+        predicted_contour (np.ndarray): The second contour.
+        shape (Tuple[int, int]): The dimensions of the image from where the contours were extracted, in the format `(HEIGHT, WIDTH)`.
+
+    Returns:
+        float: The intersection value in range [0, 1].
+    """
+    expected = np.zeros(shape, dtype=np.uint8)
+    predicted = np.zeros(shape, dtype=np.uint8)
+
+    expected = cv2.drawContours(expected, contours=[expected_contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
+    predicted = cv2.drawContours(predicted, contours=[predicted_contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
+
+    expected = expected.reshape((1,) + expected.shape).astype(np.float32)
+    predicted = predicted.reshape((1,) + predicted.shape).astype(np.float32)
+
+    iou = sm.metrics.iou_score(expected, predicted).numpy()
+    return iou
+
+
 def plot_metrics(
     metrics_file_path: str,
     output: Optional[str] = None,
@@ -101,7 +131,7 @@ def plot_metrics(
                 "test_f1-score": metrics_file["test_metrics"]["test_f1-score"],
                 "test_iou-score": metrics_file["test_metrics"]["test_iou_score"]
             },
-            "Learning rage": {
+            "Learning rate": {
                 "lr": metrics_file["train_metrics"]["lr"]
             }
         }
@@ -132,7 +162,7 @@ def plot_metrics(
                     image.annotate(text, value, arrowprops=dict(facecolor='black', shrink=0.05))
 
             image = image.get_figure()
-            image.savefig(str(output_path.joinpath(f"0{i+1}_{title.lower().replace('', '')}.png")))
+            image.savefig(str(output_path.joinpath(f"0{i+1}_{title.lower().replace('', '_')}.png")))
 
 
 def compute_classes_distribution(
@@ -262,7 +292,7 @@ def pad_along_axis(array: np.ndarray, size: int, axis: int = 0, mode="reflect"):
     npad = [(0, 0)] * array.ndim
     npad[axis] = (0, pad_size)
 
-    return np.pad(array, pad_width=npad, mode="reflect")
+    return np.pad(array, pad_width=npad, mode="constant", constant_values=0)
 
 
 def get_labelme_shapes(annotation_path: str, shape_types: Optional[List[str]] = None) -> List[dict]:

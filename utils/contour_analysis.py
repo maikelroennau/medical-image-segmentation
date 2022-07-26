@@ -3,12 +3,14 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import cv2
+import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from scipy.interpolate import splev, splprep
 
-from utils.utils import color_classes
+from utils.utils import (color_classes, convert_bbox_to_contour,
+                         get_intersection, get_labelme_points)
 
 
 NUCLEUS_COLUMNS = [
@@ -30,8 +32,8 @@ AGNOR_COLUMNS = [
     "agnor_pixel_count",
     "agnor_type",
     "nucleus_ratio",
-    "greatest_cluster_ratio",
-    "smallest_cluster_ratio"]
+    "greatest_agnor_ratio",
+    "smallest_agnor_ratio"]
 
 CLASSES = [
     "control",
@@ -431,8 +433,8 @@ def get_contour_measurements(
 
                     if min_contour_size is not None and max_contour_size is not None:
                         child_features.append(child_pixel_count / parent_pixel_count)
-                        child_features.append(child_pixel_count / min_contour_size)
                         child_features.append(child_pixel_count / max_contour_size)
+                        child_features.append(child_pixel_count / min_contour_size)
                     child_measurements.append({ key: value for key, value in zip(AGNOR_COLUMNS, child_features) })
                     child_id += 1
                     break
@@ -464,6 +466,8 @@ def write_contour_measurements(
     df_parent = pd.DataFrame(parent_measurements, columns=NUCLEUS_COLUMNS)
     df_child = pd.DataFrame(child_measurements, columns=AGNOR_COLUMNS)
 
+    df_child["nucleus"] = df_parent["nucleus"].unique()[0]
+
     df_parent["datetime"] = datetime
     df_child["datetime"] = datetime
 
@@ -480,3 +484,58 @@ def write_contour_measurements(
         df_child.to_csv(str(child_measurements_output), mode="a", header=False, index=False)
     else:
         df_child.to_csv(str(child_measurements_output), mode="w", header=True, index=False)
+
+
+def classify_agnor(model_path: str, contours: List[np.ndarray]) -> List[np.ndarray]:
+    if len(contours) == 0:
+        return contours
+
+    features_list = [
+        "nucleus_ratio",
+        "smallest_agnor_ratio",
+        "greatest_agnor_ratio"
+    ]
+
+    df = pd.DataFrame.from_dict(contours)
+    features = df[features_list].copy()
+
+    classifier =joblib.load(model_path)
+    predictions = classifier.predict(features)
+    df["agnor_type"] = predictions
+
+    contours = list(df.T.to_dict().values())
+    return contours
+
+
+def discard_unboxed_contours(prediction, parent_contours, child_contours, annotation):
+    if prediction is not None:
+        bboxes = get_labelme_points(annotation, shape_types=["rectangle"])
+
+        # Convert bboxes into contours with four points.
+        for i in range(len(bboxes)):
+            bboxes[i] = convert_bbox_to_contour(bboxes[i].tolist())
+
+        nuclei_contours_adequate, _ = discard_contours_outside_contours(bboxes, parent_contours)
+        nuclei_contours_adequate_final = []
+        for contour in nuclei_contours_adequate:
+            for bbox in bboxes:
+                iou = get_intersection(bbox, contour, shape=prediction.shape[:2])
+                if iou > 0.2:
+                    nuclei_contours_adequate_final.append(contour)
+        parent_contours = nuclei_contours_adequate_final
+        child_contours, _ = discard_contours_outside_contours(parent_contours, child_contours)
+        
+        # Create a new mask with the filtered nuclei and NORs
+        pixel_intensity = int(np.max(np.unique(prediction)))
+        background = np.ones(prediction.shape[:2], dtype=np.uint8)
+        nucleus = np.zeros(prediction.shape[:2], dtype=np.uint8)
+        nor = np.zeros(prediction.shape[:2], dtype=np.uint8)
+
+        cv2.drawContours(nucleus, contours=parent_contours, contourIdx=-1, color=pixel_intensity, thickness=cv2.FILLED)
+        cv2.drawContours(nor, contours=child_contours, contourIdx=-1, color=pixel_intensity, thickness=cv2.FILLED)
+
+        nucleus = np.where(nor, 0, nucleus)
+        background = np.where(np.logical_and(nucleus == 0, nor == 0), pixel_intensity, 0)
+        prediction = np.stack([background, nucleus, nor], axis=2).astype(np.uint8)
+    
+    return prediction, parent_contours, child_contours
