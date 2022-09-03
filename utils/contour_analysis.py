@@ -405,7 +405,7 @@ def get_contour_measurements(
     record_id: Optional[str] = "unknown",
     record_class: Optional[str] = "unknown",
     start_index: Optional[int] = 0,
-    contours_flag: Optional[str] = "valid") -> Union[List[dict], List[dict]]:
+    contours_flag: Optional[str] = "valid") -> Union[List[dict], List[dict], int, int]:
     """Calculate the number of pixels per contour and create a record for each of them.
 
     Args:
@@ -423,7 +423,7 @@ def get_contour_measurements(
         contours_flag (Optional[str], optional): A string value identifying the characteristic of the record. Usually it will be `valid`, but it can be `discarded` or anything else. Defaults to "valid".
 
     Returns:
-        Union[List[dict], List[dict]]: The parent and child measurements.
+        Union[List[dict], List[dict], int, int]: The parent and child contours, and the pixel count of the smallest and biggest AgNOR.
     """
     parent_measurements = []
     child_measurements = []
@@ -501,6 +501,15 @@ def write_contour_measurements(
 
 
 def classify_agnor(model_path: str, contours: List[np.ndarray]) -> List[np.ndarray]:
+    """Loads a Scikit-Learn model and classify the input arrays in `clusters` and `satellites`.
+
+    Args:
+        model_path (str): Path to the model file.
+        contours (List[np.ndarray]): Input array containing the features `agnor_pixel_count`, `nucleus_ratio`, `smallest_agnor_ratio`, `greatest_agnor_ratio`."
+
+    Returns:
+        List[np.ndarray]: Updated array with a column containing the predicted class of each element in the input array, where `0` corresponds to `cluster` and `1` to `satellite`.
+    """
     if len(contours) == 0:
         return contours
 
@@ -522,7 +531,22 @@ def classify_agnor(model_path: str, contours: List[np.ndarray]) -> List[np.ndarr
     return contours
 
 
-def discard_unboxed_contours(prediction, parent_contours, child_contours, annotation):
+def discard_unboxed_contours(
+    prediction: Union[np.ndarray, tf.Tensor],
+    parent_contours: List[np.ndarray],
+    child_contours: List[np.ndarray],
+    annotation: str) -> Tuple[Union[np.ndarray, tf.Tensor], np.ndarray, np.ndarray]:
+    """Zero pixels that are not contained by a bounding box.
+
+    Args:
+        prediction (Union[np.ndarray, tf.Tensor]): Predicted segmentation.
+        parent_contours (List[np.ndarray]): The parent contours.
+        child_contours (List[np.ndarray]): The child contours.
+        annotation (str): Path to the `labelme` annotation file.
+
+    Returns:
+        Tuple[Union[np.ndarray, tf.Tensor], np.ndarray, np.ndarray]: Updated segmentation mask and contour arrays containing only objects within bounding boxes.
+    """
     if prediction is not None:
         bboxes = get_labelme_points(annotation, shape_types=["rectangle"])
 
