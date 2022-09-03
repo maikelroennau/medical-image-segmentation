@@ -29,6 +29,8 @@ COLUMNS = [
     "bboxes"
 ]
 
+iou_threshold = 0.50
+
 
 def get_false_positive_contours(
     ground_truth_contours: List[np.ndarray],
@@ -40,11 +42,11 @@ def get_false_positive_contours(
     Args:
         ground_truth_contours (List[np.ndarray]): List containing the ground truth contours.
         predicted_contours (List[np.ndarray]): List containing the predicted contours.
-        shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
+        shape (Tuple[int, int]): The dimensions of the image from where the contours were extracted, in the format `(HEIGHT, WIDTH)`.
         drop (bool): Whether to drop contours from `ground_truth_contours` after evaluation. Defaults to False.
 
     Returns:
-        Union[list, list]: The false positive contorus.
+        Union[list, list]: The false positive contours.
     """
 
     false_positives = []
@@ -59,7 +61,7 @@ def get_false_positive_contours(
             intersected = False
             for key, ground_truth_contour in ground_truth_contours.items():
                 intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
-                if np.round(intersection, 2) > 0.:
+                if np.round(intersection, 2) >= iou_threshold:
                     intersected = True
                     ground_truth_contours.pop(key)
                     break
@@ -71,7 +73,7 @@ def get_false_positive_contours(
             intersected = False
             for ground_truth_contour in ground_truth_contours:
                 intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
-                if np.round(intersection, 2) > 0.:
+                if np.round(intersection, 2) >= iou_threshold:
                     intersected = True
                     break
 
@@ -91,7 +93,7 @@ def count_intersect_contours(
     Args:
         ground_truth_contours (List[np.ndarray]): The list of ground truth contours.
         predicted_contours (List[np.ndarray]): The list of predicted contours.
-        shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
+        shape (Tuple[int, int]): The dimensions of the image from where the contours were extracted, in the format `(HEIGHT, WIDTH)`.
         drop (bool): Whether to drop contours from `ground_truth_contours` after evaluation. Defaults to False.
 
     Returns:
@@ -108,7 +110,7 @@ def count_intersect_contours(
             intersected = False
             for key, ground_truth_contour in ground_truth_contours.items():
                 intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
-                if np.round(intersection, 2) > 0.:
+                if np.round(intersection, 2) >= iou_threshold:
                     intersected = True
                     ground_truth_contours.pop(key)
                     break
@@ -120,7 +122,7 @@ def count_intersect_contours(
             intersected = False
             for ground_truth_contour in ground_truth_contours:
                 intersection = get_intersection(ground_truth_contour, predicted_contour, shape=shape)
-                if np.round(intersection, 2) > 0.:
+                if np.round(intersection, 2) >= iou_threshold:
                     intersected = True
                     break
 
