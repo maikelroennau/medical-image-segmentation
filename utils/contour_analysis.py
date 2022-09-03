@@ -42,12 +42,26 @@ CLASSES = [
     "unknown"]
 
 MAX_NUCLEUS_PIXEL_COUNT = 67000
-MIN_NUCLEUS_PERCENT_PIXEL_COUNT = 5.5 # 3700
+MIN_NUCLEUS_PERCENT_PIXEL_COUNT = 0.02 # 1196
 
-MAX_NOR_PIXEL_COUNT = 2000
-MIN_NOR_PERCENT_PIXEL_COUNT = 0.5 # 10
+MAX_NOR_PIXEL_COUNT = 3521
+MIN_NOR_PERCENT_PIXEL_COUNT = 0.0017 # 1
 
 MAX_CONTOUR_PERCENT_DIFF = 5.0
+
+# Nuclei
+# - count: 3300
+# - min: 1196
+# - max: 66129
+# - avg: 15783.546363636364
+# - std: 6670.074556984292
+
+# AgNORs
+# - count: 12337
+# - min: 2
+# - max: 3521
+# - avg: 92.36167625840966
+# - std: 171.46624198587395
 
 
 def smooth_contours(contours: List[np.ndarray], points: Optional[int] = 30) -> List[np.ndarray]:
@@ -491,6 +505,7 @@ def classify_agnor(model_path: str, contours: List[np.ndarray]) -> List[np.ndarr
         return contours
 
     features_list = [
+        "agnor_pixel_count",
         "nucleus_ratio",
         "smallest_agnor_ratio",
         "greatest_agnor_ratio"
