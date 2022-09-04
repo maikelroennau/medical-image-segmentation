@@ -66,9 +66,8 @@ def predict(
     output_contour_analysis: Optional[str] = None,
     bboxes: Optional[str] = None,
     classify_agnor: Optional[bool] = False,
-    decision_tree_model_path: Optional[str] = "agnor_classifier.joblib",
+    decision_tree_model_path: Optional[str] = "agnor_decision_tree_classifier.joblib",
     record_id: Optional[str] = None,
-    record_class: Optional[str] = None,
     measures_only: Optional[bool] = False,
     current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S')) -> None:
     """_summary_
@@ -134,7 +133,7 @@ def predict(
         file = Path(file)
         if analyze_contours:
             prediction, detail = contour_analysis.analyze_contours(mask=prediction)
-            
+
             if bboxes is not None:
                 annotation = Path(bboxes).joinpath(f"{Path(file).stem.replace('_mask', '')}.json")
                 prediction = contour_analysis.discard_unboxed_contours(*prediction, annotation=annotation)
@@ -142,69 +141,56 @@ def predict(
             prediction, parent_contours, child_contours = prediction
             detail, discarded_parent_contours, discarded_child_contours = detail
 
-            if record_id:
-                for i, parent_contour in enumerate(parent_contours):
-                    parent_measurements, child_measurements, min_contour_size, max_contour_size = contour_analysis.get_contour_measurements(
-                        parent_contours=[parent_contour],
-                        child_contours=child_contours,
-                        shape=input_shape[:2],
-                        mask_name=Path(file).name,
-                        record_id=record_id,
-                        record_class=record_class,
-                        start_index=i)
+            # Add an extra channel to map `satellites`.
+            prediction = np.stack([
+                prediction[:, :, 0],
+                prediction[:, :, 1],
+                prediction[:, :, 2],
+                np.zeros(input_shape[:2], dtype=np.uint8)
+            ], axis=2)
 
-                    _, child_measurements, _, _ = contour_analysis.get_contour_measurements(
-                        parent_contours=[parent_contour],
-                        child_contours=child_contours,
+            for i, parent_contour in enumerate(parent_contours):
+                filtered_child_contour, _ = contour_analysis.discard_contours_outside_contours([parent_contour], child_contours)
+                measurements = contour_analysis.get_contour_measurements(
+                    parent_contours=[parent_contour],
+                    child_contours=filtered_child_contour,
+                    shape=input_shape[:2],
+                    mask_name=Path(file).name,
+                    record_id=record_id,
+                    start_index=i)
+
+                if classify_agnor:
+                    measurements = contour_analysis.classify_agnor(decision_tree_model_path, measurements)
+                    # OpenCV's `drawContours` fails using array slices, so a new matrix must be created, drawn on and assigned to `predictions`.
+                    satellites = prediction[:, :, 3].copy()
+                    for classified_measurement, classified_contour in zip(measurements[1:], filtered_child_contour):
+                        if classified_measurement["type"] == "satellite":
+                            cv2.drawContours(satellites, contours=[classified_contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
+                    prediction[:, :, 3] = satellites
+
+                contour_analysis.write_contour_measurements(
+                    measurements=measurements,
+                    output_path=output_contour_analysis,
+                    datetime=current_time)
+
+            if len(discarded_parent_contours) > 0 or len(discarded_child_contours) > 0:
+                for i, parent_discarded_contour in enumerate(discarded_parent_contours):
+                    discarded_measurements = contour_analysis.get_contour_measurements(
+                        parent_contours=[parent_discarded_contour],
+                        child_contours=discarded_child_contours,
                         shape=input_shape[:2],
                         mask_name=Path(file).name,
                         record_id=record_id,
-                        record_class=record_class,
-                        min_contour_size=min_contour_size,
-                        max_contour_size=max_contour_size)
+                        start_index=len(parent_contours) + i,
+                        contours_flag="invalid")
 
                     if classify_agnor:
-                        child_measurements = contour_analysis.classify_agnor(decision_tree_model_path, child_measurements)
+                        discarded_measurements = contour_analysis.classify_agnor(decision_tree_model_path, discarded_measurements)
 
                     contour_analysis.write_contour_measurements(
-                        parent_measurements=parent_measurements,
-                        child_measurements=child_measurements,
+                        measurements=discarded_measurements,
                         output_path=output_contour_analysis,
                         datetime=current_time)
-
-                    if len(discarded_parent_contours) > 0 or len(discarded_child_contours) > 0:
-                        measurements = contour_analysis.get_contour_measurements(
-                            parent_contours=discarded_parent_contours,
-                            child_contours=discarded_child_contours,
-                            shape=input_shape[:2],
-                            mask_name=Path(file).name,
-                            record_id=record_id,
-                            record_class=record_class,
-                            start_index=len(parent_contours) + i,
-                            contours_flag="invalid")
-                        discarded_parent_measurements, discarded_child_measurements, min_contour_size, max_contour_size = measurements
-
-                        _, discarded_child_measurements, _, _ = contour_analysis.get_contour_measurements(
-                            parent_contours=discarded_parent_contours,
-                            child_contours=discarded_child_contours,
-                            shape=input_shape[:2],
-                            mask_name=Path(file).name,
-                            record_id=record_id,
-                            record_class=record_class,
-                            start_index=len(parent_contours) + i,
-                            contours_flag="invalid",
-                            min_contour_size=min_contour_size,
-                            max_contour_size=max_contour_size)
-
-                        if classify_agnor:
-                            discarded_child_measurements = contour_analysis.classify_agnor(
-                                decision_tree_model_path, discarded_child_measurements)
-
-                        contour_analysis.write_contour_measurements(
-                            parent_measurements=discarded_parent_measurements,
-                            child_measurements=discarded_child_measurements,
-                            output_path=output_contour_analysis,
-                            datetime=current_time)
 
             if detail is not None and not measures_only:
                 filtered_objects = output_predictions.joinpath("filtered_objects")

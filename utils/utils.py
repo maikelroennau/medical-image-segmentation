@@ -46,7 +46,9 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
         [130, 130, 130], # Gray
         [255, 128,   0], # Orange
         [  0,   0, 255], # Blue
-        [128,   0,  64]  # Purple
+        [128,   0,  64], # Purple
+        [255, 255, 255], # White
+        [  0, 128,   0]  # Dark green
     ]
 
     # Extend color map if necessary.
@@ -56,11 +58,11 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
 
     # Obtain color map before changing the array.
     class_maps = []
-    for i in range(prediction.shape[-1]):
+    for i in range(n_classes):
         class_maps.append(prediction[:, :, i] > 0)
 
     # Recolor classes.
-    for i in range(prediction.shape[-1]):
+    for i in range(n_classes):
         for j in range(3): # 3 color channels
             prediction[:, :, j] = np.where(class_maps[i], color_map[i][j], prediction[:, :, j])
 

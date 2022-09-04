@@ -77,12 +77,6 @@ def main():
         type=str)
 
     parser.add_argument(
-        "--record-class",
-        help="The class the contour measurements belong to.",
-        required=False,
-        type=str)
-
-    parser.add_argument(
         "-bboxes",
         "--bboxes",
         help="The path to a directory containing `labelme` annotations with bounding boxes indicating objects to be considered.",
@@ -155,7 +149,6 @@ def main():
                 output_predictions=str(Path(output).joinpath(directory.parent.name).joinpath(directory.name)),
                 output_contour_analysis=output,
                 record_id=directory.name,
-                record_class=directory.parent.name,
                 bboxes=args.bboxes,
                 classify_agnor=args.classify_agnor,
                 decision_tree_model_path=args.decision_tree_model_path,
@@ -173,7 +166,6 @@ def main():
             output_predictions=output,
             output_contour_analysis=args.analysis_output,
             record_id=args.record_id,
-            record_class=args.record_class,
             bboxes=args.bboxes,
             classify_agnor=args.classify_agnor,
             decision_tree_model_path=args.decision_tree_model,
