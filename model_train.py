@@ -8,7 +8,10 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+
 import segmentation_models as sm
+sm.set_framework("tf.keras")
+
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
