@@ -46,7 +46,7 @@ def main():
     parser.add_argument(
         "-g",
         "--grayscale",
-        help="Whether or not to save predictions as gayscale masks.",
+        help="Whether or not to save predictions as grayscale masks.",
         default=False,
         action="store_true")
 
@@ -83,6 +83,25 @@ def main():
         type=str)
 
     parser.add_argument(
+        "-bboxes",
+        "--bboxes",
+        help="The path to a directory containing `labelme` annotations with bounding boxes indicating objects to be considered.",
+        required=False,
+        type=str)
+
+    parser.add_argument(
+        "--classify-agnor",
+        help="Whether or not to classify AgNORs in `cluster` or `satellite`.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
+        "--decision-tree-model",
+        help="The path to the decision tree model to be used to classify AgNORs. Only effective if `--classify-agnor` is `True`.",
+        required=False,
+        type=str)
+
+    parser.add_argument(
         "--measures-only",
         help="Do not save the predicted images or copy the input images to the output path. If `True`, it will override the effect of `output`.",
         default=False,
@@ -90,7 +109,7 @@ def main():
 
     parser.add_argument(
         "--multi-measurements",
-        help="Performs the measurement of multiple records in a directory containing subdirectories of classes. The classes subdirectores should contain subdirectories with images.",
+        help="Performs the measurement of multiple records in a directory containing subdirectories of classes. The classes subdirectories should contain subdirectories with images.",
         default=False,
         action="store_true")
 
@@ -137,6 +156,9 @@ def main():
                 output_contour_analysis=output,
                 record_id=directory.name,
                 record_class=directory.parent.name,
+                bboxes=args.bboxes,
+                classify_agnor=args.classify_agnor,
+                decision_tree_model_path=args.decision_tree_model_path,
                 measures_only=args.measures_only,
             )
     else:
@@ -152,6 +174,9 @@ def main():
             output_contour_analysis=args.analysis_output,
             record_id=args.record_id,
             record_class=args.record_class,
+            bboxes=args.bboxes,
+            classify_agnor=args.classify_agnor,
+            decision_tree_model_path=args.decision_tree_model,
             measures_only=args.measures_only,
         )
 
