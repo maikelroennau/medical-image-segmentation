@@ -162,7 +162,7 @@ def plot_metrics(
                     image.annotate(text, value, arrowprops=dict(facecolor='black', shrink=0.05))
 
             image = image.get_figure()
-            image.savefig(str(output_path.joinpath(f"0{i+1}_{title.lower().replace('', '_')}.png")))
+            image.savefig(str(output_path.joinpath(f"0{i+1}_{title.lower().replace(' ', '_')}.png")))
 
 
 def compute_classes_distribution(
