@@ -179,7 +179,7 @@ def compute_classes_distribution(
         dataset (tf.data.Dataset): A `tf.data.Dataset` containing the images and segmentation masks.
         batches (Optional[int], optional): The number of batches the dataset contains. Defaults to 1.
         plot (Optional[bool], optional): Whether or not to plot and save a Matplotlib bars graph with the classes distribution. Defaults to True.
-        figsize (Optional[Tuple[int, int]], optional): The size of the figure to be ploted. Defaults to (20, 10).
+        figsize (Optional[Tuple[int, int]], optional): The size of the figure to be plotted. Defaults to (20, 10).
         output (Optional[str], optional): The path where to save the figure. Defaults to ".".
         get_as_weights (Optional[bool], optional): Converts the number of pixels per class to percentage over all classes. Defaults to False.
         classes (Optional[list], optional): The name of the classes. Defaults to ["Background", "Nucleus", "NOR"].
