@@ -6,6 +6,8 @@ import tensorflow as tf
 from skimage.io import imread
 from tqdm import tqdm
 
+from utils.utils import color_classes
+
 
 SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
 
@@ -42,8 +44,8 @@ def one_hot_encode(image: Union[np.ndarray, tf.Tensor], classes: int, as_numpy: 
     """
     if isinstance(image, np.ndarray):
         one_hot_encoded = np.zeros(image.shape[:2] + (classes,), dtype=np.uint8)
-        for i, unique_value in enumerate(np.unique(image)):
-            one_hot_encoded[:, :, i][image == unique_value] = 1
+        for unique_value in enumerate(np.unique(image)):
+            one_hot_encoded[:, :, unique_value][image == unique_value] = 1
         return one_hot_encoded
     elif isinstance(image, tf.Tensor):
         image = tf.cast(image, dtype=tf.int32)
@@ -271,9 +273,9 @@ def write_dataset(
 
     Args:
         dataset (tf.data.Dataset): The dataset to be written, in the format `((None, HEIGHT, WIDTH, CHANNELS), (None, HEIGHT, WIDTH, CLASSES))`.
-        batches (Optional[int], optional): The number of batches of the dataset to write.. Defaults to None.
+        batches (Optional[int], optional): The number of batches of the dataset to write. Defaults to None.
         output_path (Optional[str], optional): The path where to save the written items of the dataset.. Defaults to "dataset_visualization".
-        rgb_masks (Optional[bool], optional): Whether to write the masks as RGB images.. Defaults to True.
+        rgb_masks (Optional[bool], optional): Whether to write the masks as RGB images. Defaults to True.
         mask_intensity (Optional[int], optional): The intensity of the masks. Defaults to 127.
     """
     output = Path(output_path)
@@ -305,6 +307,7 @@ def write_dataset(
                 for new_intensity, intensity in enumerate(np.unique(mask)):
                     mask = np.where(mask == intensity, new_intensity, mask)
 
+            mask = color_classes(mask.numpy())
             tf.keras.preprocessing.image.save_img(mask_name, mask * mask_intensity, scale=False)
 
         if i == batches:

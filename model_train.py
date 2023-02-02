@@ -53,6 +53,7 @@ def show_train_config(
     print(f"  - Steps per epoch: {train_config['steps_per_epoch']}")
     print(f"  - Input shape: {train_config['input_shape']}")
     print(f"  - One hot encoded: {train_config['one_hot_encoded']}")
+    print(f"  - Encoder weights freeze: {train_config['encoder_freeze']}")
     print(f"  - GPU(s): {train_config['gpu']}")
     print(f"  - Metrics: {train_config['metrics']}")
     print(f"  - Save all weights: {train_config['save_all']}")
@@ -111,6 +112,7 @@ def train(
     height: int,
     width: int,
     rgb: bool,
+    encoder_freeze: bool,
     save_all: bool,
     gpu: str,
     model_name: str,
@@ -139,6 +141,7 @@ def train(
         height (int): The height of the images.
         width (int): The width of the images.
         rgb (bool): Whether or not the dataset images are RGB.
+        encoder_freeze (bool): Whether or not to freeze the encoder weights.
         save_all (bool): Whether or not to save the model weights after each epoch. If `False`, overrites the previous model with the new one if it scores better given a metric.
         gpu (str): What GPUs to use during training. For multi-GPU, use the format `GPU0,GPU1,GPU2,...`. For CPU, pass `-1`.
         model_name (str): The name of the model file.
@@ -218,6 +221,7 @@ def train(
         "steps_per_epoch": steps_per_epoch,
         "input_shape": input_shape,
         "one_hot_encoded": one_hot_encoded,
+        "encoder_freeze": encoder_freeze,
         "gpu": str(gpu),
         "metrics": [metric if isinstance(metric, str) else metric.__name__ for metric in metrics],
         "train_dataset": str(train_dataset_path),
@@ -275,7 +279,7 @@ def train(
                         initial_epoch=int(resume_epoch),
                         callbacks=callbacks)
                 else:
-                    model = make_model(backbone, decoder, input_shape, classes, learning_rate, loss_function, metrics, model_name)
+                    model = make_model(backbone, decoder, input_shape, classes, learning_rate, loss_function, metrics, encoder_freeze, model_name)
                     model.summary()
                     show_train_config(train_config, start_time)
 
@@ -303,7 +307,7 @@ def train(
                     initial_epoch=int(resume_epoch),
                     callbacks=callbacks)
             else:
-                model = make_model(backbone, decoder, input_shape, classes, learning_rate, loss_function, metrics, model_name)
+                model = make_model(backbone, decoder, input_shape, classes, learning_rate, loss_function, metrics, encoder_freeze, model_name)
                 model.summary()
                 show_train_config(train_config, start_time)
 
@@ -352,7 +356,7 @@ def train(
             batch_size=1,
             classes=classes,
             one_hot_encoded=one_hot_encoded,
-            input_shape=(1920, 2560, 3), # TODO: Update to be the same value specified in the arguments.
+            input_shape=(1088, 1920, 3), # TODO: Update to be the same value specified in the arguments.
             loss_function=loss_function,
             model_name=model_name)
 
@@ -432,6 +436,12 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "--encoder-freeze",
+        help="Whether or not to freeze the encoder weights.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
         "--save-all",
         default=False,
         help="Whether or no to save all weights. If `True` saves weights after each epoch, if `False`, saves only if better than the previous epoch.",
@@ -488,6 +498,7 @@ def main():
         height=args.height,
         width=args.width,
         rgb=args.rgb,
+        encoder_freeze=args.encoder_freeze,
         save_all=args.save_all,
         gpu=args.gpu,
         model_name=args.name,
