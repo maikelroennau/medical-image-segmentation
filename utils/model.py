@@ -66,6 +66,7 @@ def make_model(
     learning_rate: float,
     loss_function: str,
     metrics: List[str],
+    encoder_freeze: Optional[bool] = False,
     model_name: Optional[str] = None) -> tf.keras.Model:
     """Make a TensorFlow model on top of Keras using `Segmentation models` library.
 
@@ -79,6 +80,7 @@ def make_model(
         learning_rate (float): The learning rate to use to train the model.
         loss_function (str): The loss function to be used by the model. Should be a callable or a string supported by TensorFlow.
         metrics (List[str]): A list of metrics to evaluate the model.
+        encoder_freeze (Optional[bool]): Whether or not to freeze the encoder weights.
         model_name (Optional[str], optional): A name to be added to the model. Defaults to None.
 
     Returns:
@@ -91,7 +93,7 @@ def make_model(
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",
             encoder_weights="imagenet",
-            encoder_freeze=False,
+            encoder_freeze=encoder_freeze,
             decoder_block_type="transpose",
             decoder_filters=(512, 256, 128, 64, 32),
             decoder_use_batchnorm=True
@@ -103,7 +105,7 @@ def make_model(
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",
             encoder_weights="imagenet",
-            encoder_freeze=False,
+            encoder_freeze=encoder_freeze,
             decoder_filters=(None, None, None, None, 16),
             decoder_use_batchnorm=True,
             decoder_block_type="transpose"
@@ -115,7 +117,7 @@ def make_model(
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",
             encoder_weights="imagenet",
-            encoder_freeze=False,
+            encoder_freeze=encoder_freeze,
             pyramid_block_filters=256,
             pyramid_use_batchnorm=True,
             pyramid_aggregation="concat",
@@ -128,7 +130,7 @@ def make_model(
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",
             encoder_weights="imagenet",
-            encoder_freeze=False,
+            encoder_freeze=encoder_freeze,
             downsample_factor=8,
             psp_conv_filters=512,
             psp_pooling_type="avg",

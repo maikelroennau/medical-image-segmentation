@@ -11,6 +11,26 @@ import segmentation_models as sm
 import tensorflow as tf
 
 
+# Default color map start.
+COLOR_MAP = np.asarray([
+    [130, 130, 130], # Gray         _background_
+    
+    # AgNOR
+    [255, 128,   0], # Orange
+    [  0,   0, 255], # Blue
+    [128,   0,  64], # Purple
+
+    # Papanicolaou
+    [ 78, 121, 167], # Blue         aglomerado
+    [242, 142,  43], # Orange       citoplasma
+    [ 44, 160,  44], # Green        escama
+    [200,  82,   0], # Brown        superficial
+    [ 23, 190, 207], # Turquoise    intermediaria
+    [188, 189,  34], # Mustard      suspeita
+    [148, 103, 189], # Purple       binucleacao
+], dtype=np.uint8)
+
+
 def collapse_probabilities(
     prediction: Union[np.ndarray, tf.Tensor],
     pixel_intensity: Optional[int] = 127) -> Union[np.ndarray, tf.Tensor]:
@@ -41,18 +61,14 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: A RGB image with colored pixels per class.
     """
-    # Default color map start.
-    color_map = [
-        [130, 130, 130], # Gray
-        [255, 128,   0], # Orange
-        [  0,   0, 255], # Blue
-        [128,   0,  64]  # Purple
-    ]
+    # Check if the image encodes the number of classes.
+    if len(prediction.shape) < 3:
+        raise ValueError("The image must be one hot encoded.")
 
     # Extend color map if necessary.
     n_classes = prediction.shape[-1]
-    if n_classes > len(color_map):
-        color_map.extend(imgviz.label_colormap(n_label=n_classes))
+    if n_classes > len(COLOR_MAP):
+        COLOR_MAP.extend(imgviz.label_colormap(n_label=n_classes))
 
     # Obtain color map before changing the array.
     class_maps = []
@@ -62,12 +78,32 @@ def color_classes(prediction: np.ndarray) -> np.ndarray:
     # Recolor classes.
     for i in range(prediction.shape[-1]):
         for j in range(3): # 3 color channels
-            prediction[:, :, j] = np.where(class_maps[i], color_map[i][j], prediction[:, :, j])
+            prediction[:, :, j] = np.where(class_maps[i], COLOR_MAP[i][j], prediction[:, :, j])
 
     # Remove any extra channels so the array can be saved as an image.
     prediction = prediction[:, :, :3]
 
     return prediction
+
+
+def one_hot_encoded_to_rgb(image: np.ndarray) -> np.ndarray:
+    """Convert one-hot-encoded arrays to RGB images.
+
+    Args:
+        image (np.ndarray): The input array, with an arbitrary number of dimensions.
+
+    Returns:
+        np.ndarray: The RGB image mapping each dimension to a color.
+    """
+    # Extend color map if necessary.
+    n_classes = len(np.unique(image))
+    if n_classes > len(COLOR_MAP):
+        COLOR_MAP.extend(imgviz.label_colormap(n_label=n_classes))
+
+    # Add new axis to represent RGB colors.
+    overlay_mask = imgviz.label2rgb(image, colormap=COLOR_MAP)
+
+    return overlay_mask
 
 
 def get_intersection(

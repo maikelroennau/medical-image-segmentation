@@ -97,7 +97,7 @@ def evaluate(
     if Path(models_paths).is_file():
         models_paths = [models_paths]
     elif Path(models_paths).is_dir():
-        models_paths = [str(path) for path in Path(models_paths).glob("*.h5")]
+        models_paths = [str(path) for path in Path(models_paths).glob("*.h5") if model_name in str(path)]
     else:
         raise FileNotFoundError(f"No file models were found at `{models_paths}`.")
 
