@@ -68,13 +68,18 @@ def is_nan(number: Union[int, float]) -> bool:
     return number != number
 
 
-def document(experiment_file: str, file_pattern: Optional[str] = "*train_config*.json", output: Optional[str] = "."):
+def document(
+    experiment_file: str,
+    file_pattern: Optional[str] = "*train_config*.json",
+    output: Optional[str] = ".",
+    ignore_duplicates: Optional[bool] = False):
     """Extract model information like metrics and hyperparameters from `train_config.json` files.
 
     Args:
         experiment_file (str): Path to a `train_config.json` file or a directory containing multiple `train_config.json` files.
         file_pattern (Optional[str], optional): A pattern of file names to search for recursively. Defaults to "*train_config.json".
         output (Optional[str], optional): The location where to save the `.csv` with the extracted metrics. Defaults to ".".
+        ignore_duplicates (Optional[bool], optional): Whether or not to ignore duplicate records in the output file. A duplicate is when a `directory` already exists in the file. Defaults to False.
     """
     experiment_file = Path(experiment_file)
     if experiment_file.is_file():
@@ -142,9 +147,12 @@ def document(experiment_file: str, file_pattern: Optional[str] = "*train_config*
 
                 if output.name.endswith(".csv"):
                     if output.is_file():
-                        existing_data = pd.read_csv(str(output))
-                        if int(EXPERIMENT_DATA["directory"][0]) not in existing_data["directory"].values:
+                        if ignore_duplicates:
                             df.to_csv(str(output), mode="a", header=False, index=False)
+                        else:
+                            existing_data = pd.read_csv(str(output))
+                            if int(EXPERIMENT_DATA["directory"][0].split("_")[0]) not in existing_data["directory"].values:
+                                df.to_csv(str(output), mode="a", header=False, index=False)
                     else:
                         df.to_csv(str(output), mode="w", header=True, index=False)
                 else:
@@ -179,8 +187,15 @@ def main():
             default="experiments.csv",
             type=str)
 
+    parser.add_argument(
+        "-i",
+        "--ignore-duplicates",
+        help="Ignore duplicate entries. Based on `directory` field.",
+        action="store_true",
+        default=False)
+
     args = parser.parse_args()
-    document(args.experiment_file, args.pattern, args.output)
+    document(args.experiment_file, args.pattern, args.output, args.ignore_duplicates)
 
 
 if __name__ == "__main__":
