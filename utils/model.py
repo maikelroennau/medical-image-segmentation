@@ -150,8 +150,7 @@ def load_model(
     input_shape: Tuple[int, int, int] = None,
     loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
     optimizer: Optional[tf.keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
-    compile: Optional[bool] = True,
-    is_training: Optional[bool] = False) -> tf.keras.Model:
+    compile: Optional[bool] = True) -> tf.keras.Model:
     """Load a Keras model.
 
     Args:
@@ -175,63 +174,6 @@ def load_model(
     if input_shape:
         if input_shape != get_model_input_shape(model):
             model = replace_model_input_shape(model, input_shape)
-
-    if is_training:
-        # Replace last layer
-        x = model.layers[-3].output
-        x = tf.keras.layers.Conv2D(filters=8, kernel_size=(3, 3), padding="same", use_bias=True, kernel_initializer="glorot_uniform")(x)
-        x = tf.keras.layers.Softmax()(x)
-        model = tf.keras.Model(inputs=model.input, outputs=x)
-
-    #     for i in range(len(model.layers)):
-    #         model.layers[i].trainable = True
-
-    #     model.layers[-2].trainable = True
-
-    layers_to_freeze = [
-        "data",
-        "zero_padding2d",
-        "conv0",
-        "relu0",
-        "zero_padding2d_1",
-        "pooling0",
-        "stage1_unit1_relu1",
-        "zero_padding2d_2",
-        "stage1_unit1_conv1",
-        "stage1_unit1_relu2",
-        "zero_padding2d_3",
-        "stage1_unit1_conv2",
-        "stage1_unit1_sc",
-        "add",
-        "stage1_unit2_relu1",
-        "zero_padding2d_4",
-        "stage1_unit2_conv1",
-        "stage1_unit2_relu2",
-        "zero_padding2d_5",
-        "stage1_unit2_conv2",
-        "add_1",
-        "stage2_unit1_relu1",
-        "zero_padding2d_6",
-        "stage2_unit1_conv1",
-        "stage2_unit1_relu2",
-        "zero_padding2d_7",
-        "stage2_unit1_conv2",
-        "stage2_unit1_sc",
-        "add_2",
-        "stage2_unit2_relu1",
-        "zero_padding2d_8",
-        "stage2_unit2_conv1",
-        "stage2_unit2_relu2",
-        "zero_padding2d_9",
-        "stage2_unit2_conv2",
-        "add_3",
-        "stage3_unit1_relu1",
-        "zero_padding2d_10",
-    ]
-    
-    for layer in model.layers:
-        if layer.name in layers_to_freeze:
-            layer.trainable = False
 
     if compile:
         model.compile(optimizer=optimizer, loss=loss_function, metrics=[METRICS])
