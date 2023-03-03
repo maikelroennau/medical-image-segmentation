@@ -16,9 +16,9 @@ COLOR_MAP = np.asarray([
     [130, 130, 130], # Gray         _background_
     
     # AgNOR
-    [255, 128,   0], # Orange
-    [  0,   0, 255], # Blue
-    [128,   0,  64], # Purple
+    # [255, 128,   0], # Orange
+    # [  0,   0, 255], # Blue
+    # [128,   0,  64], # Purple
 
     # Papanicolaou
     [ 78, 121, 167], # Blue         aglomerado
@@ -348,7 +348,7 @@ def get_labelme_shapes(annotation_path: str, shape_types: Optional[List[str]] = 
     if not annotation_path.is_file():
         raise FileNotFoundError(f"The annotation file `{annotation_path}` was not found.")
     else:
-        with open(str(annotation_path), "r") as annotation_pointer:
+        with open(str(annotation_path), "r", encoding="utf-8") as annotation_pointer:
             annotation_file = json.load(annotation_pointer)
 
         shapes = []

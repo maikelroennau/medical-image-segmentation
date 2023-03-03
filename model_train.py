@@ -267,7 +267,8 @@ def train(
                         model_path=str(Path(resume)),
                         input_shape=input_shape,
                         loss_function=loss_function,
-                        optimizer=Adam(learning_rate=learning_rate))
+                        optimizer=Adam(learning_rate=learning_rate),
+                        is_training=True)
                     model.summary()
                     show_train_config(train_config, start_time)
 
@@ -295,7 +296,8 @@ def train(
                     model_path=str(Path(resume)),
                     input_shape=input_shape,
                     loss_function=loss_function,
-                    optimizer=Adam(learning_rate=learning_rate))
+                    optimizer=Adam(learning_rate=learning_rate),
+                    is_training=True)
                 model.summary()
                 show_train_config(train_config, start_time)
 
