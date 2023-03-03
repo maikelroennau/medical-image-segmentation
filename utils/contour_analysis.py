@@ -526,6 +526,7 @@ def classify_agnor(model_path: str, contours: List[np.ndarray]) -> List[np.ndarr
     classifier =joblib.load(model_path)
     predictions = classifier.predict(features)
     df["agnor_type"] = predictions
+    # print(predictions)
 
     contours = list(df.T.to_dict().values())
     return contours
@@ -563,7 +564,7 @@ def discard_unboxed_contours(
                     nuclei_contours_adequate_final.append(contour)
         parent_contours = nuclei_contours_adequate_final
         child_contours, _ = discard_contours_outside_contours(parent_contours, child_contours)
-        
+
         # Create a new mask with the filtered nuclei and NORs
         pixel_intensity = int(np.max(np.unique(prediction)))
         background = np.ones(prediction.shape[:2], dtype=np.uint8)
@@ -576,5 +577,5 @@ def discard_unboxed_contours(
         nucleus = np.where(nor, 0, nucleus)
         background = np.where(np.logical_and(nucleus == 0, nor == 0), pixel_intensity, 0)
         prediction = np.stack([background, nucleus, nor], axis=2).astype(np.uint8)
-    
+
     return prediction, parent_contours, child_contours

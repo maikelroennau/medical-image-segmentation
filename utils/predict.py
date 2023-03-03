@@ -166,6 +166,22 @@ def predict(
                     if classify_agnor:
                         child_measurements = contour_analysis.classify_agnor(decision_tree_model_path, child_measurements)
 
+                        prediction = np.stack([
+                            prediction[:, :, 0],
+                            prediction[:, :, 1],
+                            prediction[:, :, 2],
+                            np.zeros(prediction.shape[:2], dtype=np.uint8)
+                        ], axis=2)
+
+                        filtered_child_contour, _ = contour_analysis.discard_contours_outside_contours([parent_contour], child_contours)
+
+                        # OpenCV's `drawContours` fails using array slices, so a new matrix must be created, drawn on and assigned to `predictions`.
+                        satellites = prediction[:, :, 3].copy()
+                        for classified_measurement, classified_contour in zip(child_measurements, filtered_child_contour):
+                            if classified_measurement["agnor_type"] == "satellite":
+                                cv2.drawContours(satellites, contours=[classified_contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
+                        prediction[:, :, 3] = satellites
+
                     contour_analysis.write_contour_measurements(
                         parent_measurements=parent_measurements,
                         child_measurements=child_measurements,

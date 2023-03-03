@@ -16,7 +16,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from utils.utils import color_classes
+from utils.utils import COLOR_MAP, one_hot_encoded_to_rgb
 
 
 def parse_labels_file(labels_file: str, filter_labels: bool) -> Tuple[List, dict]:
@@ -167,57 +167,55 @@ def convert_annotations_to_masks(
             overlay_dir.mkdir(parents=True, exist_ok=True)
 
         for annotation in tqdm(annotations):
-            try:
-                if filter_invalid:
-                    with open(str(annotation), "r") as annotation_file:
-                        annotation_file = json.load(annotation_file)
-                        if "invalidated" in annotation_file.keys():
-                            if annotation_file["invalidated"]:
-                                continue
+            if filter_invalid:
+                with open(str(annotation), "r", encoding="utf-8") as annotation_file:
+                    annotation_file = json.load(annotation_file)
+                    if "invalidated" in annotation_file.keys():
+                        if annotation_file["invalidated"]:
+                            continue
 
-                label_file = labelme.LabelFile(filename=annotation)
+            label_file = labelme.LabelFile(filename=annotation)
 
-                if filter_labels:
-                    label_file.shapes = [shape for shape in label_file.shapes if shape["label"] in class_names]
+            if filter_labels:
+                label_file.shapes = [shape for shape in label_file.shapes if shape["label"] in class_names]
 
-                image_type = ".tif" if save_as_tif else ".png"
-                image_file_path = str(images_dir.joinpath(annotation.stem + image_type))
-                mask_file_path = str(masks_dir.joinpath(annotation.stem + "_mask.png"))
+            image_type = ".tif" if save_as_tif else ".png"
+            image_file_path = str(images_dir.joinpath(annotation.stem + image_type))
+            mask_file_path = str(masks_dir.joinpath(annotation.stem + "_mask.png"))
 
-                image = labelme.utils.img_data_to_arr(label_file.imageData)
-                if save_as_tif:
-                    tifffile.imwrite(image_file_path, image, photometric="rgb")
-                else:
-                    cv2.imwrite(image_file_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            image = labelme.utils.img_data_to_arr(label_file.imageData)
+            if save_as_tif:
+                tifffile.imwrite(image_file_path, image, photometric="rgb")
+            else:
+                cv2.imwrite(image_file_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
-                label_file = filter_shapes(label_file)
-                label_file = merge_classes(label_file, "nucleus", "discarded_nucleus")
-                label_file = merge_classes(label_file, "nor", "discarded_nor")
-                label_file = sort_shapes(label_file, classes_order=class_names)
-                class_names = tuple(class_name for class_name in class_names if class_name not in ["discarded_nucleus", "discarded_nor"])
+            label_file = filter_shapes(label_file)
+            # label_file = merge_classes(label_file, "nucleus", "discarded_nucleus")
+            # label_file = merge_classes(label_file, "nor", "discarded_nor")
+            label_file = sort_shapes(label_file, classes_order=class_names)
+            # class_names = tuple(class_name for class_name in class_names if class_name not in ["discarded_nucleus", "discarded_nor"])
 
-                mask, _ = labelme.utils.shapes_to_label(
-                    img_shape=image.shape,
-                    shapes=label_file.shapes,
-                    label_name_to_value=class_name_to_id)
+            mask, _ = labelme.utils.shapes_to_label(
+                img_shape=image.shape,
+                shapes=label_file.shapes,
+                label_name_to_value=class_name_to_id)
 
-                if color:
-                    colored_mask = color_classes(mask)
-                    imsave(mask_file_path, colored_mask, check_contrast=False)
-                else:
-                    cv2.imwrite(mask_file_path, mask)
+            if color:
+                colored_mask = one_hot_encoded_to_rgb(mask.copy())
+                imsave(mask_file_path, colored_mask, check_contrast=False)
+            else:
+                cv2.imwrite(mask_file_path, mask)
 
-                if overlay:
-                    overlay_file_path = str(overlay_dir.joinpath(annotation.stem + "_overlay.png"))
-                    overlay_mask = imgviz.label2rgb(
-                        label=mask,
-                        img=image,
-                        font_size=20,
-                        label_names=class_names,
-                        loc="rb")
-                    cv2.imwrite(overlay_file_path, cv2.cvtColor(overlay_mask, cv2.COLOR_BGR2RGB))
-            except Exception as e:
-                print(e)
+            if overlay:
+                overlay_file_path = str(overlay_dir.joinpath(annotation.stem + "_overlay.png"))
+                overlay_mask = imgviz.label2rgb(
+                    label=mask,
+                    image=image,
+                    font_size=20,
+                    label_names=class_names,
+                    loc="rb",
+                    colormap=COLOR_MAP)
+                cv2.imwrite(overlay_file_path, cv2.cvtColor(overlay_mask, cv2.COLOR_BGR2RGB))
     else:
         raise FileNotFoundError(f"No directory was found at `{input_dir}`.")
 
