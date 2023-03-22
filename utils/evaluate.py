@@ -120,9 +120,15 @@ def evaluate(
         metric = METRICS[i] if isinstance(METRICS[i], str) else METRICS[i].__name__
         models_metrics[f"test_{metric}"] = [0] * len(models_metrics["test_loss"])
 
+    previous_metrics = None
     for i, model_path in enumerate(models_paths):
-        model = load_model(model_path=model_path, input_shape=input_shape, loss_function=loss_function)
-        evaluation_metrics = model.evaluate(evaluate_dataset, return_dict=True)
+        try:
+            model = load_model(model_path=model_path, input_shape=input_shape, loss_function=loss_function)
+            evaluation_metrics = model.evaluate(evaluate_dataset, return_dict=True)
+            previous_metrics = evaluation_metrics
+        except Exception:
+            print(f"Could not open model file `{model_path}`. Replicating metrics from the previous weight.")
+            evaluation_metrics = previous_metrics
 
         print(f"Model {str(model_path)}")
         print(f"  - Loss: {np.round(evaluation_metrics['loss'], 4)}")

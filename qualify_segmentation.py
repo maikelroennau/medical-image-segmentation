@@ -2,8 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
-# from utils.qualify_segmentation import qualify_segmentation
-from utils.qualify_segmentation_report_iou import qualify_segmentation
+from utils.qualify_segmentation import qualify_segmentation
 
 
 def main():

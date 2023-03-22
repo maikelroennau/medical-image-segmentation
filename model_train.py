@@ -18,7 +18,7 @@ from tensorflow.keras.optimizers import Adam
 from utils.data import list_files, load_dataset
 from utils.evaluate import evaluate
 from utils.model import load_model, make_model
-from utils.utils import add_time_delta, get_duration, plot_metrics
+from utils.utils import add_time_delta, get_duration, plot_metrics, optimize_models_storage
 
 
 def show_train_config(
@@ -367,6 +367,7 @@ def train(
                 json.dump(train_config, config_file, indent=4)
 
             plot_metrics(train_config_path)
+            optimize_models_storage(str(checkpoint_directory))
     else:
         print(f"\nSkipping evaluation, no models were found at `{str(checkpoint_directory)}`.")
 

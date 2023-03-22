@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
@@ -14,7 +15,7 @@ import tensorflow as tf
 # Default color map start.
 COLOR_MAP = np.asarray([
     [130, 130, 130], # Gray         _background_
-    
+
     # AgNOR
     # [255, 128,   0], # Orange
     # [  0,   0, 255], # Blue
@@ -438,3 +439,32 @@ def get_mean_rgb_values(contour: np.ndarray, image: np.ndarray) -> List[Union[fl
     green = np.round(np.sum(mask * image[:, :, 1]) / total, 4)
     blue = np.round(np.sum(mask * image[:, :, 2]) / total, 4)
     return red, green, blue
+
+
+def optimize_models_storage(directory: str) -> None:
+    directory = Path(directory)
+    train_config_file = directory.joinpath(f"train_config_{directory.name}.json")
+    if not train_config_file.is_file():
+        train_config_file = directory.joinpath(f"train_config.json")
+        if not train_config_file.is_file():
+            print(f"Train config file not found at '{str(directory)}'.")
+            return
+
+    with open(str(train_config_file)) as f:
+        config_file = json.load(f)
+
+        if "best_model" not in config_file:
+            print(f"No best model information found in `{str(directory.joinpath(train_config_file.name))}`")
+            return
+
+        best_model = config_file["best_model"]["model"]
+
+        models = [model.name for model in directory.glob("*.h5")]
+        if best_model in models:
+            models.remove(best_model)
+        else:
+            print(f"The best model '{best_model}' was not found in the directory '{str(directory.joinpath(train_config_file.name))}'")
+            return
+
+        for model in models:
+            os.remove(str(directory.joinpath(model)))
