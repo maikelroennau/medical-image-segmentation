@@ -393,11 +393,13 @@ def main():
     parser.add_argument(
         "--loss",
         default="dice",
+        help="Loss function to use during training.",
         type=str)
 
     parser.add_argument(
         "--lr",
         default=1e-4,
+        help="Learning rate.",
         type=float)
 
     parser.add_argument(
@@ -409,6 +411,7 @@ def main():
     parser.add_argument(
         "--classes",
         default=3,
+        help="Number of output dimensions.",
         type=int)
 
     parser.add_argument(
@@ -434,6 +437,7 @@ def main():
     parser.add_argument(
         "--rgb",
         default=True,
+        help="Whether the input images are RGB.",
         action="store_true")
 
     parser.add_argument(
@@ -451,6 +455,7 @@ def main():
     parser.add_argument(
         "--gpu",
         default="0",
+        help="What GPU to use for training. For multi-GPU, pass GPU numbers separated with commas (e.g., `0,1`). For using CPU, pass `-1`.",
         type=str)
 
     parser.add_argument(
