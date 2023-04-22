@@ -16,7 +16,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from utils.utils import COLOR_MAP, one_hot_encoded_to_rgb
+from utils.utils import get_color_map, one_hot_encoded_to_rgb
 
 
 def parse_labels_file(labels_file: str, filter_labels: bool) -> Tuple[List, dict]:
@@ -206,6 +206,9 @@ def convert_annotations_to_masks(
             else:
                 cv2.imwrite(mask_file_path, mask)
 
+            n_classes = len(class_names)
+            color_map = get_color_map(n_classes)
+
             if overlay:
                 overlay_file_path = str(overlay_dir.joinpath(annotation.stem + "_overlay.png"))
                 overlay_mask = imgviz.label2rgb(
@@ -214,7 +217,7 @@ def convert_annotations_to_masks(
                     font_size=20,
                     label_names=class_names,
                     loc="rb",
-                    colormap=COLOR_MAP)
+                    colormap=color_map)
                 cv2.imwrite(overlay_file_path, cv2.cvtColor(overlay_mask, cv2.COLOR_BGR2RGB))
     else:
         raise FileNotFoundError(f"No directory was found at `{input_dir}`.")
