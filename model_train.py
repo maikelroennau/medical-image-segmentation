@@ -42,7 +42,7 @@ def show_train_config(
         print(f"Duration: {duration}")
 
     print(f"  - Directory: {train_config['directory']}")
-    print(f"  - Backbone: {train_config['backbone']}")
+    print(f"  - Encoder: {train_config['encoder']}")
     print(f"  - Decoder: {train_config['decoder']}")
     print(f"  - Loss function: {train_config['loss_function']}")
     print(f"  - Initial learning rate: {train_config['initial_learning_rate']}")
@@ -99,7 +99,7 @@ def update_best_model_and_metrics(train_config: dict, best_model: dict, models_m
 
 
 def train(
-    backbone: str,
+    encoder: str,
     decoder: str,
     dataset: str,
     loss: str,
@@ -122,13 +122,13 @@ def train(
     resume_epoch: int) -> None:
     """Trains a segmentation model using the specified architecture and hyperparameters.
 
-    This function will train a segmentation model using the specified backbone and decoder and hyperparameters.
+    This function will train a segmentation model using the specified encoder and decoder and hyperparameters.
     The trained model is saved to a directory named `checkpoints`, in a subdirectory with named after the date and time the training started, following this pattern: `YYYYMMDDHHMMSS`.
     A `JSON` file is also saved containing all specifications used to train the model, including paths to the dataset and number of samples in each subset.
     The `JSON` file can be used as an argument to te `document_experiments.py` script to produce a `.csv` file summarizing the experiment. Multiple `JSON` files from different experiments can be processed and be saved to a single `.csv` file.
 
     Args:
-        backbone (str): The backbone to be used in the model's architecture. See the available backbones at `https://github.com/qubvel/segmentation_models`.
+        encoder (str): The encoder to be used in the model's architecture. See the available encoders at `https://github.com/qubvel/segmentation_models`.
         decoder (str): The decoder to be used in the model's architecture. Must be one of `U-Net`, `Linknet`, `FPN`, or `PSPNet`.
         dataset (str): The path to the directory containing the images. It must contain three subdirectories: `train`, `validation`, and `test`. And each subdirectory must contain other two subdirectories: `images`, and `masks`.
         loss (str): The loss function to be used to train the model. Must be one of `dice`, `focal`, or `categorical`.
@@ -210,7 +210,7 @@ def train(
     train_config_path = str(checkpoint_directory.joinpath(f"train_config_{checkpoint_directory.name}.json"))
     train_config = {
         "directory": checkpoint_directory.name,
-        "backbone": backbone,
+        "encoder": encoder,
         "decoder": decoder,
         "loss_function": loss_function.__name__ if isinstance(loss_function, types.FunctionType) else loss_function.name,
         "initial_learning_rate": learning_rate,
@@ -279,7 +279,7 @@ def train(
                         initial_epoch=int(resume_epoch),
                         callbacks=callbacks)
                 else:
-                    model = make_model(backbone, decoder, input_shape, classes, learning_rate, loss_function, metrics, encoder_freeze, model_name)
+                    model = make_model(encoder, decoder, input_shape, classes, learning_rate, loss_function, metrics, encoder_freeze, model_name)
                     model.summary()
                     show_train_config(train_config, start_time)
 
@@ -307,7 +307,7 @@ def train(
                     initial_epoch=int(resume_epoch),
                     callbacks=callbacks)
             else:
-                model = make_model(backbone, decoder, input_shape, classes, learning_rate, loss_function, metrics, encoder_freeze, model_name)
+                model = make_model(encoder, decoder, input_shape, classes, learning_rate, loss_function, metrics, encoder_freeze, model_name)
                 model.summary()
                 show_train_config(train_config, start_time)
 
@@ -376,7 +376,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train a model accordingly to the arguments.")
 
     parser.add_argument(
-        "--backbone",
+        "--encoder",
         help="The feature extractor of the model.",
         type=str)
 
@@ -486,7 +486,7 @@ def main():
     args = parser.parse_args()
 
     train(
-        backbone=args.backbone,
+        encoder=args.encoder,
         decoder=args.decoder,
         dataset=args.dataset,
         loss=args.loss,
