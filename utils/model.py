@@ -59,7 +59,7 @@ def replace_model_input_shape(model: tf.keras.Model, new_input_shape: Tuple[int,
 
 
 def make_model(
-    backbone: str,
+    encoder: str,
     decoder: str,
     input_shape: Tuple[int, int, int],
     classes: int,
@@ -70,10 +70,10 @@ def make_model(
     model_name: Optional[str] = None) -> tf.keras.Model:
     """Make a TensorFlow model on top of Keras using `Segmentation models` library.
 
-    The complete list of supported backbones and decoders is available at Segmentation models: https://github.com/qubvel/segmentation_models.
+    The complete list of supported encoders and decoders is available at Segmentation models: https://github.com/qubvel/segmentation_models.
 
     Args:
-        backbone (str): The backbone of the model.
+        encoder (str): The encoder of the model.
         decoder (str): The decoder of the model.
         input_shape (Tuple[int, int, int]): The input shape of the model in the format `(HEIGHT, WIDTH, CHANNELS)`.
         classes (int): The number of classes the model must predict.
@@ -88,7 +88,7 @@ def make_model(
     """
     if decoder == "U-Net":
         model = sm.Unet(
-            backbone_name=backbone,
+            backbone_name=encoder,
             input_shape=input_shape,
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",
@@ -100,7 +100,7 @@ def make_model(
         )
     elif decoder == "Linknet":
         model = sm.Linknet(
-            backbone_name=backbone,
+            backbone_name=encoder,
             input_shape=input_shape,
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",
@@ -112,7 +112,7 @@ def make_model(
         )
     elif decoder == "FPN":
         model = sm.FPN(
-            backbone_name=backbone,
+            backbone_name=encoder,
             input_shape=input_shape,
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",
@@ -125,7 +125,7 @@ def make_model(
         )
     elif decoder == "PSPNet":
         model = sm.PSPNet(
-            backbone_name=backbone,
+            backbone_name=encoder,
             input_shape=input_shape,
             classes=classes,
             activation="softmax" if classes > 1 else "sigmoid",

@@ -11,7 +11,7 @@ from tqdm import tqdm
 EXPERIMENT_DATA = {
     "directory": None,
     "model_name": None,
-    "backbone": None,
+    "encoder": None,
     "decoder": None,
     "epochs": None,
     "batch_size": None,
