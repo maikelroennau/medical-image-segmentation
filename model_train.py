@@ -373,7 +373,7 @@ def train(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train a model accordingly to the arguments.")
+    parser = argparse.ArgumentParser(description="Train a segmentation model.")
 
     parser.add_argument(
         "--encoder",
