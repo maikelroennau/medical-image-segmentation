@@ -356,7 +356,7 @@ def train(
             batch_size=1,
             classes=classes,
             one_hot_encoded=one_hot_encoded,
-            input_shape=(1088, 1920, 3), # TODO: Update to be the same value specified in the arguments.
+            input_shape=input_shape,
             loss_function=loss_function,
             model_name=model_name)
 

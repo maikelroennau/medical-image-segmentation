@@ -14,7 +14,7 @@ This repository contains the code for the paper "A CNN-based approach for joint 
 2. Execute the following commands:
 
 ```console
-git clone https://github.com/maikelroennau/medical-image-segmentation
+git clone https://github.com/maikelroennau/medical-image-segmentation.git
 cd medical-image-segmentation
 conda env create -n mis --file environment.yml
 conda activate mis
@@ -78,6 +78,21 @@ Training a model:
 python model_train.py --encoder resnet18 --decoder U-Net --dataset path/to/dataset --loss dice --classes 3 --epochs 3 --batch-size 16 --steps 40 --height 1920 --width 2560 --save-all --name MySegmentationModel --description "Segmentation model"
 ```
 
+Note: The training script expects the dataset directory to contain the following structure:
+
+```console
+dataset/
+├─ train/
+│  ├─ images/
+│  ├─ masks/
+├─ validation/
+│  ├─ images/
+│  ├─ masks/
+├─ test/
+│  ├─ images/
+│  ├─ masks/
+```
+
 Predicting with a trained model:
 
 ```console
@@ -86,4 +101,12 @@ python predict.py --model paht/to/model.h5 -i path/to/images -o output/path --in
 
 ## Pre-trained models
 
-You can download pre-trained models for AgNOR slide-image segmentation from here: https://ufrgscpd-my.sharepoint.com/:f:/g/personal/00330519_ufrgs_br/EnzAQbs3_4FHlbxemScpD9IBVKNpGUbXRH0Oqqw7nFkYGA?e=vRbBpS
+You can download pre-trained models (and a few image samples too) for AgNOR slide-image segmentation from here: https://ufrgscpd-my.sharepoint.com/:f:/g/personal/00330519_ufrgs_br/EnzAQbs3_4FHlbxemScpD9IBVKNpGUbXRH0Oqqw7nFkYGA?e=vRbBpS
+
+| **Rank** | **Model file**                              |
+|----------|---------------------------------------------|
+|     1    | AgNOR_DenseNet-169_LinkNet_1920x2560x3.h5** |
+|     2    | AgNOR_DenseNet-169_FPN_1920x2560x3.h5       |
+|     3    | AgNOR_ResNet-34_U-Net_1920x2560x3.h5        |
+
+** This is the preferred model because it obtained the best performance (Dice score) in the [AgECOM](https://github.com/maikelroennau/AgECOM) dataset.
