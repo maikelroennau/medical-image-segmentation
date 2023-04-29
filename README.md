@@ -99,7 +99,7 @@ Predicting with a trained model:
 python predict.py --model paht/to/model.h5 -i path/to/images -o output/path --input-shape 1920x2560x3
 ```
 
-## Pre-trained models
+## Pre-trained models and sample images
 
 You can download pre-trained models (and a few image samples too) for AgNOR slide-image segmentation from here: https://ufrgscpd-my.sharepoint.com/:f:/g/personal/00330519_ufrgs_br/EnzAQbs3_4FHlbxemScpD9IBVKNpGUbXRH0Oqqw7nFkYGA?e=vRbBpS
 
