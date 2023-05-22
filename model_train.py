@@ -111,6 +111,7 @@ def train(
     steps_per_epoch: int,
     height: int,
     width: int,
+    augment: bool,
     rgb: bool,
     encoder_freeze: bool,
     save_all: bool,
@@ -140,6 +141,7 @@ def train(
         steps_per_epoch (int): The number of steps per epoch (number of batches per epoch).
         height (int): The height of the images.
         width (int): The width of the images.
+        augment (bool): Wheter or not to augment the training dataset.
         rgb (bool): Whether or not the dataset images are RGB.
         encoder_freeze (bool): Whether or not to freeze the encoder weights.
         save_all (bool): Whether or not to save the model weights after each epoch. If `False`, overrites the previous model with the new one if it scores better given a metric.
@@ -195,7 +197,7 @@ def train(
         mask_one_hot_encoded=one_hot_encoded,
         repeat=True,
         shuffle=True,
-        augment=True
+        augment=augment
     )
 
     validation_dataset = load_dataset(
@@ -435,6 +437,12 @@ def main():
     parser.add_argument(
         "--width",
         type=int)
+    
+    parser.add_argument(
+        "--augment",
+        default=False,
+        help="Wheter or not to augment the training dataset. Defaults to False.",
+        action="store_true")
 
     parser.add_argument(
         "--rgb",
@@ -505,6 +513,7 @@ def main():
         steps_per_epoch=args.steps,
         height=args.height,
         width=args.width,
+        augment=args.augment,
         rgb=args.rgb,
         encoder_freeze=args.encoder_freeze,
         save_all=args.save_all,
