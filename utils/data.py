@@ -198,6 +198,51 @@ def load_dataset_files(
     return image, mask
 
 
+def augment_dataset(
+    image: tf.Tensor,
+    mask: tf.Tensor,
+    threshold: Optional[float] = 0.5,
+    brightness_delta: Optional[float] = 0.4,
+    contrast_lower: Optional[float] = 0.6,
+    contrast_upper: Optional[float] = 1.6,
+    hue_delta: Optional[float] = 0.2,
+    saturation_lower: Optional[float] = 0.6,
+    saturation_upper: Optional[float] = 1.6) -> Tuple[tf.Tensor, tf.Tensor]:
+    """
+    Applies data augmentation techniques to an image and its corresponding mask.
+
+    Args:
+        image (tf.Tensor): The input image tensor.
+        mask (tf.Tensor): The corresponding mask tensor.
+        threshold (float, optional): The threshold value for determining if augmentation should be applied. If the randomly generated probability is greater than the threshold, augmentation is applied.Defaults to 0.5.
+        brightness_delta (float, optional): The maximum delta value for adjusting the brightness of the image.Defaults to 0.4.
+        contrast_lower (float, optional): The lower bound for adjusting the contrast of the image. Defaults to 0.6.
+        contrast_upper (float, optional): The upper bound for adjusting the contrast of the image. Defaults to 1.6.
+        hue_delta (float, optional): The maximum delta value for adjusting the hue of the image. Defaults to 0.2.
+        saturation_lower (float, optional): The lower bound for adjusting the saturation of the image. Defaults to 0.6.
+        saturation_upper (float, optional): The upper bound for adjusting the saturation of the image. Defaults to 1.6.
+
+    Returns:
+        Tuple[tf.Tensor, tf.Tensor]: A tuple containing the augmented image and its corresponding mask tensor.
+    """
+    probability = tf.random.uniform(shape=[], minval=0.0, maxval=1.0, dtype=tf.float32)
+    if probability > threshold:
+        image = tf.image.flip_left_right(image)
+        mask = tf.image.flip_left_right(mask)
+
+    if probability > threshold:
+        image = tf.image.flip_up_down(image)
+        mask = tf.image.flip_up_down(mask)
+
+    seed = tf.random.uniform(shape=[2], maxval=1000, dtype=tf.int32)
+
+    image = tf.image.stateless_random_brightness(image, brightness_delta, seed=seed)
+    image = tf.image.stateless_random_contrast(image, contrast_lower, contrast_upper, seed=seed)
+    image = tf.image.stateless_random_hue(image, hue_delta, seed=seed)
+    image = tf.image.stateless_random_saturation(image, saturation_lower, saturation_upper, seed=seed)
+    return image, mask
+
+
 def load_dataset(
     dataset_path: str,
     batch_size: Optional[int] = 1,
@@ -205,7 +250,8 @@ def load_dataset(
     classes: Optional[int] = 3,
     mask_one_hot_encoded: Optional[bool] = True,
     repeat: Optional[bool] = False,
-    shuffle: Optional[bool] = True) -> tf.data.Dataset:
+    shuffle: Optional[bool] = True,
+    augment: Optional[bool] = False) -> tf.data.Dataset:
     """Loads a `tf.data.Dataset`.
 
     Args:
@@ -216,6 +262,7 @@ def load_dataset(
         mask_one_hot_encoded (Optional[bool], optional): Converts the masks to one-hot-encoded masks, where one dimension is added per class, and each dimension is a binary mask of that class. Defaults to True.
         repeat (Optional[bool], optional): Whether the dataset should be infinite or not. Defaults to False.
         shuffle (Optional[bool], optional): Whether to shuffle the loaded elements. Defaults to True.
+        augment (Optional[bool], optional): Whether to apply augmentation to the dataset. Defaults to False.
 
     Raises:
         FileNotFoundError: In case the dataset path does not exist.
@@ -240,6 +287,8 @@ def load_dataset(
 
         dataset = tf.data.Dataset.zip((images_list, masks_list))
 
+        dataset = dataset.cache()
+
         dataset = dataset.map(
             lambda image_path, mask_path: load_dataset_files(
                 image_path=image_path,
@@ -250,14 +299,18 @@ def load_dataset(
             )
         )
 
+        if augment:
+            dataset = dataset.map(augment_dataset, num_parallel_calls=tf.data.AUTOTUNE)
+        
+        dataset = dataset.batch(batch_size)
+        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+
         if shuffle:
-            dataset = dataset.shuffle(buffer_size=batch_size * batch_size)
+            dataset = dataset.shuffle(buffer_size=batch_size * batch_size, reshuffle_each_iteration=True)
 
         if repeat:
             dataset = dataset.repeat()
 
-        dataset = dataset.batch(batch_size)
-        dataset = dataset.prefetch(buffer_size=1)
         return dataset
     else:
         raise FileNotFoundError(f"The directory `{str(dataset_path)}` does not exist.")

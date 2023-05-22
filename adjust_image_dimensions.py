@@ -65,6 +65,7 @@ def main() -> None:
         "-m",
         "--mode",
         help="The interpolation method. Must be one of [`constant`, `edge`, `linear_ramp`, `maximum`, `mean`, `median`, `minimum`, `reflect`, `symmetric`, `wrap`, `empty`]. Only effective if adding pixels to the image. Defaults to `constant`.",
+        default="constant",
         type=str)
 
     args = parser.parse_args()
