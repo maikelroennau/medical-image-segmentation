@@ -20,7 +20,7 @@ def get_color_map(classes: Optional[int] = 4):
     Args:
         classes (Optional[int], optional): The number of classes to provide a color map for. If 4, then provides the default colormap for AgNOR images. If 8, then provides the default colormap for Papanicolaou. Defaults to 4.
     """
-    if classes == 3:
+    if classes <= 4:
         # AgNOR
         color_map = np.asarray([
             [130, 130, 130], # Gray         _background_
@@ -28,7 +28,7 @@ def get_color_map(classes: Optional[int] = 4):
             [  0,   0, 255], # Blue
             [128,   0,  64], # Purple
         ], dtype=np.uint8)
-    elif classes == 7:
+    elif classes <= 8:
         # Papanicolaou
         color_map = np.asarray([
             [130, 130, 130], # Gray         _background_

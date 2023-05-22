@@ -194,7 +194,8 @@ def train(
         classes=classes,
         mask_one_hot_encoded=one_hot_encoded,
         repeat=True,
-        shuffle=True
+        shuffle=True,
+        augment=True
     )
 
     validation_dataset = load_dataset(
@@ -204,7 +205,8 @@ def train(
         classes=classes,
         mask_one_hot_encoded=one_hot_encoded,
         repeat=False,
-        shuffle=True
+        shuffle=True,
+        augment=False
     )
 
     train_config_path = str(checkpoint_directory.joinpath(f"train_config_{checkpoint_directory.name}.json"))
