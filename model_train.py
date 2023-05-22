@@ -52,6 +52,7 @@ def show_train_config(
     print(f"  - Batch size: {train_config['batch_size']}")
     print(f"  - Steps per epoch: {train_config['steps_per_epoch']}")
     print(f"  - Input shape: {train_config['input_shape']}")
+    print(f"  - Augmentation: {train_config['augmentation']}")
     print(f"  - One hot encoded: {train_config['one_hot_encoded']}")
     print(f"  - Encoder weights freeze: {train_config['encoder_freeze']}")
     print(f"  - GPU(s): {train_config['gpu']}")
@@ -111,7 +112,7 @@ def train(
     steps_per_epoch: int,
     height: int,
     width: int,
-    augment: bool,
+    augmentation: bool,
     rgb: bool,
     encoder_freeze: bool,
     save_all: bool,
@@ -141,7 +142,7 @@ def train(
         steps_per_epoch (int): The number of steps per epoch (number of batches per epoch).
         height (int): The height of the images.
         width (int): The width of the images.
-        augment (bool): Wheter or not to augment the training dataset.
+        augmentation (bool): Wheter or not to augmentation the training dataset.
         rgb (bool): Whether or not the dataset images are RGB.
         encoder_freeze (bool): Whether or not to freeze the encoder weights.
         save_all (bool): Whether or not to save the model weights after each epoch. If `False`, overrites the previous model with the new one if it scores better given a metric.
@@ -197,7 +198,7 @@ def train(
         mask_one_hot_encoded=one_hot_encoded,
         repeat=True,
         shuffle=True,
-        augment=augment
+        augment=augmentation
     )
 
     validation_dataset = load_dataset(
@@ -224,6 +225,7 @@ def train(
         "batch_size": batch_size,
         "steps_per_epoch": steps_per_epoch,
         "input_shape": input_shape,
+        "augmentation": augmentation,
         "one_hot_encoded": one_hot_encoded,
         "encoder_freeze": encoder_freeze,
         "gpu": str(gpu),
@@ -439,10 +441,11 @@ def main():
         type=int)
     
     parser.add_argument(
-        "--augment",
-        default=False,
-        help="Wheter or not to augment the training dataset. Defaults to False.",
-        action="store_true")
+        "--augmentation",
+        help="Enable or disable agumentation in the training set. Defaults to False.",
+        choices=["true", "false"],
+        default="false",
+        type=str)
 
     parser.add_argument(
         "--rgb",
@@ -513,7 +516,7 @@ def main():
         steps_per_epoch=args.steps,
         height=args.height,
         width=args.width,
-        augment=args.augment,
+        augmentation=True if args.augmentation.lower() == "true" else False,
         rgb=args.rgb,
         encoder_freeze=args.encoder_freeze,
         save_all=args.save_all,
