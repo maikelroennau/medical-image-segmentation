@@ -23,6 +23,7 @@ EXPERIMENT_DATA = {
     "train_samples": None,
     "validation_samples": None,
     "test_samples": None,
+    "augmentation": None,
     "duration": None,
     "train_loss": None,
     "train_f1-score": None,
@@ -68,6 +69,23 @@ def is_nan(number: Union[int, float]) -> bool:
     return number != number
 
 
+def format_encoder_name(encoder):
+    names = (
+        ("densenet", "DenseNet-"),
+        ("efficientnetb", "EfficientNet-B"),
+        ("inceptionv3", "Inception-V3"),
+        ("resnet", "ResNet-"),
+        ("resnext", "ResNeXt-"),
+        ("vgg", "VGG-")
+    )
+
+    for name in names:
+        if name[0] in encoder:
+            encoder = encoder.replace(name[0], name[1])
+            return encoder
+    return encoder
+
+
 def document(
     experiment_file: str,
     file_pattern: Optional[str] = "*train_config*.json",
@@ -85,7 +103,7 @@ def document(
     if experiment_file.is_file():
         files = [str(experiment_file)]
     elif experiment_file.is_dir():
-        files = [str(experiment) for experiment in experiment_file.rglob(file_pattern)]
+        files = [str(experiment) for experiment in experiment_file.rglob(file_pattern) if "failed" not in str(experiment)]
     else:
         print(f"The file or directory '{str(experiment_file)}' was not found.")
         return
@@ -141,7 +159,19 @@ def document(
                 for key in EXPERIMENT_DATA.keys():
                     EXPERIMENT_DATA[key] = None
                     if key in experiment.keys():
-                        EXPERIMENT_DATA[key] = [experiment[key]]
+                        if key == "encoder":
+                            EXPERIMENT_DATA[key] = [format_encoder_name(experiment[key])]
+                        elif key == "train_dataset":
+                            EXPERIMENT_DATA[key] = [Path(experiment[key]).parent.name]
+                        elif key == "loss_function":
+                            if experiment[key] == "categorical_crossentropy_plus_dice_loss":
+                                EXPERIMENT_DATA[key] = ["Dice loss"]
+                            elif experiment[key] == "focal_loss_plus_dice_loss":
+                                EXPERIMENT_DATA[key] = ["Focal loss"]
+                            else:
+                                EXPERIMENT_DATA[key] = [experiment[key]]
+                        else:
+                            EXPERIMENT_DATA[key] = [experiment[key]]
 
                 df = pd.DataFrame.from_dict(EXPERIMENT_DATA)
 
