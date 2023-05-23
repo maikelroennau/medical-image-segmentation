@@ -230,6 +230,7 @@ def augment_dataset(
         image = tf.image.flip_left_right(image)
         mask = tf.image.flip_left_right(mask)
 
+    probability = tf.random.uniform(shape=[], minval=0.0, maxval=1.0, dtype=tf.float32)
     if probability > threshold:
         image = tf.image.flip_up_down(image)
         mask = tf.image.flip_up_down(mask)
