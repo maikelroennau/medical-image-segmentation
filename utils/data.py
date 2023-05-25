@@ -333,8 +333,7 @@ def write_dataset(
     dataset: tf.data.Dataset,
     batches: Optional[int] = None,
     output_path: Optional[str] = "dataset_visualization",
-    rgb_masks: Optional[bool] = True,
-    mask_intensity: Optional[int] = 127) -> None:
+    rgb_masks: Optional[bool] = True) -> None:
     """Write to disk a given `tf.data.Dataset`.
 
     Args:
@@ -342,7 +341,6 @@ def write_dataset(
         batches (Optional[int], optional): The number of batches of the dataset to write. Defaults to None.
         output_path (Optional[str], optional): The path where to save the written items of the dataset.. Defaults to "dataset_visualization".
         rgb_masks (Optional[bool], optional): Whether to write the masks as RGB images. Defaults to True.
-        mask_intensity (Optional[int], optional): The intensity of the masks. Defaults to 127.
     """
     output = Path(output_path)
     images_path = output.joinpath("images")
@@ -374,7 +372,7 @@ def write_dataset(
                     mask = np.where(mask == intensity, new_intensity, mask)
 
             mask = color_classes(mask.numpy())
-            tf.keras.preprocessing.image.save_img(mask_name, mask * mask_intensity, scale=False)
+            tf.keras.preprocessing.image.save_img(mask_name, mask, scale=False)
 
         if i == batches:
             break
