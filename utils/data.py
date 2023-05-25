@@ -202,7 +202,7 @@ def augment_dataset(
     image: tf.Tensor,
     mask: tf.Tensor,
     threshold: Optional[float] = 0.5,
-    brightness_delta: Optional[float] = 0.4,
+    brightness_delta: Optional[float] = 0.2,
     contrast_lower: Optional[float] = 0.6,
     contrast_upper: Optional[float] = 1.6,
     hue_delta: Optional[float] = 0.2,
@@ -235,12 +235,24 @@ def augment_dataset(
         image = tf.image.flip_up_down(image)
         mask = tf.image.flip_up_down(mask)
 
-    seed = tf.random.uniform(shape=[2], maxval=1000, dtype=tf.int32)
+    seed = tf.random.uniform(shape=[2], maxval=10000, dtype=tf.int32)
 
-    image = tf.image.stateless_random_brightness(image, brightness_delta, seed=seed)
-    image = tf.image.stateless_random_contrast(image, contrast_lower, contrast_upper, seed=seed)
-    image = tf.image.stateless_random_hue(image, hue_delta, seed=seed)
-    image = tf.image.stateless_random_saturation(image, saturation_lower, saturation_upper, seed=seed)
+    probability = tf.random.uniform(shape=[], minval=0.0, maxval=1.0, dtype=tf.float32)
+    if probability > threshold:
+        image = tf.image.stateless_random_brightness(image, brightness_delta, seed=seed)
+
+    probability = tf.random.uniform(shape=[], minval=0.0, maxval=1.0, dtype=tf.float32)
+    if probability > threshold:
+        image = tf.image.stateless_random_contrast(image, contrast_lower, contrast_upper, seed=seed)
+
+    probability = tf.random.uniform(shape=[], minval=0.0, maxval=1.0, dtype=tf.float32)
+    if probability > threshold:
+        image = tf.image.stateless_random_hue(image, hue_delta, seed=seed)
+
+    probability = tf.random.uniform(shape=[], minval=0.0, maxval=1.0, dtype=tf.float32)
+    if probability > threshold:
+        image = tf.image.stateless_random_saturation(image, saturation_lower, saturation_upper, seed=seed)
+
     return image, mask
 
 
@@ -302,7 +314,7 @@ def load_dataset(
 
         if augment:
             dataset = dataset.map(augment_dataset, num_parallel_calls=tf.data.AUTOTUNE)
-        
+
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
