@@ -9,7 +9,7 @@ from utils.data import SUPPORTED_IMAGE_TYPES
 from utils.utils import pad_along_axis
 
 
-def process(images: str, axis: int, pixels: int, mode: Optional[str] = "constant") -> None:
+def process(images: str, axis: int, pixels: int, mode: Optional[str] = "constant", grayscale: Optional[bool] = False) -> None:
     """Process the images and pad them or remove pixels from them according to the arguments.
 
     Args:
@@ -17,11 +17,15 @@ def process(images: str, axis: int, pixels: int, mode: Optional[str] = "constant
         axis (int): The axis of the images to change. Must be either `0` (width) or `1` (height).
         pixels (int): The number of pixels the output images must have.
         mode (Optional[str], optional): How to fill new pixels. Only effective if adding new pixels to the image. Defaults to "constant".
+        grayscale (Optional[bool], optional): Load images in grayscale. Defaults to `False`.
     """
     files = [str(file) for file in Path(images).glob("*") if file.suffix in SUPPORTED_IMAGE_TYPES]
 
     for file in tqdm(files):
-        image = cv2.imread(file)
+        if grayscale:
+            image = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
+        else:
+            image = cv2.imread(file)
 
         if image.shape[axis] > pixels:
             if axis == 0:
@@ -67,6 +71,14 @@ def main() -> None:
         help="The interpolation method. Must be one of [`constant`, `edge`, `linear_ramp`, `maximum`, `mean`, `median`, `minimum`, `reflect`, `symmetric`, `wrap`, `empty`]. Only effective if adding pixels to the image. Defaults to `constant`.",
         default="constant",
         type=str)
+    
+    parser.add_argument(
+        "-g",
+        "--grayscale",
+        help="Load images in grayscale. Defaults to `False`.",
+        choices=["true", "false"],
+        default="false",
+        type=str)
 
     args = parser.parse_args()
 
@@ -74,7 +86,8 @@ def main() -> None:
         images=args.images,
         axis=args.axis,
         pixels=args.pixels,
-        mode=args.mode)
+        mode=args.mode,
+        grayscale=True if args.augmentation.lower() == "true" else False)
 
 
 if __name__ == "__main__":
