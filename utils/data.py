@@ -61,6 +61,25 @@ def one_hot_encode(image: Union[np.ndarray, tf.Tensor], classes: int, as_numpy: 
         raise TypeError(f"Argument `image` should be `np.ndarray` or `tf.Tensor. Given `{type(image)}`.")
 
 
+def normalize(image: tf.Tensor) -> tf.Tensor:
+    """Normalize image in range [0, 1].
+
+    Args:
+        image (tf.Tensor): The imput image.
+
+    Returns:
+        tf.Tensor: Normalized image.
+    """
+    image = tf.cast(image, dtype=tf.float32)
+
+    min = tf.reduce_min(image)
+    max = tf.reduce_max(image)
+
+    image = (image - min) / (max - min)
+
+    return image
+
+
 def load_image(
     image_path: Union[str, tf.Tensor],
     shape: Tuple[int, int] = None,
@@ -106,8 +125,7 @@ def load_image(
                         image = tf.image.resize(image, shape, method="nearest")
 
                 if normalize:
-                    image = tf.cast(image, dtype=tf.float32)
-                    image = image / 255.
+                    image = normalize(image)
 
                 if as_numpy:
                     image = image.numpy()
@@ -189,7 +207,7 @@ def load_dataset_files(
     Returns:
         Tuple[tf.Tensor, tf.Tensor]: The loaded image and mask.
     """
-    image = load_image(image_path, shape=shape, normalize=True)
+    image = load_image(image_path, shape=shape, normalize=False)
     mask = load_image(mask_path, shape=shape, as_gray=True)
 
     if mask_one_hot_encoded:
@@ -314,6 +332,12 @@ def load_dataset(
 
         if augment:
             dataset = dataset.map(augment_dataset, num_parallel_calls=tf.data.AUTOTUNE)
+
+        def normalize_images(image: tf.Tensor, mask: tf.Tensor):
+            image = normalize(image)
+            return image, mask
+
+        dataset = dataset.map(normalize_images)
 
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
