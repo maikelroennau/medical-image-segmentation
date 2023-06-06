@@ -61,7 +61,7 @@ def one_hot_encode(image: Union[np.ndarray, tf.Tensor], classes: int, as_numpy: 
         raise TypeError(f"Argument `image` should be `np.ndarray` or `tf.Tensor. Given `{type(image)}`.")
 
 
-def normalize(image: tf.Tensor) -> tf.Tensor:
+def normalize_image(image: tf.Tensor) -> tf.Tensor:
     """Normalize image in range [0, 1].
 
     Args:
@@ -125,7 +125,7 @@ def load_image(
                         image = tf.image.resize(image, shape, method="nearest")
 
                 if normalize:
-                    image = normalize(image)
+                    image = normalize_image(image)
 
                 if as_numpy:
                     image = image.numpy()
@@ -333,11 +333,11 @@ def load_dataset(
         if augment:
             dataset = dataset.map(augment_dataset, num_parallel_calls=tf.data.AUTOTUNE)
 
-        def normalize_images(image: tf.Tensor, mask: tf.Tensor):
-            image = normalize(image)
+        def apply_normalization(image: tf.Tensor, mask: tf.Tensor):
+            image = normalize_image(image)
             return image, mask
 
-        dataset = dataset.map(normalize_images)
+        dataset = dataset.map(apply_normalization)
 
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
