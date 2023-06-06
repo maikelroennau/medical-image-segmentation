@@ -206,8 +206,10 @@ def convert_annotations_to_masks(
             else:
                 cv2.imwrite(mask_file_path, mask)
 
-            n_classes = len(class_names)
-            color_map = get_color_map(n_classes)
+            if len(class_names) > 4:
+                color_map = get_color_map(colormap="papanicolaou")
+            else:
+                color_map = get_color_map(colormap="agnor")
 
             if overlay:
                 overlay_file_path = str(overlay_dir.joinpath(annotation.stem + "_overlay.png"))
