@@ -12,25 +12,25 @@ import segmentation_models as sm
 import tensorflow as tf
 
 
-def get_color_map(classes: Optional[int] = 4):
+def get_color_map(colormap: Optional[str] = "agnor"):
     """Provides the default color map for the specified number of classes.
 
     The number of classes refers to the number of dimentions outputted by the model.
 
     Args:
-        classes (Optional[int], optional): The number of classes to provide a color map for. If 4, then provides the default colormap for AgNOR images. If 8, then provides the default colormap for Papanicolaou. Defaults to 4.
+        colormap (str): What color map to use. Pass `agnor` for a color map for 3 classes plus background, or pass `papanicolaou` for a color map for 7 classes plus background. Defaults to `agnor`.
     """
-    if classes <= 4:
+    if colormap == "agnor":
         # AgNOR
-        color_map = np.asarray([
+        color_map = [
             [130, 130, 130], # Gray         _background_
-            [255, 128,   0], # Orange
-            [  0,   0, 255], # Blue
-            [128,   0,  64], # Purple
-        ], dtype=np.uint8)
-    elif classes <= 8:
+            [255, 128,   0], # Orange       citoplasma
+            [  0,   0, 255], # Blue         AgNOR
+            [128,   0,  64], # Purple       Satellite
+        ]
+    elif colormap == "papanicolaou":
         # Papanicolaou
-        color_map = np.asarray([
+        color_map = [
             [130, 130, 130], # Gray         _background_
             [ 78, 121, 167], # Blue         aglomerado
             [242, 142,  43], # Orange       citoplasma
@@ -39,7 +39,7 @@ def get_color_map(classes: Optional[int] = 4):
             [ 23, 190, 207], # Turquoise    intermediaria
             [188, 189,  34], # Mustard      suspeita
             [148, 103, 189], # Purple       binucleacao
-        ], dtype=np.uint8)
+        ]
     else:
         return None
 
@@ -66,39 +66,66 @@ def collapse_probabilities(
     return prediction.astype(np.uint8)
 
 
-def color_classes(prediction: np.ndarray) -> np.ndarray:
+def color_classes(prediction: np.ndarray, colormap: Optional[str] = "agnor") -> np.ndarray:
     """Color a n-dimensional array of one-hot-encoded semantic segmentation image.
 
     Args:
         prediction (np.ndarray): The one-hot-encoded array image.
+        colormap (str): What color map to use. Pass `agnor` for a color map for 3 classes plus background, or pass `papanicolaou` for a color map for 7 classes plus background. Defaults to `agnor`.
 
     Returns:
         np.ndarray: A RGB image with colored pixels per class.
     """
     # Check if the image encodes the number of classes.
-    if len(prediction.shape) < 3:
-        raise ValueError("The image must be one hot encoded.")
+    if len(prediction.shape) >= 3:
 
-    # Extend color map if necessary.
-    n_classes = prediction.shape[-1]
-    color_map = get_color_map(n_classes)
-    if n_classes > len(color_map):
-        color_map.extend(imgviz.label_colormap(n_label=n_classes))
+        # Extend color map if necessary.
+        n_classes = prediction.shape[-1]
+        if n_classes > 4:
+            color_map = get_color_map(colormap="papanicolaou")
+        else:
+            color_map = get_color_map(colormap="agnor")
 
-    # Obtain color map before changing the array.
-    class_maps = []
-    for i in range(prediction.shape[-1]):
-        class_maps.append(prediction[:, :, i] > 0)
+        if n_classes > len(color_map):
+            color_map.extend(imgviz.label_colormap(n_label=n_classes))
 
-    # Recolor classes.
-    for i in range(prediction.shape[-1]):
-        for j in range(3): # 3 color channels
-            prediction[:, :, j] = np.where(class_maps[i], color_map[i][j], prediction[:, :, j])
+        # Obtain color map before changing the array.
+        class_maps = []
+        for i in range(n_classes):
+            class_maps.append(prediction[:, :, i] > 0)
 
-    # Remove any extra channels so the array can be saved as an image.
-    prediction = prediction[:, :, :3]
+        # Recolor classes.
+        for i in range(n_classes):
+            for j in range(3): # 3 color channels
+                prediction[:, :, j] = np.where(class_maps[i], color_map[i][j], prediction[:, :, j])
 
-    return prediction
+        # Remove any extra channels so the array can be saved as an image.
+        prediction = prediction[:, :, :3]
+
+        return prediction
+    else:
+        class_values = np.unique(prediction)
+        n_classes = len(class_values)
+
+        color_map = get_color_map(colormap=colormap)
+
+        # Extend color map if necessary.
+        if n_classes > len(color_map):
+            color_map.extend(imgviz.label_colormap(n_label=n_classes))
+
+        # Obtain color map.
+        class_maps = []
+        for class_value in class_values:
+            class_maps.append(prediction == class_value)
+
+        colored = np.zeros(prediction.shape + (3,), dtype=np.uint8)
+
+        # Recolor classes.
+        for i in range(n_classes):
+            for j in range(3): # 3 color channels
+                colored[:, :, j] = np.where(class_maps[i], color_map[i][j], colored[:, :, j])
+
+        return colored
 
 
 def one_hot_encoded_to_rgb(image: np.ndarray) -> np.ndarray:
@@ -112,7 +139,10 @@ def one_hot_encoded_to_rgb(image: np.ndarray) -> np.ndarray:
     """
     # Extend color map if necessary.
     n_classes = len(np.unique(image))
-    color_map = get_color_map(n_classes)
+    if n_classes > 4:
+        color_map = get_color_map(colormap="papanicolaou")
+    else:
+        color_map = get_color_map()
     if n_classes > len(color_map):
         color_map.extend(imgviz.label_colormap(n_label=n_classes))
 
