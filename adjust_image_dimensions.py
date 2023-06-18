@@ -87,7 +87,7 @@ def main() -> None:
         axis=args.axis,
         pixels=args.pixels,
         mode=args.mode,
-        grayscale=True if args.augmentation.lower() == "true" else False)
+        grayscale=True if args.grayscale.lower() == "true" else False)
 
 
 if __name__ == "__main__":
