@@ -121,9 +121,9 @@ def color_classes(prediction: np.ndarray, colormap: Optional[str] = "agnor") -> 
         colored = np.zeros(prediction.shape + (3,), dtype=np.uint8)
 
         # Recolor classes.
-        for i in range(n_classes):
+        for i, class_value in enumerate(class_values):
             for j in range(3): # 3 color channels
-                colored[:, :, j] = np.where(class_maps[i], color_map[i][j], colored[:, :, j])
+                colored[:, :, j] = np.where(class_maps[i], color_map[class_value][j], colored[:, :, j])
 
         return colored
 
