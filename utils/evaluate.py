@@ -138,15 +138,15 @@ def evaluate(
                 print(f"  - {metric}: {np.round(value, 4)}")
 
         # Add model metrics to dict
-        if len(model_path.split(model_name)[1].split("_")[1:]) > 0:
-            models_metrics["test_loss"][int(model_path.split(model_name)[1].split("_")[1][1:])-1] = evaluation_metrics["loss"]
+        if len(model_path.split(model.name)[1].split("_")[1:]) > 0:
+            models_metrics["test_loss"][int(model_path.split(model.name)[1].split("_")[1][1:])-1] = evaluation_metrics["loss"]
         else:
             models_metrics["test_loss"][-1] = evaluation_metrics["loss"]
 
         for metric, value in evaluation_metrics.items():
             if metric != "loss":
-                if len(model_path.split(model_name)[1].split("_")[1:]) > 0:
-                    models_metrics[f"test_{metric}"][int(str(model_path).split(model_name)[1].split("_")[1][1:])-1] = value
+                if len(model_path.split(model.name)[1].split("_")[1:]) > 0:
+                    models_metrics[f"test_{metric}"][int(str(model_path).split(model.name)[1].split("_")[1][1:])-1] = value
                 else:
                     models_metrics[f"test_{metric}"][-1] = value
 
