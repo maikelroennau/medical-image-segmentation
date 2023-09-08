@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 import cv2
 import imgviz
 import labelme
+import numpy as np
 import tifffile
 from skimage.io import imsave
 from tqdm import tqdm
@@ -210,6 +211,8 @@ def convert_annotations_to_masks(
                 color_map = get_color_map(colormap="papanicolaou")
             else:
                 color_map = get_color_map(colormap="agnor")
+
+            color_map = np.asarray(color_map, dtype=np.uint8)
 
             if overlay:
                 overlay_file_path = str(overlay_dir.joinpath(annotation.stem + "_overlay.png"))

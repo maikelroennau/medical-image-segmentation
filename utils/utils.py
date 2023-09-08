@@ -146,6 +146,8 @@ def one_hot_encoded_to_rgb(image: np.ndarray) -> np.ndarray:
     if n_classes > len(color_map):
         color_map.extend(imgviz.label_colormap(n_label=n_classes))
 
+    color_map = np.asarray(color_map, dtype=np.uint8)
+
     # Add new axis to represent RGB colors.
     overlay_mask = imgviz.label2rgb(image, colormap=color_map)
 
