@@ -138,3 +138,6 @@ dataset/**
 *.h5
 *_prediction.png
 *_image_detail.png
+*.tif
+*.png
+*.jpg
