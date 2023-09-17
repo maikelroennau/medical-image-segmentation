@@ -141,3 +141,5 @@ dataset/**
 *.tif
 *.png
 *.jpg
+*.json
+*.dat
