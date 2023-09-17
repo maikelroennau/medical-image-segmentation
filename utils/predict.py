@@ -121,7 +121,7 @@ def predict(
     output_predictions.mkdir(exist_ok=True, parents=True)
 
     for file in tqdm(files, desc=record_id):
-        image = load_image(image_path=file, normalize=normalize, as_numpy=True)
+        image, original_shape = load_image(image_path=file, normalize=normalize, shape=input_shape[:2], as_numpy=True, return_original_shape=True)
 
         if image.shape != input_shape:
             prediction = patch_predict(model, image, input_shape)
@@ -130,11 +130,12 @@ def predict(
             prediction = model(batch, training=False)[0].numpy()
 
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
+        prediction = cv2.resize(prediction, original_shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
 
         file = Path(file)
         if analyze_contours:
             prediction, detail = contour_analysis.analyze_contours(mask=prediction)
-            
+
             if bboxes is not None:
                 annotation = Path(bboxes).joinpath(f"{Path(file).stem.replace('_mask', '')}.json")
                 prediction = contour_analysis.discard_unboxed_contours(*prediction, annotation=annotation)
