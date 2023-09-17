@@ -9,7 +9,7 @@ from tqdm import tqdm
 from utils.utils import color_classes
 
 
-SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg"]
+SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp", ".JPG", ".PNG", ".BMP"]
 
 
 def reset_class_values(mask: np.ndarray) -> np.ndarray:
@@ -122,7 +122,10 @@ def load_image(
 
                 if shape:
                     if shape != image.shape[:2]:
-                        image = tf.image.resize(image, shape, method="nearest")
+                        if "mask" in image_path.stem:
+                            image = tf.image.resize(image, shape, method="nearest")
+                        else:
+                            image = tf.image.resize(image, shape, method="bilinear")
 
                 if normalize:
                     image = normalize_image(image)
