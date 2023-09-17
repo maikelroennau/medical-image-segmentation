@@ -85,7 +85,8 @@ def load_image(
     shape: Tuple[int, int] = None,
     normalize: Optional[bool] = False,
     as_gray: Optional[bool] = False,
-    as_numpy: Optional[bool] = False) -> tf.Tensor:
+    as_numpy: Optional[bool] = False,
+    return_original_shape: Optional[bool] = False) -> tf.Tensor:
     """Read an image from the storage media.
 
     Args:
@@ -94,6 +95,7 @@ def load_image(
         normalize (Optional[bool], optional): Whether or not to put the image values between zero and one ([0,1]). Defaults to False.
         as_gray (Optional[bool], optional): Whether or not to read the image in grayscale. Defaults to False.
         as_numpy: (Optional[bool], optional): Whether to return the listed files as Numpy comparable objects.
+        return_original_shape: (Optional[bool], optional): Whether to return the original shape of the image. Defaults to False.
 
     Raises:
         TypeError: If the image type is not supported.
@@ -103,6 +105,8 @@ def load_image(
     Returns:
         tf.Tensor: The read image.
     """
+    original_shape = None
+
     if isinstance(image_path, str):
         image_path = Path(image_path)
 
@@ -115,10 +119,12 @@ def load_image(
 
                 if image_path.suffix in [".tif", ".tiff"]:
                     image = imread(str(image_path), as_gray=as_gray)
+                    original_shape = image.shape
                     image = tf.convert_to_tensor(image, dtype=tf.float32)
                 else:
                     image = tf.io.read_file(str(image_path))
                     image = tf.image.decode_png(image, channels=channels)
+                    original_shape = tuple(image.shape.as_list())
 
                 if shape:
                     if shape != image.shape[:2]:
@@ -136,13 +142,18 @@ def load_image(
                     if as_gray:
                         image = image[:, :, 0]
 
-                return image
+                if return_original_shape:
+                    return image, original_shape
+                else:
+                    return image
         else:
             raise FileNotFoundError(f"The file `{image_path}` was not found.")
     elif isinstance(image_path, tf.Tensor):
         channels = 1 if as_gray else 3
         image = tf.io.read_file(image_path)
         image = tf.image.decode_png(image, channels=channels)
+
+        original_shape = tuple(image.shape.as_list())
 
         if shape:
             if shape != image.shape[:2]:
@@ -152,7 +163,10 @@ def load_image(
             image = tf.cast(image, dtype=tf.float32)
             image = image / 255.
 
-        return image
+        if return_original_shape:
+            return image, original_shape
+        else:
+            return image
     else:
         raise TypeError("Object `{image_path}` is not supported.")
 

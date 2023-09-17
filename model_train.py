@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-
 import segmentation_models as sm
 sm.set_framework("tf.keras")
 
@@ -18,7 +17,8 @@ from tensorflow.keras.optimizers import Adam
 from utils.data import list_files, load_dataset
 from utils.evaluate import evaluate
 from utils.model import load_model, make_model
-from utils.utils import add_time_delta, get_duration, plot_metrics, optimize_models_storage
+from utils.utils import (add_time_delta, get_duration, optimize_models_storage,
+                         plot_metrics)
 
 
 def show_train_config(
@@ -49,6 +49,7 @@ def show_train_config(
     print(f"  - Learning rate factor: {train_config['learning_rate_factor']}")
     print(f"  - Classes: {train_config['classes']}")
     print(f"  - Epochs: {train_config['epochs']}")
+    print(f"  - Patience: {train_config['patience']}")
     print(f"  - Batch size: {train_config['batch_size']}")
     print(f"  - Steps per epoch: {train_config['steps_per_epoch']}")
     print(f"  - Input shape: {train_config['input_shape']}")
@@ -108,6 +109,7 @@ def train(
     learning_rate_factor: float,
     classes: int,
     epochs: int,
+    patience: int,
     batch_size: int,
     steps_per_epoch: int,
     height: int,
@@ -138,6 +140,7 @@ def train(
         learning_rate_factor (float): A value to multiple to the learning rate and decrease it during the training.
         classes (int): The number of classes to segment.
         epochs (int): The number of epochs to train the model for.
+        patience (int): The number of epochs to wait before reducing the learning rate.
         batch_size (int): The number of images per batch.
         steps_per_epoch (int): The number of steps per epoch (number of batches per epoch).
         height (int): The height of the images.
@@ -222,6 +225,7 @@ def train(
         "learning_rate_factor": learning_rate_factor,
         "classes": classes,
         "epochs": epochs,
+        "patience": patience,
         "batch_size": batch_size,
         "steps_per_epoch": steps_per_epoch,
         "input_shape": input_shape,
@@ -254,7 +258,7 @@ def train(
 
     callbacks = [
         tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=10, verbose=1, mode="max"),
+            monitor="val_f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=patience, verbose=1, mode="max"),
         tf.keras.callbacks.ModelCheckpoint(
             checkpoint_model, monitor="val_f1-score", mode="max", save_best_only=False if save_all else True),
         # tf.keras.callbacks.TensorBoard(
@@ -423,6 +427,12 @@ def main():
     parser.add_argument(
         "--epochs",
         type=int)
+    
+    parser.add_argument(
+        "--patience",
+        default=10,
+        help="Number of epochs to wait before reducing the learning rate.",
+        type=int)
 
     parser.add_argument(
         "--batch-size",
@@ -442,7 +452,7 @@ def main():
     
     parser.add_argument(
         "--augmentation",
-        help="Enable or disable agumentation in the training set. Defaults to False.",
+        help="Enable or disable augmentation in the training set. Defaults to False.",
         choices=["true", "false"],
         default="false",
         type=str)
@@ -512,6 +522,7 @@ def main():
         learning_rate_factor=args.lr_factor,
         classes=args.classes,
         epochs=args.epochs,
+        patience=args.patience,
         batch_size=args.batch_size,
         steps_per_epoch=args.steps,
         height=args.height,

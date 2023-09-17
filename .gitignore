@@ -143,3 +143,4 @@ dataset/**
 *.jpg
 *.json
 *.dat
+*.bmp
