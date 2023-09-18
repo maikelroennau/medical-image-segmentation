@@ -9,7 +9,7 @@ from tqdm import tqdm
 from utils.utils import color_classes
 
 
-SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp", ".JPG", ".PNG", ".BMP"]
+SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp"]
 
 
 def reset_class_values(mask: np.ndarray) -> np.ndarray:
