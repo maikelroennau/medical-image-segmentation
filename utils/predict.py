@@ -132,6 +132,8 @@ def predict(
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
         prediction = cv2.resize(prediction, original_shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
 
+        prediction = contour_analysis.post_process_papanicolaou(prediction)
+
         file = Path(file)
         if analyze_contours:
             prediction, detail = contour_analysis.analyze_contours(mask=prediction)

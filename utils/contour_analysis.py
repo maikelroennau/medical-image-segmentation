@@ -9,6 +9,7 @@ import pandas as pd
 import tensorflow as tf
 from scipy.interpolate import splev, splprep
 
+from utils.data import reset_class_values, one_hot_encode
 from utils.utils import (color_classes, convert_bbox_to_contour,
                          get_intersection, get_labelme_points)
 
@@ -579,3 +580,85 @@ def discard_unboxed_contours(
         prediction = np.stack([background, nucleus, nor], axis=2).astype(np.uint8)
 
     return prediction, parent_contours, child_contours
+
+
+def post_process_papanicolaou(prediction: np.ndarray) -> np.ndarray:
+    """Reclassify the objects in the segmentation mask according to the Papanicolaou classification.
+
+    Args:
+        prediction (np.ndarray): The segmentation mask to be reclassified.
+    
+    Returns:
+        np.ndarray: The reclassified segmentation mask.
+    """
+    # Merge classes
+    nuclei = np.sum(prediction[:, :, 4:], axis=-1).astype(np.uint8)
+    cluster_cytoplasm = prediction[:, :, 1] + prediction[:, :, 2] + prediction[:, :, 3] + nuclei
+
+    # Extract contours
+    cluster_cytoplasm_contours, _ = cv2.findContours(cluster_cytoplasm, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    nuclei_contours, _ = cv2.findContours(nuclei, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Create masks to receive the reclassified objects
+    clusters_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+    nuclei_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+    anucleate_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+
+    # Reclassify clusters, cytoplasm and anucleate considering the number of nuclei inside the object
+    for contour in cluster_cytoplasm_contours:
+        nuclei_count = len(discard_contours_outside_contours(parent_contours=[contour], child_contours=nuclei_contours)[0])
+
+        if nuclei_count == 0:
+            # Anucleate
+            cv2.drawContours(anucleate_mask, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+        elif nuclei_count == 1:
+            # Cytoplasm
+            cv2.drawContours(nuclei_mask, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+        elif nuclei_count > 1:
+            # Cluster
+            cv2.drawContours(clusters_mask, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+
+    # Replace the original classes with the reclassified ones
+    prediction[:, :, 1] = clusters_mask
+    prediction[:, :, 2] = nuclei_mask
+    prediction[:, :, 3] = anucleate_mask
+
+    # Reset class values
+    prediction_reset = reset_class_values(prediction.copy())
+
+    # Create masks to receive the reclassified objects
+    superficial = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+    intermediate = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+    suspected = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+    binucleation = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+
+    for contour in nuclei_contours:
+        nucleus_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+        
+        cv2.drawContours(nucleus_mask, contours=[contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
+        
+        nuclei_pixels = nucleus_mask * prediction_reset
+        nucleus_class, counts = np.unique(nuclei_pixels, return_counts=True)
+
+        prevalent_class = nucleus_class[np.argmax(counts[1:]) + 1]
+
+        if prevalent_class == 4:
+            # Superficial
+            cv2.drawContours(superficial, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+        elif prevalent_class == 5:
+            # Intermediate
+            cv2.drawContours(intermediate, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+        elif prevalent_class == 6:
+            # Suspected
+            cv2.drawContours(suspected, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+        elif prevalent_class == 7:
+            # Binucleation
+            cv2.drawContours(binucleation, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+
+    # Replace the original classes with the reclassified ones
+    prediction[:, :, 4] = superficial
+    prediction[:, :, 5] = intermediate
+    prediction[:, :, 6] = suspected
+    prediction[:, :, 7] = binucleation
+
+    return prediction
