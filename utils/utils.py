@@ -459,6 +459,17 @@ def convert_bbox_to_contour(bbox: np.ndarray) -> np.array:
 
 
 def get_object_classes(annotation_path):
+    """Get the classes of the objects in an annotation file.
+
+    Args:
+        annotation_path (str): The path to the .json `labelme` annotation file.
+
+    Raises:
+        FileNotFoundError: If the annotation file is not found.
+
+    Returns:
+        List[str]: List containing the classes of the objects in the annotation file.
+    """
     annotation_path = Path(annotation_path)
     if not annotation_path.is_file():
         raise FileNotFoundError(f"The annotation file `{annotation_path}` was not found.")
@@ -492,6 +503,11 @@ def get_mean_rgb_values(contour: np.ndarray, image: np.ndarray) -> List[Union[fl
 
 
 def optimize_models_storage(directory: str) -> None:
+    """Removes all models in the directory except the best one.
+
+    Args:
+        directory (str): The directory where the models are stored.
+    """
     directory = Path(directory)
     train_config_file = directory.joinpath(f"train_config_{directory.name}.json")
     if not train_config_file.is_file():
