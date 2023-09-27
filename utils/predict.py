@@ -120,6 +120,8 @@ def predict(
     output_predictions = Path(output_predictions)
     output_predictions.mkdir(exist_ok=True, parents=True)
 
+    files = list(set(files))
+
     for file in tqdm(files, desc=record_id):
         image, original_shape = load_image(image_path=file, normalize=normalize, shape=input_shape[:2], as_numpy=True, return_original_shape=True)
 
@@ -129,7 +131,9 @@ def predict(
             batch = image.reshape((1,) + image.shape)
             prediction = model(batch, training=False)[0].numpy()
 
+        prediction = contour_analysis.adjust_probability(prediction=prediction)
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
+
         prediction = cv2.resize(prediction, original_shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
 
         prediction = contour_analysis.post_process_papanicolaou(prediction)

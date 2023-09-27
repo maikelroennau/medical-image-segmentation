@@ -582,12 +582,46 @@ def discard_unboxed_contours(
     return prediction, parent_contours, child_contours
 
 
+def adjust_probability(prediction: np.ndarray) -> np.ndarray:
+    """Adjust the probabilities of the classes in the segmentation mask.
+
+    Args:
+        prediction (np.ndarray): The segmentation mask to be adjusted.
+
+    Returns:
+        np.ndarray: The adjusted segmentation mask.
+    """
+    cluster = prediction[:, :, 1].copy() * 127
+    cluster = cluster.astype(np.uint8)
+
+    cytoplasm = prediction[:, :, 2].copy() * 127
+    cytoplasm = cytoplasm.astype(np.uint8)
+
+    cluster_contours, _ = cv2.findContours(cluster, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cluster_mask = np.zeros(prediction.shape[:2], dtype=np.uint8)
+    cv2.drawContours(cluster_mask, contours=cluster_contours, contourIdx=-1, color=1, thickness=cv2.FILLED)
+
+    cytoplasm_contours, _ = cv2.findContours(cytoplasm, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cytoplasm_mask = np.zeros(prediction.shape[:2], dtype=np.uint8)
+    cv2.drawContours(cytoplasm_mask, contours=cytoplasm_contours, contourIdx=-1, color=1, thickness=cv2.FILLED)
+
+    prediction[:, :, 0] = np.where(cluster_mask, 0, prediction[:, :, 0])
+    prediction[:, :, 0] = np.where(cytoplasm_mask, 0, prediction[:, :, 0])
+
+    prediction[:, :, 1] = np.where(cytoplasm_mask, 0, prediction[:, :, 1])
+    prediction[:, :, 2] = np.where(cluster_mask, 0, prediction[:, :, 2])
+
+    # Increase the probabilities of classes 4 through 8
+    prediction[:, :, 5:6] += 0.005
+    return prediction
+
+
 def post_process_papanicolaou(prediction: np.ndarray) -> np.ndarray:
     """Reclassify the objects in the segmentation mask according to the Papanicolaou classification.
 
     Args:
         prediction (np.ndarray): The segmentation mask to be reclassified.
-    
+
     Returns:
         np.ndarray: The reclassified segmentation mask.
     """
@@ -634,9 +668,9 @@ def post_process_papanicolaou(prediction: np.ndarray) -> np.ndarray:
 
     for contour in nuclei_contours:
         nucleus_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
-        
+
         cv2.drawContours(nucleus_mask, contours=[contour], contourIdx=-1, color=1, thickness=cv2.FILLED)
-        
+
         nuclei_pixels = nucleus_mask * prediction_reset
         nucleus_class, counts = np.unique(nuclei_pixels, return_counts=True)
 
