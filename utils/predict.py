@@ -40,16 +40,34 @@ def patch_predict(
     else:
         height = image.shape[0]
         width = image.shape[1]
-        x_range = range(0, height, patch_shape[0])
-        y_range = range(0, width, patch_shape[1])
 
-        patch_prediction = np.zeros(image.shape)
+        x_range = []
+        y_range = []
+        start, end = 0, 0
+        for x in range(int(np.ceil(height / patch_shape[0]))):
+            end = start + patch_shape[0]
+            if end > height:
+                end = height
+                start = end - patch_shape[0]
+            x_range.append([start, end])
+            start = end
+        start, end = 0, 0
+        for y in range(int(np.ceil(width / patch_shape[1]))):
+            end = start + patch_shape[1]
+            if end > width:
+                end = width
+                start = end - patch_shape[1]
+            y_range.append([start, end])
+            start = end
+
+        patch_prediction = np.zeros((image.shape[0], image.shape[1], 8), dtype=np.float32)
 
         for x in x_range:
             for y in y_range:
-                slice = image[x:x+patch_shape[0], y:y+patch_shape[1]]
-                batch = slice.reshape((1,) + slice.shape)
-                patch_prediction[x:x+patch_shape[0], y:y+patch_shape[1]] = model(batch, training=False)[0].numpy()
+                patch = image[x[0]:x[1], y[0]:y[1]]
+                print(f"{patch.min()}, {patch.max()}")
+                patch = patch.reshape((1,) + patch.shape)
+                patch_prediction[x[0]:x[1], y[0]:y[1]] = model(patch, training=False)[0].numpy()
 
         return patch_prediction
 
