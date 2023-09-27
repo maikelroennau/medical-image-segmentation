@@ -1,5 +1,6 @@
 import argparse
 import os
+os.environ["SM_FRAMEWORK"] = "tf.keras"
 from pathlib import Path
 
 from utils.data import SUPPORTED_IMAGE_TYPES
