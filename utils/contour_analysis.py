@@ -175,7 +175,7 @@ def discard_contours_by_size(
 
     Args:
         contours (List[np.ndarray]): The contours to be evaluated.
-        shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
+        shape (Tuple[int, int]): The dimensions of the image from where the contours were extracted, in the format `(HEIGHT, WIDTH)`.
         max_pixel_count (Optional[int], optional): The maximum number of pixels the contour must have. Defaults to `MAX_NUCLEUS_PIXEL_COUNT`.
         min_relative_pixel_count (Optional[float], optional): The minimal percent of pixels the contour must have in range `[0, 100]`. Defaults to `MIN_NUCLEUS_PERCENT_PIXEL_COUNT`.
 
@@ -257,7 +257,7 @@ def discard_overlapping_deformed_contours(
     contours: List[np.ndarray],
     shape: Tuple[int, int],
     max_diff: Optional[float] = MAX_CONTOUR_PERCENT_DIFF) -> Union[List[np.ndarray], List[np.ndarray]]:
-    """Discards contours overlapping with other and defformed contours.
+    """Discards contours overlapping with other and deformed contours.
 
     This function verifies if contours are overlapping with others by computing the difference in the number of pixels between the contour and the convex hull of that contour.
     If the difference exceeds the given threshold (`diff`), then the contour is discarded as it is likely overlapping with another one.
@@ -266,11 +266,11 @@ def discard_overlapping_deformed_contours(
 
     Args:
         contours (List[np.ndarray]): The list of contours to be evaluated.
-        shape (Tuple[int, int]): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
+        shape (Tuple[int, int]): The dimensions of the image from where the contours were extracted, in the format `(HEIGHT, WIDTH)`.
         max_diff (Optional[int], optional): The maximum percentage difference between the contour pixel count and its convex hull pixel count. If the difference is over `max_diff`, then the contour is discarded. Defaults to `MAX_CONTOUR_PERCENT_DIFF`.
 
     Returns:
-        Union[List[np.ndarray], List[np.ndarray]]: The `kept` array contains the contours that are not overlapping with other or are not deformed. The `discarded` array contains the overlapping and deforemed nuclei.
+        Union[List[np.ndarray], List[np.ndarray]]: The `kept` array contains the contours that are not overlapping with other or are not deformed. The `discarded` array contains the overlapping and deformed nuclei.
     """
     kept = []
     discarded = []
@@ -608,11 +608,40 @@ def adjust_probability(prediction: np.ndarray) -> np.ndarray:
     prediction[:, :, 0] = np.where(cluster_mask, 0, prediction[:, :, 0])
     prediction[:, :, 0] = np.where(cytoplasm_mask, 0, prediction[:, :, 0])
 
-    prediction[:, :, 1] = np.where(cytoplasm_mask, 0, prediction[:, :, 1])
-    prediction[:, :, 2] = np.where(cluster_mask, 0, prediction[:, :, 2])
-
-    # Increase the probabilities of classes 4 through 8
+    # Increase the probabilities of classes 5 through 6
     prediction[:, :, 5:6] += 0.005
+
+    return prediction
+
+
+def remove_objects(prediction: np.ndarray) -> np.ndarray:
+    """Remove objects from the segmentation mask.
+
+    Args:
+        prediction (np.ndarray): The segmentation mask to be adjusted.
+    
+    Returns:
+        np.ndarray: The adjusted segmentation mask.
+    """
+    for i in range(4, 8):
+        class_mask = prediction[:, :, i].copy()
+        class_mask = class_mask.astype(np.uint8)
+
+        contours, _ = cv2.findContours(class_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if len(contours) > 0:
+            contours_pixel_count = [get_contour_pixel_count(contour, prediction.shape[:2]) for contour in contours]
+
+            kept_contours = []
+            for contours, contours_pixel_count in zip(contours, contours_pixel_count):
+                if contours_pixel_count > 50:
+                    kept_contours.append(contours)
+
+            updated_mask = np.zeros(prediction.shape[:2], dtype=np.uint8)
+            cv2.drawContours(updated_mask, contours=kept_contours, contourIdx=-1, color=1, thickness=cv2.FILLED)
+
+            prediction[:, :, i] = updated_mask
+        
     return prediction
 
 

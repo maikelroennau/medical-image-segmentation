@@ -88,7 +88,10 @@ def predict(
     record_id: Optional[str] = None,
     record_class: Optional[str] = None,
     measures_only: Optional[bool] = False,
-    current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S')) -> None:
+    current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S'),
+    redistribute_papanicolaou_probabilities: Optional[bool] = False,
+    papanicolaou_post_process: Optional[bool] = False
+    ) -> None:
     """_summary_
 
     Args:
@@ -108,6 +111,8 @@ def predict(
         record_class (Optional[str], optional): The class the contour measurements belong to. Defaults to None.
         measures_only (Optional[bool], optional): Do not save the predicted images or copy the input images to the output path. If `True`, it will override the effect of `output_predictions`. Defaults to False.
         current_time (Optional[str], optional): A timestamp to be added to the contour measurements, in the format `YYYYMMDDHHMMSS`. Defaults to time.strftime('%Y%m%d%H%M%S').
+        redistribute_papanicolaou_probabilities (Optional[bool], optional): Whether or not to redistribute the Papanicolaou probabilities of the predicted masks. Defaults to False.
+        papanicolaou_post_process (Optional[bool], optional): Whether or not to apply the Papanicolaou post-processing algorithm. Defaults to False.
 
     Raises:
         FileNotFoundError: If `images` is not a path to file or a directory that exist.
@@ -125,7 +130,7 @@ def predict(
         raise ValueError(f"`images` must be a `str`. Given `{type(images)}`.")
 
     if isinstance(model, str):
-        model = load_model(model_path=model, input_shape=input_shape)
+        model = load_model(model_path=model, input_shape=input_shape, redistribute_probabilities=redistribute_papanicolaou_probabilities)
     elif not isinstance(model, tf.keras.Model):
         raise ValueError(f"`model` must be a `str` or `tf.keras.Model`. Given `{type(model)}`.")
 
@@ -139,6 +144,7 @@ def predict(
     output_predictions.mkdir(exist_ok=True, parents=True)
 
     files = list(set(files))
+    files.sort()
 
     for file in tqdm(files, desc=record_id):
         image, original_shape = load_image(image_path=file, normalize=normalize, shape=input_shape[:2], as_numpy=True, return_original_shape=True)
@@ -149,12 +155,16 @@ def predict(
             batch = image.reshape((1,) + image.shape)
             prediction = model(batch, training=False)[0].numpy()
 
-        prediction = contour_analysis.adjust_probability(prediction=prediction)
+        if not redistribute_papanicolaou_probabilities and papanicolaou_post_process:
+            prediction = contour_analysis.adjust_probability(prediction=prediction.copy())
+        
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
 
         prediction = cv2.resize(prediction, original_shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
 
-        prediction = contour_analysis.post_process_papanicolaou(prediction)
+        if papanicolaou_post_process:
+            prediction = contour_analysis.post_process_papanicolaou(prediction)
+            prediction = contour_analysis.remove_objects(prediction=prediction)
 
         file = Path(file)
         if analyze_contours:

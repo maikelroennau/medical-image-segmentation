@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
+import cv2
+import numpy as np
 import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
@@ -150,7 +152,8 @@ def load_model(
     input_shape: Tuple[int, int, int] = None,
     loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
     optimizer: Optional[tf.keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
-    compile: Optional[bool] = True) -> tf.keras.Model:
+    compile: Optional[bool] = True,
+    redistribute_probabilities: Optional[bool] = False) -> tf.keras.Model:
     """Load a Keras model.
 
     Args:
@@ -159,6 +162,7 @@ def load_model(
         loss_function (sm.losses.Loss, optional): The loss function of the model. Defaults to sm.losses.cce_dice_loss.
         optimizer (tf.keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
         compile (bool, optional): If false, does not compile the loaded model before returning it. Defaults to True.
+        redistribute_probabilities (bool, optional): If true, adds a `RedistributeProbabilities` layer to the model. Defaults to False.
 
     Raises:
         FileNotFoundError: If the model file is not found.
@@ -174,6 +178,10 @@ def load_model(
     if input_shape:
         if input_shape != get_model_input_shape(model):
             model = replace_model_input_shape(model, input_shape)
+
+    if redistribute_probabilities:
+        x = RedistributeProbabilities()(model.layers[-1].output)
+        model = tf.keras.Model(inputs=model.input, outputs=x)
 
     if compile:
         model.compile(optimizer=optimizer, loss=loss_function, metrics=[METRICS])
@@ -221,3 +229,61 @@ def load_models(
             compile=compile)
 
     return models
+
+
+class RedistributeProbabilities(tf.keras.layers.Layer):
+    """Redistribute probabilities of the output layer of a model.
+
+    This layer redistributes the probabilities of the output layer of a model by increasing the probabilities of classes 4 through 7 and setting the probabilities of classes 0 through 3 to 0 where the cluster and cytoplasm masks are 1.
+    """
+    def __init__(self):
+        super(RedistributeProbabilities, self).__init__()
+
+    def call(self, prediction):
+        prediction_identity = tf.identity(prediction)
+        unstacked = tf.unstack(prediction[0], axis=-1)
+
+        cluster = prediction_identity[0, :, :, 1] * 127
+        cluster = tf.cast(cluster, tf.uint8)
+
+        cytoplasm = prediction_identity[0, :, :, 2] * 127
+        cytoplasm = tf.cast(cytoplasm, tf.uint8)
+
+        def find_contours(mask):
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            return contours
+
+        def draw_contours(mask, contours):
+            contours = [contour.numpy() if type(contour) != np.ndarray else contour for contour in contours]
+            mask = cv2.drawContours(mask, contours, contourIdx=-1, color=1, thickness=cv2.FILLED)
+            return mask
+
+        cluster_contours = tf.numpy_function(find_contours, inp=[cluster], Tout=[tf.int32])
+
+        # Check if there are any contours
+        if len(cluster_contours) > 0:
+            cluster_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cluster.shape, dtype=tf.uint8), cluster_contours], Tout=tf.uint8)
+
+            # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
+            unstacked[0] = tf.where(tf.equal(cluster_mask, 1), 0.0, unstacked[0])
+
+        cytoplasm_contours = tf.numpy_function(find_contours, inp=[cytoplasm], Tout=[tf.int32])
+
+        if len(cytoplasm_contours) > 0:
+            cytoplasm_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cytoplasm.shape, dtype=tf.uint8), cytoplasm_contours], Tout=tf.uint8)
+
+            # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
+            unstacked[0] = tf.where(tf.equal(cytoplasm_mask, 1), 0.0, unstacked[0])
+
+        # Increase the probabilities of classes 4 through 7
+        delta = tf.constant(0.005, dtype=tf.float32)
+        
+        # Sum the delta to the probabilities of classes 4 through 7
+        unstacked[4] = tf.add(unstacked[4], delta)
+        unstacked[5] = tf.add(unstacked[5], delta)
+        unstacked[6] = tf.add(unstacked[6], delta)
+
+        prediction = tf.stack(unstacked, axis=-1)
+        prediction = tf.expand_dims(prediction, axis=0)
+
+        return prediction
