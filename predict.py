@@ -115,6 +115,21 @@ def main():
         action="store_true")
 
     parser.add_argument(
+        "-r",
+        "--redistribute-papanicolaou-probabilities",
+        help="Whether or not to redistribute the Papanicolaou probabilities of the predicted masks.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
+        "-p",
+        "--papanicolaou-post-process",
+        help="Whether or not to apply the Papanicolaou postprocessing to the predicted masks.",
+        default=False,
+        action="store_true")
+
+
+    parser.add_argument(
         "-gpu",
         "--gpu",
         help="What GPU to use. Pass `-1` to use CPU.",
@@ -161,6 +176,8 @@ def main():
                 classify_agnor=args.classify_agnor,
                 decision_tree_model_path=args.decision_tree_model_path,
                 measures_only=args.measures_only,
+                redistribute_papanicolaou_probabilities=args.redistribute_papanicolaou_probabilities,
+                papanicolaou_post_process=args.papanicolaou_post_process,
             )
     else:
         predict(
@@ -179,6 +196,8 @@ def main():
             classify_agnor=args.classify_agnor,
             decision_tree_model_path=args.decision_tree_model,
             measures_only=args.measures_only,
+            redistribute_papanicolaou_probabilities=args.redistribute_papanicolaou_probabilities,
+            papanicolaou_post_process=args.papanicolaou_post_process,
         )
 
 
