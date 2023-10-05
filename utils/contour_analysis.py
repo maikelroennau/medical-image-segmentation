@@ -147,7 +147,7 @@ def dilate_contours(
         structuring_element (Optional[int], optional): The morphological transform to apply. Defaults to `cv2.MORPH_ELLIPSE`.
         kernel (Optional[Tuple[int, int]], optional): The size of the kernel to be used. Defaults to `(3, 3)`.
         iterations (Optional[int], optional): Number of iterations to apply the dilatation. Defaults to 1.
-        shape (Optional[Tuple[int, int]], optional): The dimensions of the image from where the contours were extrated, in the format `(HEIGHT, WIDTH)`.
+        shape (Optional[Tuple[int, int]], optional): The dimensions of the image from where the contours were extracted, in the format `(HEIGHT, WIDTH)`.
 
     Returns:
         np.ndarray: _description_
@@ -614,8 +614,8 @@ def adjust_probability(prediction: np.ndarray) -> np.ndarray:
     return prediction
 
 
-def remove_objects(prediction: np.ndarray) -> np.ndarray:
-    """Remove objects from the segmentation mask.
+def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
+    """Remove segmentation artifacts from the segmentation mask.
 
     Args:
         prediction (np.ndarray): The segmentation mask to be adjusted.
@@ -630,18 +630,48 @@ def remove_objects(prediction: np.ndarray) -> np.ndarray:
         contours, _ = cv2.findContours(class_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) > 0:
-            contours_pixel_count = [get_contour_pixel_count(contour, prediction.shape[:2]) for contour in contours]
+            kept_contours, converted_to_background = discard_overlapping_deformed_contours(contours, shape=prediction.shape[:2])
 
-            kept_contours = []
-            for contours, contours_pixel_count in zip(contours, contours_pixel_count):
-                if contours_pixel_count > 50:
-                    kept_contours.append(contours)
+            if len(converted_to_background) > 0:
+                # Check which contours can be kept by analyzing if their convex hull approximates an ellipse or a circle.
+                confirmed_discarded = []
+                for contour in converted_to_background:
+                    contour_convex = cv2.convexHull(contour)
+                    contour_convex_area = cv2.contourArea(contour_convex)
+                    contour_area = cv2.contourArea(contour)
+                    if contour_convex_area > 0:
+                        convexity = contour_area / contour_convex_area
+                        if convexity > 0.8:
+                            kept_contours.append(contour)
+                        else:
+                            confirmed_discarded.append(contour)
+                converted_to_background = confirmed_discarded
+
+            if len(kept_contours) > 0:
+                # Check which contours have less than 100 pixels and which are 2x bigger than the median.
+                contours_pixel_count = [get_contour_pixel_count(contour, prediction.shape[:2]) for contour in kept_contours]
+                median = np.median(contours_pixel_count)
+
+                confirmed_kept = []
+                for j, contour in enumerate(kept_contours):
+                    if contours_pixel_count[j] < 100 or contours_pixel_count[j] > 2 * median:
+                        converted_to_background.append(contour)
+                    else:
+                        confirmed_kept.append(contour)
+                kept_contours = confirmed_kept
 
             updated_mask = np.zeros(prediction.shape[:2], dtype=np.uint8)
-            cv2.drawContours(updated_mask, contours=kept_contours, contourIdx=-1, color=1, thickness=cv2.FILLED)
-
+            cv2.drawContours(updated_mask, contours=kept_contours, contourIdx=-1, color=127, thickness=cv2.FILLED)
             prediction[:, :, i] = updated_mask
-        
+
+            updated_background = np.zeros(prediction.shape[:2], dtype=np.uint8)
+            cv2.drawContours(updated_background, contours=converted_to_background, contourIdx=-1, color=127, thickness=cv2.FILLED)
+            prediction[:, :, 0] += updated_background
+            
+            for j in range(1, prediction.shape[-1]):
+                if j != i:
+                    prediction[:, :, j] = np.where(updated_background, 0, prediction[:, :, j])
+
     return prediction
 
 
