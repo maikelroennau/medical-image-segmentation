@@ -180,9 +180,8 @@ def load_model(
             model = replace_model_input_shape(model, input_shape)
 
     if use_bias_layer:
-        x = PapBias()(model.layers[-2].output)
-        activation = model.layers[-1](x)
-        model = tf.keras.Model(inputs=model.input, outputs=activation)
+        x = PapBias()(model.layers[-1].output)
+        model = tf.keras.Model(inputs=model.input, outputs=x)
 
     if compile:
         model.compile(optimizer=optimizer, loss=loss_function, metrics=[METRICS])

@@ -164,7 +164,7 @@ def predict(
 
         if papanicolaou_post_process:
             prediction = contour_analysis.post_process_papanicolaou(prediction)
-            prediction = contour_analysis.remove_objects(prediction=prediction)
+            prediction = contour_analysis.remove_segmentation_artifacts(prediction=prediction)
 
         file = Path(file)
         if analyze_contours:
