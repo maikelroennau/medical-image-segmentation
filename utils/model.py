@@ -153,7 +153,7 @@ def load_model(
     loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
     optimizer: Optional[tf.keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
     compile: Optional[bool] = True,
-    redistribute_probabilities: Optional[bool] = False) -> tf.keras.Model:
+    use_bias_layer: Optional[bool] = False) -> tf.keras.Model:
     """Load a Keras model.
 
     Args:
@@ -162,7 +162,7 @@ def load_model(
         loss_function (sm.losses.Loss, optional): The loss function of the model. Defaults to sm.losses.cce_dice_loss.
         optimizer (tf.keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
         compile (bool, optional): If false, does not compile the loaded model before returning it. Defaults to True.
-        redistribute_probabilities (bool, optional): If true, adds a `RedistributeProbabilities` layer to the model. Defaults to False.
+        use_bias_layer (bool, optional): If true, adds a `PapBias` layer to the model. Defaults to False.
 
     Raises:
         FileNotFoundError: If the model file is not found.
@@ -179,9 +179,10 @@ def load_model(
         if input_shape != get_model_input_shape(model):
             model = replace_model_input_shape(model, input_shape)
 
-    if redistribute_probabilities:
-        x = RedistributeProbabilities()(model.layers[-1].output)
-        model = tf.keras.Model(inputs=model.input, outputs=x)
+    if use_bias_layer:
+        x = PapBias()(model.layers[-2].output)
+        activation = model.layers[-1](x)
+        model = tf.keras.Model(inputs=model.input, outputs=activation)
 
     if compile:
         model.compile(optimizer=optimizer, loss=loss_function, metrics=[METRICS])
@@ -231,13 +232,13 @@ def load_models(
     return models
 
 
-class RedistributeProbabilities(tf.keras.layers.Layer):
-    """Redistribute probabilities of the output layer of a model.
+class PapBias(tf.keras.layers.Layer):
+    """Bias the probabilities of the convolution output of a model.
 
-    This layer redistributes the probabilities of the output layer of a model by increasing the probabilities of classes 4 through 7 and setting the probabilities of classes 0 through 3 to 0 where the cluster and cytoplasm masks are 1.
+    This layer adds a bias to the convolution output layer of a model by increasing the probabilities of classes 4 through 7 and setting the probabilities of classes 0 through 3 to 0 where the cluster and cytoplasm masks are 1.
     """
     def __init__(self):
-        super(RedistributeProbabilities, self).__init__()
+        super(PapBias, self).__init__()
 
     def call(self, prediction):
         prediction_identity = tf.identity(prediction)
@@ -277,7 +278,7 @@ class RedistributeProbabilities(tf.keras.layers.Layer):
 
         # Increase the probabilities of classes 4 through 7
         delta = tf.constant(0.005, dtype=tf.float32)
-        
+
         # Sum the delta to the probabilities of classes 4 through 7
         unstacked[4] = tf.add(unstacked[4], delta)
         unstacked[5] = tf.add(unstacked[5], delta)

@@ -89,7 +89,7 @@ def predict(
     record_class: Optional[str] = None,
     measures_only: Optional[bool] = False,
     current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S'),
-    redistribute_papanicolaou_probabilities: Optional[bool] = False,
+    use_bias_layer: Optional[bool] = False,
     papanicolaou_post_process: Optional[bool] = False
     ) -> None:
     """_summary_
@@ -111,7 +111,7 @@ def predict(
         record_class (Optional[str], optional): The class the contour measurements belong to. Defaults to None.
         measures_only (Optional[bool], optional): Do not save the predicted images or copy the input images to the output path. If `True`, it will override the effect of `output_predictions`. Defaults to False.
         current_time (Optional[str], optional): A timestamp to be added to the contour measurements, in the format `YYYYMMDDHHMMSS`. Defaults to time.strftime('%Y%m%d%H%M%S').
-        redistribute_papanicolaou_probabilities (Optional[bool], optional): Whether or not to redistribute the Papanicolaou probabilities of the predicted masks. Defaults to False.
+        use_bias_layer (Optional[bool], optional): Whether or not to use the add the PabBias layer the model. Defaults to False.
         papanicolaou_post_process (Optional[bool], optional): Whether or not to apply the Papanicolaou post-processing algorithm. Defaults to False.
 
     Raises:
@@ -130,7 +130,7 @@ def predict(
         raise ValueError(f"`images` must be a `str`. Given `{type(images)}`.")
 
     if isinstance(model, str):
-        model = load_model(model_path=model, input_shape=input_shape, redistribute_probabilities=redistribute_papanicolaou_probabilities)
+        model = load_model(model_path=model, input_shape=input_shape, use_bias_layer=use_bias_layer)
     elif not isinstance(model, tf.keras.Model):
         raise ValueError(f"`model` must be a `str` or `tf.keras.Model`. Given `{type(model)}`.")
 
@@ -155,7 +155,7 @@ def predict(
             batch = image.reshape((1,) + image.shape)
             prediction = model(batch, training=False)[0].numpy()
 
-        if not redistribute_papanicolaou_probabilities and papanicolaou_post_process:
+        if not use_bias_layer and papanicolaou_post_process:
             prediction = contour_analysis.adjust_probability(prediction=prediction.copy())
         
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
