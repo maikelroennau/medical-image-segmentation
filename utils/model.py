@@ -239,51 +239,56 @@ class PapBias(tf.keras.layers.Layer):
     def __init__(self):
         super(PapBias, self).__init__()
 
-    def call(self, prediction):
-        prediction_identity = tf.identity(prediction)
-        unstacked = tf.unstack(prediction[0], axis=-1)
+    def call(self, batch):
 
-        cluster = prediction_identity[0, :, :, 1] * 127
-        cluster = tf.cast(cluster, tf.uint8)
+        def process(prediction):
+            prediction_identity = tf.identity(prediction)
+            unstacked = tf.unstack(prediction, axis=-1)
 
-        cytoplasm = prediction_identity[0, :, :, 2] * 127
-        cytoplasm = tf.cast(cytoplasm, tf.uint8)
+            cluster = prediction_identity[:, :, 1] * 127
+            cluster = tf.cast(cluster, tf.uint8)
 
-        def find_contours(mask):
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            return contours
+            cytoplasm = prediction_identity[:, :, 2] * 127
+            cytoplasm = tf.cast(cytoplasm, tf.uint8)
 
-        def draw_contours(mask, contours):
-            contours = [contour.numpy() if type(contour) != np.ndarray else contour for contour in contours]
-            mask = cv2.drawContours(mask, contours, contourIdx=-1, color=1, thickness=cv2.FILLED)
-            return mask
+            def find_contours(mask):
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                return contours
 
-        cluster_contours = tf.numpy_function(find_contours, inp=[cluster], Tout=[tf.int32])
+            def draw_contours(mask, contours):
+                contours = [contour.numpy() if type(contour) != np.ndarray else contour for contour in contours]
+                mask = cv2.drawContours(mask, contours, contourIdx=-1, color=1, thickness=cv2.FILLED)
+                return mask
 
-        # Check if there are any contours
-        if len(cluster_contours) > 0:
-            cluster_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cluster.shape, dtype=tf.uint8), cluster_contours], Tout=tf.uint8)
+            cluster_contours = tf.numpy_function(find_contours, inp=[cluster], Tout=[tf.int32])
 
-            # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
-            unstacked[0] = tf.where(tf.equal(cluster_mask, 1), 0.0, unstacked[0])
+            # Check if there are any contours
+            if len(cluster_contours) > 0:
+                cluster_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cluster.shape, dtype=tf.uint8), cluster_contours], Tout=tf.uint8)
 
-        cytoplasm_contours = tf.numpy_function(find_contours, inp=[cytoplasm], Tout=[tf.int32])
+                # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
+                unstacked[0] = tf.where(tf.equal(cluster_mask, 1), 0.0, unstacked[0])
 
-        if len(cytoplasm_contours) > 0:
-            cytoplasm_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cytoplasm.shape, dtype=tf.uint8), cytoplasm_contours], Tout=tf.uint8)
+            cytoplasm_contours = tf.numpy_function(find_contours, inp=[cytoplasm], Tout=[tf.int32])
 
-            # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
-            unstacked[0] = tf.where(tf.equal(cytoplasm_mask, 1), 0.0, unstacked[0])
+            if len(cytoplasm_contours) > 0:
+                cytoplasm_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cytoplasm.shape, dtype=tf.uint8), cytoplasm_contours], Tout=tf.uint8)
 
-        # Increase the probabilities of classes 4 through 7
-        delta = tf.constant(0.005, dtype=tf.float32)
+                # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
+                unstacked[0] = tf.where(tf.equal(cytoplasm_mask, 1), 0.0, unstacked[0])
 
-        # Sum the delta to the probabilities of classes 4 through 7
-        unstacked[4] = tf.add(unstacked[4], delta)
-        unstacked[5] = tf.add(unstacked[5], delta)
-        unstacked[6] = tf.add(unstacked[6], delta)
+            # Increase the probabilities of classes 4 through 7
+            delta = tf.constant(0.005, dtype=tf.float32)
 
-        prediction = tf.stack(unstacked, axis=-1)
-        prediction = tf.expand_dims(prediction, axis=0)
+            # Sum the delta to the probabilities of classes 4 through 7
+            unstacked[4] = tf.add(unstacked[4], delta)
+            unstacked[5] = tf.add(unstacked[5], delta)
+            unstacked[6] = tf.add(unstacked[6], delta)
 
-        return prediction
+            prediction = tf.stack(unstacked, axis=-1)
+
+            return prediction
+
+        batch = tf.map_fn(process, batch)
+
+        return batch
