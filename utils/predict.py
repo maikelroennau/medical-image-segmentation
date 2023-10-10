@@ -157,14 +157,14 @@ def predict(
 
         if not use_bias_layer and papanicolaou_post_process:
             prediction = contour_analysis.adjust_probability(prediction=prediction.copy())
-        
+
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
 
         prediction = cv2.resize(prediction, original_shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
 
         if papanicolaou_post_process:
-            prediction = contour_analysis.remove_segmentation_artifacts(prediction=prediction)
             prediction = contour_analysis.post_process_papanicolaou(prediction)
+            prediction = contour_analysis.remove_segmentation_artifacts(prediction=prediction)
 
         file = Path(file)
         if analyze_contours:

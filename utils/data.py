@@ -9,7 +9,7 @@ from tqdm import tqdm
 from utils.utils import color_classes
 
 
-SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp"]
+SUPPORTED_IMAGE_TYPES = [".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp", ".BMP"]
 
 
 def reset_class_values(mask: np.ndarray) -> np.ndarray:
@@ -121,6 +121,10 @@ def load_image(
                     image = imread(str(image_path), as_gray=as_gray)
                     original_shape = image.shape
                     image = tf.convert_to_tensor(image, dtype=tf.float32)
+                elif image_path.suffix in [".bmp", ".BMP"]:
+                        image = tf.io.read_file(str(image_path))
+                        image = tf.image.decode_bmp(image, channels=channels)
+                        original_shape = tuple(image.shape.as_list())
                 else:
                     image = tf.io.read_file(str(image_path))
                     image = tf.image.decode_png(image, channels=channels)
