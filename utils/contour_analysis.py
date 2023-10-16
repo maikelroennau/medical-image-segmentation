@@ -623,29 +623,32 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: The adjusted segmentation mask.
     """
-    for i in range(4, 8):
+    for i in range(prediction.shape[-1]):
         class_mask = prediction[:, :, i].copy()
         class_mask = class_mask.astype(np.uint8)
 
         contours, _ = cv2.findContours(class_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) > 0:
-            kept_contours, converted_to_background = discard_overlapping_deformed_contours(contours, shape=prediction.shape[:2])
+            if i < 4:
+                kept_contours, converted_to_background = contours, []
+            else:
+                kept_contours, converted_to_background = discard_overlapping_deformed_contours(contours, shape=prediction.shape[:2])
 
-            if len(converted_to_background) > 0:
-                # Check which contours can be kept by analyzing if their convex hull approximates an ellipse or a circle.
-                confirmed_discarded = []
-                for contour in converted_to_background:
-                    contour_convex = cv2.convexHull(contour)
-                    contour_convex_area = cv2.contourArea(contour_convex)
-                    contour_area = cv2.contourArea(contour)
-                    if contour_convex_area > 0:
-                        convexity = contour_area / contour_convex_area
-                        if convexity > 0.8:
-                            kept_contours.append(contour)
-                        else:
-                            confirmed_discarded.append(contour)
-                converted_to_background = confirmed_discarded
+                if len(converted_to_background) > 0:
+                    # Check which contours can be kept by analyzing if their convex hull approximates an ellipse or a circle.
+                    confirmed_discarded = []
+                    for contour in converted_to_background:
+                        contour_convex = cv2.convexHull(contour)
+                        contour_convex_area = cv2.contourArea(contour_convex)
+                        contour_area = cv2.contourArea(contour)
+                        if contour_convex_area > 0:
+                            convexity = contour_area / contour_convex_area
+                            if convexity > 0.8:
+                                kept_contours.append(contour)
+                            else:
+                                confirmed_discarded.append(contour)
+                    converted_to_background = confirmed_discarded
 
             if len(kept_contours) > 0:
                 # Check which contours have less than 100 pixels and which are 2x bigger than the median.
