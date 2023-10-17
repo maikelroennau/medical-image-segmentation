@@ -163,7 +163,7 @@ def predict(
         prediction = cv2.resize(prediction, original_shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
 
         if papanicolaou_post_process:
-            prediction = contour_analysis.post_process_papanicolaou(prediction)
+            prediction = contour_analysis.reclassify_segmentation_objects(prediction)
             prediction = contour_analysis.remove_segmentation_artifacts(prediction=prediction)
 
         file = Path(file)
