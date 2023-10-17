@@ -678,7 +678,7 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
     return prediction
 
 
-def post_process_papanicolaou(prediction: np.ndarray) -> np.ndarray:
+def reclassify_segmentation_objects(prediction: np.ndarray) -> np.ndarray:
     """Reclassify the objects in the segmentation mask according to the Papanicolaou classification.
 
     Args:
