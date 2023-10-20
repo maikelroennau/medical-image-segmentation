@@ -90,8 +90,9 @@ def predict(
     measures_only: Optional[bool] = False,
     current_time: Optional[str] = time.strftime('%Y%m%d%H%M%S'),
     use_bias_layer: Optional[bool] = False,
-    papanicolaou_post_process: Optional[bool] = False
-    ) -> None:
+    use_bias: Optional[bool] = False,
+    reclassify: Optional[bool] = False,
+    remove_artifacts: Optional[bool] = False) -> None:
     """_summary_
 
     Args:
@@ -112,7 +113,9 @@ def predict(
         measures_only (Optional[bool], optional): Do not save the predicted images or copy the input images to the output path. If `True`, it will override the effect of `output_predictions`. Defaults to False.
         current_time (Optional[str], optional): A timestamp to be added to the contour measurements, in the format `YYYYMMDDHHMMSS`. Defaults to time.strftime('%Y%m%d%H%M%S').
         use_bias_layer (Optional[bool], optional): Whether or not to use the add the PabBias layer the model. Defaults to False.
-        papanicolaou_post_process (Optional[bool], optional): Whether or not to apply the Papanicolaou post-processing algorithm. Defaults to False.
+        use_bias (Optional[bool], optional): Whether or not to use the bias correction function. Defaults to False.
+        reclassify (Optional[bool], optional): Whether or not to apply the Papanicolaou post-processing algorithm. Defaults to False.
+        remove_artifacts (Optional[bool], optional): Whether or not to remove artifacts from the Papanicolaou predicted masks. Defaults to False.
 
     Raises:
         FileNotFoundError: If `images` is not a path to file or a directory that exist.
@@ -155,15 +158,17 @@ def predict(
             batch = image.reshape((1,) + image.shape)
             prediction = model(batch, training=False)[0].numpy()
 
-        if not use_bias_layer and papanicolaou_post_process:
+        if use_bias:
             prediction = contour_analysis.adjust_probability(prediction=prediction.copy())
 
         prediction = collapse_probabilities(prediction=prediction, pixel_intensity=127)
 
         prediction = cv2.resize(prediction, original_shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
 
-        if papanicolaou_post_process:
+        if reclassify:
             prediction = contour_analysis.reclassify_segmentation_objects(prediction)
+
+        if remove_artifacts:
             prediction = contour_analysis.remove_segmentation_artifacts(prediction=prediction)
 
         file = Path(file)

@@ -657,10 +657,16 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
 
                 confirmed_kept = []
                 for j, contour in enumerate(kept_contours):
-                    if contours_pixel_count[j] < 100 or contours_pixel_count[j] > 2 * median:
-                        converted_to_background.append(contour)
+                    if i < 4:
+                        if contours_pixel_count[j] < 100:
+                            converted_to_background.append(contour)
+                        else:
+                            confirmed_kept.append(contour)
                     else:
-                        confirmed_kept.append(contour)
+                        if contours_pixel_count[j] < 100 or contours_pixel_count[j] > 3 * median:
+                            converted_to_background.append(contour)
+                        else:
+                            confirmed_kept.append(contour)
                 kept_contours = confirmed_kept
 
             updated_mask = np.zeros(prediction.shape[:2], dtype=np.uint8)
