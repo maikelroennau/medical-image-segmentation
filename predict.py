@@ -115,19 +115,30 @@ def main():
         action="store_true")
 
     parser.add_argument(
-        "-u",
         "--use-bias-layer",
         help="Whether or not to use the bias layer.",
         default=False,
         action="store_true")
 
     parser.add_argument(
-        "-p",
-        "--papanicolaou-post-process",
-        help="Whether or not to apply the Papanicolaou postprocessing to the predicted masks.",
+        "-u",
+        "--use-bias",
+        help="Whether or not to use the bias.",
         default=False,
         action="store_true")
 
+    parser.add_argument(
+        "-r",
+        "--reclassify",
+        help="Whether or not to apply the Papanicolaou reclassification to the predicted masks.",
+        default=False,
+        action="store_true")
+
+    parser.add_argument(
+        "--remove-artifacts",
+        help="Whether or not to remove artifacts from the predicted masks.",
+        default=False,
+        action="store_true")
 
     parser.add_argument(
         "-gpu",
@@ -136,6 +147,9 @@ def main():
         default=0)
 
     args = parser.parse_args()
+
+    if args.use_bias_layer and args.use_bias:
+        raise ValueError("Cannot use both bias layer and bias.")
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
@@ -177,7 +191,9 @@ def main():
                 decision_tree_model_path=args.decision_tree_model_path,
                 measures_only=args.measures_only,
                 use_bias_layer=args.use_bias_layer,
-                papanicolaou_post_process=args.papanicolaou_post_process,
+                use_bias=args.use_bias,
+                reclassify=args.reclassify,
+                remove_artifacts=args.remove_artifacts,
             )
     else:
         predict(
@@ -197,7 +213,9 @@ def main():
             decision_tree_model_path=args.decision_tree_model,
             measures_only=args.measures_only,
             use_bias_layer=args.use_bias_layer,
-            papanicolaou_post_process=args.papanicolaou_post_process,
+            use_bias=args.use_bias,
+            reclassify=args.reclassify,
+            remove_artifacts=args.remove_artifacts,
         )
 
 
