@@ -609,7 +609,7 @@ def adjust_probability(prediction: np.ndarray) -> np.ndarray:
     prediction[:, :, 0] = np.where(cytoplasm_mask, 0, prediction[:, :, 0])
 
     # Increase the probabilities of classes 5 through 6
-    prediction[:, :, 5:6] += 0.005
+    prediction[:, :, 5:6] += 0.001
 
     return prediction
 
@@ -644,7 +644,7 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
                         contour_area = cv2.contourArea(contour)
                         if contour_convex_area > 0:
                             convexity = contour_area / contour_convex_area
-                            if convexity > 0.8:
+                            if convexity > 0.7:
                                 kept_contours.append(contour)
                             else:
                                 confirmed_discarded.append(contour)
@@ -653,20 +653,13 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
             if len(kept_contours) > 0:
                 # Check which contours have less than 100 pixels and which are 2x bigger than the median.
                 contours_pixel_count = [get_contour_pixel_count(contour, prediction.shape[:2]) for contour in kept_contours]
-                median = np.median(contours_pixel_count)
 
                 confirmed_kept = []
                 for j, contour in enumerate(kept_contours):
-                    if i < 4:
-                        if contours_pixel_count[j] < 100:
-                            converted_to_background.append(contour)
-                        else:
-                            confirmed_kept.append(contour)
+                    if contours_pixel_count[j] < 200:
+                        converted_to_background.append(contour)
                     else:
-                        if contours_pixel_count[j] < 100 or contours_pixel_count[j] > 3 * median:
-                            converted_to_background.append(contour)
-                        else:
-                            confirmed_kept.append(contour)
+                        confirmed_kept.append(contour)
                 kept_contours = confirmed_kept
 
             updated_mask = np.zeros(prediction.shape[:2], dtype=np.uint8)
@@ -680,6 +673,10 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
             for j in range(1, prediction.shape[-1]):
                 if j != i:
                     prediction[:, :, j] = np.where(updated_background, 0, prediction[:, :, j])
+
+    # Apply close morphological operation to the cluster and cytoplasm classes
+    prediction[:, :, 1] = cv2.morphologyEx(prediction[:, :, 1], cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    prediction[:, :, 2] = cv2.morphologyEx(prediction[:, :, 2], cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 
     return prediction
 

@@ -278,7 +278,7 @@ class PapBias(tf.keras.layers.Layer):
                 unstacked[0] = tf.where(tf.equal(cytoplasm_mask, 1), 0.0, unstacked[0])
 
             # Increase the probabilities of classes 4 through 7
-            delta = tf.constant(0.005, dtype=tf.float32)
+            delta = tf.constant(0.001, dtype=tf.float32)
 
             # Sum the delta to the probabilities of classes 4 through 7
             unstacked[4] = tf.add(unstacked[4], delta)
