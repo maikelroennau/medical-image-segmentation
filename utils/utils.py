@@ -25,25 +25,26 @@ def get_color_map(colormap: Optional[str] = "agnor"):
         color_map = [
             [130, 130, 130], # Gray         _background_
             [255, 128,   0], # Orange       citoplasma
-            [  0,   0, 255], # Blue         AgNOR
-            [128,   0,  64], # Purple       Satellite
+            [  0,   0, 255], # Blue         agnor
+            [128,   0,  64], # Purple       satelite
         ]
     elif colormap == "papanicolaou":
         # Papanicolaou
         color_map = [
-            [130, 130, 130], # Gray         _background_
-            [ 78, 121, 167], # Blue         aglomerado
-            [242, 142,  43], # Orange       citoplasma
-            [ 44, 160,  44], # Green        escama
-            [200,  82,   0], # Brown        superficial
-            [ 23, 190, 207], # Turquoise    intermediaria
-            [188, 189,  34], # Mustard      suspeita
-            [148, 103, 189], # Purple       binucleacao
+            [130, 130, 130], # Gray         0: _background_
+            [ 78, 121, 167], # Blue         1: aglomerado
+            [242, 142,  43], # Orange       2: citoplasma
+            [ 44, 160,  44], # Green        3: escama
+            [200,  82,   0], # Brown        4: superficial
+            [ 23, 190, 207], # Turquoise    5: intermediaria
+            [188, 189,  34], # Mustard      6: suspeita
+            [148, 103, 189], # Purple       7: binucleacao
         ]
     else:
         return None
 
     return color_map
+
 
 def collapse_probabilities(
     prediction: Union[np.ndarray, tf.Tensor],
