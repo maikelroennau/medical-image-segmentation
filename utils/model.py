@@ -180,7 +180,11 @@ def load_model(
             model = replace_model_input_shape(model, input_shape)
 
     if use_bias_layer:
-        x = PapBias()(model.layers[-1].output)
+        # x = PapBias()(model.layers[-1].output)
+        # model = tf.keras.Model(inputs=model.input, outputs=x)
+
+        x = TemperatureScaledSoftmax(temperature=0.1)(model.layers[-2].output)
+        x = PapBias()(x)
         model = tf.keras.Model(inputs=model.input, outputs=x)
 
     if compile:
@@ -231,6 +235,27 @@ def load_models(
     return models
 
 
+class TemperatureScaledSoftmax(tf.keras.layers.Layer):
+    """Temperature scaled softmax layer.
+
+    This layer scales the logits of the previous layer by a temperature factor and then applies the softmax function to the scaled logits.
+    """
+    def __init__(self, temperature=1, **kwargs):
+        super(TemperatureScaledSoftmax, self).__init__(**kwargs)
+        self.temperature = temperature
+
+    def call(self, logits):
+        logits_adjusted = logits / self.temperature
+        return tf.nn.softmax(logits_adjusted)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'temperature': self.temperature,
+        })
+        return config
+
+
 class PapBias(tf.keras.layers.Layer):
     """Bias the probabilities of the convolution output of a model.
 
@@ -262,19 +287,14 @@ class PapBias(tf.keras.layers.Layer):
 
             cluster_contours = tf.numpy_function(find_contours, inp=[cluster], Tout=[tf.int32])
 
-            # Check if there are any contours
             if len(cluster_contours) > 0:
                 cluster_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cluster.shape, dtype=tf.uint8), cluster_contours], Tout=tf.uint8)
-
-                # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
                 unstacked[0] = tf.where(tf.equal(cluster_mask, 1), 0.0, unstacked[0])
 
             cytoplasm_contours = tf.numpy_function(find_contours, inp=[cytoplasm], Tout=[tf.int32])
 
             if len(cytoplasm_contours) > 0:
                 cytoplasm_mask = tf.numpy_function(draw_contours, inp=[tf.zeros(cytoplasm.shape, dtype=tf.uint8), cytoplasm_contours], Tout=tf.uint8)
-
-                # Set class 0 probabilities to 0 where cluster and cytoplasm masks are 1
                 unstacked[0] = tf.where(tf.equal(cytoplasm_mask, 1), 0.0, unstacked[0])
 
             # Increase the probabilities of classes 4 through 7
