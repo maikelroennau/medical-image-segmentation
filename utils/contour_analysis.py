@@ -608,8 +608,8 @@ def adjust_probability(prediction: np.ndarray) -> np.ndarray:
     prediction[:, :, 0] = np.where(cluster_mask, 0, prediction[:, :, 0])
     prediction[:, :, 0] = np.where(cytoplasm_mask, 0, prediction[:, :, 0])
 
-    # Increase the probabilities of classes 5 through 6
-    prediction[:, :, 5:6] += 0.001
+    # Increase the probabilities of nuclei classes
+    prediction[:, :, 5:6] += 0.0005
 
     return prediction
 
@@ -644,7 +644,7 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
                         contour_area = cv2.contourArea(contour)
                         if contour_convex_area > 0:
                             convexity = contour_area / contour_convex_area
-                            if convexity > 0.7:
+                            if convexity > 0.8:
                                 kept_contours.append(contour)
                             else:
                                 confirmed_discarded.append(contour)
