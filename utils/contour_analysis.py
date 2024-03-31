@@ -11,7 +11,7 @@ from scipy.interpolate import splev, splprep
 
 from utils.data import reset_class_values, one_hot_encode
 from utils.utils import (color_classes, convert_bbox_to_contour,
-                         get_intersection, get_labelme_points)
+                         get_intersection, get_labelme_points, get_color_map)
 
 
 NUCLEUS_COLUMNS = [
@@ -614,12 +614,13 @@ def adjust_probability(prediction: np.ndarray) -> np.ndarray:
     return prediction
 
 
-def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
+def remove_segmentation_artifacts(prediction: np.ndarray, max_gap_area: int = 100) -> np.ndarray:
     """Remove segmentation artifacts from the segmentation mask.
 
     Args:
         prediction (np.ndarray): The segmentation mask to be adjusted.
-    
+        max_gap_area (int): The maximum area of a gap that can be filled. Gaps larger than this will be left as background.
+
     Returns:
         np.ndarray: The adjusted segmentation mask.
     """
@@ -627,7 +628,9 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
         class_mask = prediction[:, :, i].copy()
         class_mask = class_mask.astype(np.uint8)
 
-        contours, _ = cv2.findContours(class_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(class_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+        large_holes = []  # New code: Keep track of large holes
 
         if len(contours) > 0:
             if i < 4:
@@ -636,7 +639,12 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
                 kept_contours, converted_to_background = discard_overlapping_deformed_contours(contours, shape=prediction.shape[:2])
 
                 if len(converted_to_background) > 0:
-                    # Check which contours can be kept by analyzing if their convex hull approximates an ellipse or a circle.
+                    for j, contour in enumerate(contours):
+                        if hierarchy[0][j][3] != -1:  # If the contour has a parent, it's a hole
+                            area = cv2.contourArea(contour)
+                            if area > max_gap_area:  # If the gap is too large, make it background
+                                large_holes.append(contour)  # New code: Add to large holes list
+
                     confirmed_discarded = []
                     for contour in converted_to_background:
                         contour_convex = cv2.convexHull(contour)
@@ -644,14 +652,13 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
                         contour_area = cv2.contourArea(contour)
                         if contour_convex_area > 0:
                             convexity = contour_area / contour_convex_area
-                            if convexity > 0.8:
+                            if convexity > 0.6:
                                 kept_contours.append(contour)
                             else:
                                 confirmed_discarded.append(contour)
                     converted_to_background = confirmed_discarded
 
             if len(kept_contours) > 0:
-                # Check which contours have less than 100 pixels and which are 2x bigger than the median.
                 contours_pixel_count = [get_contour_pixel_count(contour, prediction.shape[:2]) for contour in kept_contours]
 
                 confirmed_kept = []
@@ -666,17 +673,18 @@ def remove_segmentation_artifacts(prediction: np.ndarray) -> np.ndarray:
             cv2.drawContours(updated_mask, contours=kept_contours, contourIdx=-1, color=127, thickness=cv2.FILLED)
             prediction[:, :, i] = updated_mask
 
+            # New code: Set large holes to be background again
+            if len(large_holes) > 0:
+                cv2.drawContours(prediction[:, :, i], contours=large_holes, contourIdx=-1, color=0, thickness=cv2.FILLED)
+
             updated_background = np.zeros(prediction.shape[:2], dtype=np.uint8)
             cv2.drawContours(updated_background, contours=converted_to_background, contourIdx=-1, color=127, thickness=cv2.FILLED)
+            cv2.drawContours(updated_background, contours=large_holes, contourIdx=-1, color=127, thickness=cv2.FILLED)
             prediction[:, :, 0] += updated_background
-            
+
             for j in range(1, prediction.shape[-1]):
                 if j != i:
                     prediction[:, :, j] = np.where(updated_background, 0, prediction[:, :, j])
-
-    # Apply close morphological operation to the cluster and cytoplasm classes
-    prediction[:, :, 1] = cv2.morphologyEx(prediction[:, :, 1], cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
-    prediction[:, :, 2] = cv2.morphologyEx(prediction[:, :, 2], cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 
     return prediction
 
@@ -695,7 +703,7 @@ def reclassify_segmentation_objects(prediction: np.ndarray) -> np.ndarray:
     cluster_cytoplasm = prediction[:, :, 1] + prediction[:, :, 2] + prediction[:, :, 3] + nuclei
 
     # Extract contours
-    cluster_cytoplasm_contours, _ = cv2.findContours(cluster_cytoplasm, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cluster_cytoplasm_contours, hierarchy = cv2.findContours(cluster_cytoplasm, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     nuclei_contours, _ = cv2.findContours(nuclei, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Create masks to receive the reclassified objects
@@ -703,19 +711,34 @@ def reclassify_segmentation_objects(prediction: np.ndarray) -> np.ndarray:
     nuclei_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
     anucleate_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
 
+    kernel = np.ones((3,3),np.uint8)
+
     # Reclassify clusters, cytoplasm and anucleate considering the number of nuclei inside the object
-    for contour in cluster_cytoplasm_contours:
+    for i, contour in enumerate(cluster_cytoplasm_contours):
         nuclei_count = len(discard_contours_outside_contours(parent_contours=[contour], child_contours=nuclei_contours)[0])
 
         if nuclei_count == 0:
             # Anucleate
+            if hierarchy[0][i][3] != -1:  # If the contour has a parent, it's a hole
+                continue
             cv2.drawContours(anucleate_mask, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
         elif nuclei_count == 1:
             # Cytoplasm
             cv2.drawContours(nuclei_mask, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
         elif nuclei_count > 1:
             # Cluster
+            if hierarchy[0][i][3] != -1:  # If the contour has a parent, it's a hole
+                continue
             cv2.drawContours(clusters_mask, contours=[contour], contourIdx=-1, color=127, thickness=cv2.FILLED)
+
+    # Reprocess contours to add back background holes
+    for i, contour in enumerate(cluster_cytoplasm_contours):
+        if hierarchy[0][i][3] != -1:  # If the contour has a parent, it's a hole
+            # Dilate contour to prevent black borders
+            contour_mask = np.zeros(cluster_cytoplasm.shape[:2], dtype=np.uint8)
+            cv2.drawContours(contour_mask, contours=[contour], contourIdx=-1, color=255, thickness=cv2.FILLED)
+            eroded_mask = cv2.erode(contour_mask, kernel, iterations=1)
+            clusters_mask = np.where(eroded_mask, 0, clusters_mask)
 
     # Replace the original classes with the reclassified ones
     prediction[:, :, 1] = clusters_mask
