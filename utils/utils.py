@@ -15,7 +15,7 @@ import tensorflow as tf
 def get_color_map(colormap: Optional[str] = "agnor"):
     """Provides the default color map for the specified number of classes.
 
-    The number of classes refers to the number of dimentions outputted by the model.
+    The number of classes refers to the number of dimensions outputted by the model.
 
     Args:
         colormap (str): What color map to use. Pass `agnor` for a color map for 3 classes plus background, or pass `papanicolaou` for a color map for 7 classes plus background. Defaults to `agnor`.
@@ -33,6 +33,7 @@ def get_color_map(colormap: Optional[str] = "agnor"):
         color_map = [
             [130, 130, 130], # Gray         0: _background_
             [ 78, 121, 167], # Blue         1: aglomerado
+            # [ 50, 205,  50], # Lime         2: algomerado suspeito
             [242, 142,  43], # Orange       2: citoplasma
             [ 44, 160,  44], # Green        3: escama
             [200,  82,   0], # Brown        4: superficial
