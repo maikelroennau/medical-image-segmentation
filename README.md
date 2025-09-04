@@ -95,8 +95,7 @@ python predict.py --model path/to/model.h5 -i path/to/images -o output/path --in
 
 ### `A CNN-based approach for joint segmentation and quantification of nuclei and NORs in AgNOR-stained images`
 
-You can download pre-trained models (and a few image samples too) for AgNOR slide-image segmentation from here: https://ufrgscpd-my.sharepoint.com/:f:/g/personal/00330519_ufrgs_br/EnzAQbs3_4FHlbxemScpD9IBVKNpGUbXRH0Oqqw7nFkYGA?e=vRbBpS
-
+You can download pre-trained models (and a few image samples too) for AgNOR slide-image segmentation from here: <https://ulbraedu-my.sharepoint.com/:u:/g/personal/maikel_ronnau_ulbra_edu_br/Ea0qk2iGH1NNp1rewXfvXtsBd4K3aYY4ATTrw2JxBlcbIQ?e=lAJNaV>
 | **Rank** | **Model file**                              |
 |----------|---------------------------------------------|
 |     1    | AgNOR_DenseNet-169_LinkNet_1920x2560x3.h5** |
@@ -110,6 +109,6 @@ You can download the `AgECOM` dataset used in the paper from [here](https://gith
 
 ### `Automatic Segmentation and Classification of Papanicolaou-stained Cells`
 
-You can download the pre-trained model (and a few image samples too) for Papanicolaou-stained cell segmentation from here: https://ufrgscpd-my.sharepoint.com/:f:/g/personal/00330519_ufrgs_br/EjGV_28J_PJEgOqitlSWkc4BjpEmGC09RYysHSoYmmPOHg?e=GltEe6
+You can download the pre-trained model (and a few image samples too) for Papanicolaou-stained cell segmentation from here: <https://ulbraedu-my.sharepoint.com/:u:/g/personal/maikel_ronnau_ulbra_edu_br/ESE20E4Ti1BGp0MvejRYdG4B1XvxZmnHZhJwaCWojUJdBA?e=xqFQMp>
 
 You can download the `UFRGS Pap-OMD` dataset used in the paper from [here](https://github.com/maikelroennau/UFRGS-Pap-OMD).
