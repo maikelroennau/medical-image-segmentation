@@ -1,3 +1,9 @@
+import os
+
+# Set environment variables for TensorFlow/Keras compatibility
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
+os.environ.setdefault("SM_FRAMEWORK", "tf.keras")
+
 import shutil
 import time
 from pathlib import Path
@@ -5,7 +11,11 @@ from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
+
+# Import tf_keras first to ensure proper initialization
+import tf_keras
 import tensorflow as tf
+
 from tqdm import tqdm
 
 from utils import contour_analysis
@@ -15,7 +25,7 @@ from utils.utils import collapse_probabilities, color_classes
 
 
 def patch_predict(
-    model: tf.keras.Model,
+    model: tf_keras.Model,
     image: Union[np.ndarray, tf.Tensor],
     patch_shape: Tuple[int, int, int]) -> Union[np.ndarray, tf.Tensor]:
     """Performs image prediction in patches of the original image for reduced GPU memory usage.
@@ -24,7 +34,7 @@ def patch_predict(
     The predicted `patches` are put back together in the same shape as the `image`.
 
     Args:
-        model (tf.keras.Model): The model to be used for prediction.
+        model (tf_keras.Model): The model to be used for prediction.
         image (Union[np.ndarray, tf.Tensor]): The image to be predicted.
         patch_shape (Tuple[int, int, int]): The shape of the patch to be used for the predictions.
 
@@ -73,7 +83,7 @@ def patch_predict(
 
 
 def predict(
-    model: Union[str, tf.keras.Model],
+    model: Union[str, tf_keras.Model],
     images: str,
     normalize: Optional[bool] = True,
     input_shape: Optional[Tuple[int, int, int]] = None,
@@ -96,10 +106,10 @@ def predict(
     """_summary_
 
     Args:
-        model (Union[str, tf.keras.Model]): The model to be used to perform the prediction(s).
+        model (Union[str, tf_keras.Model]): The model to be used to perform the prediction(s).
         images (str): A path to an image file, or a path to a directory containing images, or a path to a directory containing subdirectories of classes.
         normalize (Optional[bool], optional): Whether or not to put the image values between zero and one ([0,1]). Defaults to True.
-        input_shape (Optional[Tuple[int, int, int]], optional): The input shape the loaded model and images should have, in format `(HEIGHT, WIDTH, CHANNELS)`. If `model` is a `tf.keras.model` with an input shape different from `input_shape`, then its input shape will be changed to `input_shape`. Defaults to None.
+        input_shape (Optional[Tuple[int, int, int]], optional): The input shape the loaded model and images should have, in format `(HEIGHT, WIDTH, CHANNELS)`. If `model` is a `tf_keras.model` with an input shape different from `input_shape`, then its input shape will be changed to `input_shape`. Defaults to None.
         copy_images (Optional[bool], optional): Whether or not to copy the input images to the predictions output directory. Defaults to False.
         grayscale (Optional[bool], optional): Whether or not to save the predicted masks as grayscale images with values for classes starting from zero. Defaults to `False`.
         analyze_contours (Optional[bool], optional): Whether or not to apply the contour analysis algorithm. If `True`, it will also write the contour measurements to a `.csv` file. Defaults to False.
@@ -134,8 +144,8 @@ def predict(
 
     if isinstance(model, str):
         model = load_model(model_path=model, input_shape=input_shape, use_bias_layer=use_bias_layer)
-    elif not isinstance(model, tf.keras.Model):
-        raise ValueError(f"`model` must be a `str` or `tf.keras.Model`. Given `{type(model)}`.")
+    elif not isinstance(model, tf_keras.Model):
+        raise ValueError(f"`model` must be a `str` or `tf_keras.Model`. Given `{type(model)}`.")
 
     if not input_shape:
         input_shape = get_model_input_shape(model)

@@ -1,7 +1,9 @@
 import argparse
 import os
-os.environ["SM_FRAMEWORK"] = "tf.keras"
 from pathlib import Path
+
+# Import compatibility module FIRST - this patches TensorFlow/Keras for segmentation-models
+import utils.tf_compat
 
 from utils.data import SUPPORTED_IMAGE_TYPES
 from utils.predict import predict

@@ -1,6 +1,9 @@
 import argparse
 import os
 
+# Import compatibility module FIRST - this patches TensorFlow/Keras for segmentation-models
+import utils.tf_compat
+
 from utils.evaluate import evaluate, evaluate_from_files
 
 

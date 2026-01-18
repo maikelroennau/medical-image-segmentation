@@ -8,11 +8,15 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import segmentation_models as sm
-sm.set_framework("tf.keras")
 
+# Import compatibility module FIRST - this patches TensorFlow/Keras for segmentation-models
+import utils.tf_compat
+
+import tf_keras
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
+import segmentation_models as sm
+
+from tf_keras.optimizers import Adam
 
 from utils.data import list_files, load_dataset
 from utils.evaluate import evaluate
@@ -257,11 +261,11 @@ def train(
             json.dump(train_config, config_file, indent=4)
 
     callbacks = [
-        tf.keras.callbacks.ReduceLROnPlateau(
+        tf_keras.callbacks.ReduceLROnPlateau(
             monitor="val_f1-score", factor=learning_rate_factor, min_delta=1e-3, min_lr=1e-8, patience=patience, verbose=1, mode="max"),
-        tf.keras.callbacks.ModelCheckpoint(
+        tf_keras.callbacks.ModelCheckpoint(
             checkpoint_model, monitor="val_f1-score", mode="max", save_best_only=False if save_all else True),
-        # tf.keras.callbacks.TensorBoard(
+        # tf_keras.callbacks.TensorBoard(
         #     log_dir=str(checkpoint_directory.joinpath("logs")), histogram_freq=1, update_freq="batch", write_images=False)
     ]
 

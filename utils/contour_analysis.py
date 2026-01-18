@@ -1,3 +1,9 @@
+import os
+
+# Set environment variables for TensorFlow/Keras compatibility
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
+os.environ.setdefault("SM_FRAMEWORK", "tf.keras")
+
 import time
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
@@ -6,7 +12,11 @@ import cv2
 import joblib
 import numpy as np
 import pandas as pd
+
+# Import tf_keras first to ensure proper initialization
+import tf_keras
 import tensorflow as tf
+
 from scipy.interpolate import splev, splprep
 
 from utils.data import reset_class_values, one_hot_encode

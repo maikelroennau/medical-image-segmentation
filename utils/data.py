@@ -1,8 +1,18 @@
+import os
+
+# Set environment variables for TensorFlow/Keras compatibility
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
+os.environ.setdefault("SM_FRAMEWORK", "tf.keras")
+
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
 import numpy as np
+
+# Import tf_keras first to ensure proper initialization
+import tf_keras
 import tensorflow as tf
+
 from skimage.io import imread
 from tqdm import tqdm
 
@@ -409,7 +419,7 @@ def write_dataset(
             image_name = str(images_path.joinpath(f"batch_{i}_image_{j}.png"))
             mask_name = str(masks_path.joinpath(f"batch_{i}_mask_{j}.png"))
 
-            tf.keras.preprocessing.image.save_img(image_name, image)
+            tf_keras.preprocessing.image.save_img(image_name, image)
 
             if not rgb_masks:
                 mask = tf.image.rgb_to_grayscale(mask)
@@ -417,7 +427,7 @@ def write_dataset(
                     mask = np.where(mask == intensity, new_intensity, mask)
 
             mask = color_classes(mask.numpy())
-            tf.keras.preprocessing.image.save_img(mask_name, mask, scale=False)
+            tf_keras.preprocessing.image.save_img(mask_name, mask, scale=False)
 
         if i == batches:
             break

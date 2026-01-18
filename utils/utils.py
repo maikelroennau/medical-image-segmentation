@@ -1,6 +1,11 @@
+import os
+
+# Set environment variables for TensorFlow/Keras compatibility
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
+os.environ.setdefault("SM_FRAMEWORK", "tf.keras")
+
 import datetime
 import json
-import os
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
@@ -8,8 +13,13 @@ import cv2
 import imgviz
 import numpy as np
 import pandas as pd
-import segmentation_models as sm
+
+# Import tf_keras first to ensure proper initialization
+import tf_keras
 import tensorflow as tf
+
+# Now import segmentation_models after environment is configured
+import segmentation_models as sm
 
 
 def get_color_map(colormap: Optional[str] = "agnor"):

@@ -1,15 +1,29 @@
+import os
+
+# Import compatibility module FIRST - this patches TensorFlow/Keras for segmentation-models
+# When imported from model_train.py, this will already be imported, but we include it
+# for standalone usage
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
+os.environ.setdefault("SM_FRAMEWORK", "tf.keras")
+
 import json
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
-import segmentation_models as sm
+
+# Import tf_keras first to ensure proper initialization
+import tf_keras
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
+
+# Now import segmentation_models after environment is configured
+import segmentation_models as sm
+
+from tf_keras.optimizers import Adam
 
 
-class TemperatureScaledSoftmax(tf.keras.layers.Layer):
+class TemperatureScaledSoftmax(tf_keras.layers.Layer):
     """Temperature scaled Softmax layer.
 
     This layer scales the logits of the previous layer by a temperature factor and then applies the Softmax function to the scaled logits.
@@ -30,7 +44,7 @@ class TemperatureScaledSoftmax(tf.keras.layers.Layer):
         return config
 
 
-class PapBias(tf.keras.layers.Layer):
+class PapBias(tf_keras.layers.Layer):
     """Bias the probabilities of the convolution output of a model.
 
     This layer adds a bias to the convolution output layer of a model by increasing the probabilities of classes 4 through 7 and setting the probabilities of classes 0 through 3 to 0 where the cluster and cytoplasm masks are 1.
@@ -106,11 +120,11 @@ METRICS = [
 ]
 
 
-def get_model_input_shape(model: tf.keras.Model) -> tuple:
+def get_model_input_shape(model: tf_keras.Model) -> tuple:
     """Return the input shape of a Keras model object in the format (height, width, channels).
 
     Args:
-        model (tf.keras.Model): The model to get the input shape from.
+        model (tf_keras.Model): The model to get the input shape from.
 
     Returns:
         tuple: The model's input shape in the format `(height, width, channels)`.
@@ -119,15 +133,15 @@ def get_model_input_shape(model: tf.keras.Model) -> tuple:
     return (height, width, channels)
 
 
-def replace_model_input_shape(model: tf.keras.Model, new_input_shape: Tuple[int, int, int]) -> tf.keras.Model:
+def replace_model_input_shape(model: tf_keras.Model, new_input_shape: Tuple[int, int, int]) -> tf_keras.Model:
     """Replace the model input shape with the new given input shape.
 
     Args:
-        model (tf.keras.Model): The model to have its input shape replaced.
+        model (tf_keras.Model): The model to have its input shape replaced.
         new_input_shape (Tuple[int, int, int]): The new input shape in the format `(height, width, channels)`.
 
     Returns:
-        tf.keras.Model: The model with the updated input shape.
+        tf_keras.Model: The model with the updated input shape.
     """
     if not new_input_shape:
         raise TypeError("Argument `new_input_shape` is required in function `replace_model_input_shape`.")
@@ -137,7 +151,7 @@ def replace_model_input_shape(model: tf.keras.Model, new_input_shape: Tuple[int,
 
     model_json["config"]["layers"][0]["config"]["batch_input_shape"] = [None, *new_input_shape]
 
-    updated_model = tf.keras.models.model_from_json(json.dumps(model_json), custom_objects=CUSTOM_OBJECTS)
+    updated_model = tf_keras.models.model_from_json(json.dumps(model_json), custom_objects=CUSTOM_OBJECTS)
     updated_model.set_weights(model_weights)
     return updated_model
 
@@ -152,7 +166,7 @@ def make_model(
     metrics: List[str],
     encoder_freeze: Optional[bool] = False,
     model_name: Optional[str] = None,
-    use_tss: Optional[bool] = False) -> tf.keras.Model:
+    use_tss: Optional[bool] = False) -> tf_keras.Model:
     """Make a TensorFlow model on top of Keras using `Segmentation models` library.
 
     The complete list of supported encoders and decoders is available at Segmentation models: https://github.com/qubvel/segmentation_models.
@@ -170,7 +184,7 @@ def make_model(
         use_tss (Optional[bool], optional): If true, adds a `TemperatureScaledSoftmax` layer to the model. Defaults to False.
 
     Returns:
-        tf.keras.Model: The compiled model.
+        tf_keras.Model: The compiled model.
     """
     if decoder == "U-Net":
         model = sm.Unet(
@@ -226,7 +240,7 @@ def make_model(
 
     if use_tss:
         x = TemperatureScaledSoftmax(temperature=0.1)(model.layers[-2].output)
-        model = tf.keras.Model(inputs=model.input, outputs=x)
+        model = tf_keras.Model(inputs=model.input, outputs=x)
 
     if model_name:
         model._name = model_name
@@ -240,16 +254,16 @@ def load_model(
     model_path: str,
     input_shape: Tuple[int, int, int] = None,
     loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
-    optimizer: Optional[tf.keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
+    optimizer: Optional[tf_keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
     compile: Optional[bool] = True,
-    use_bias_layer: Optional[bool] = False) -> tf.keras.Model:
+    use_bias_layer: Optional[bool] = False) -> tf_keras.Model:
     """Load a Keras model.
 
     Args:
         model_path (str): The path to the model file.
         input_shape (Tuple[int, int, int], optional): The input shape the loaded model should have in format `(HEIGHT, WIDTH, CHANNELS)`. If not `None`, the function `update_model_input_shape` gets called. Defaults to None.
         loss_function (sm.losses.Loss, optional): The loss function of the model. Defaults to sm.losses.cce_dice_loss.
-        optimizer (tf.keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
+        optimizer (tf_keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
         compile (bool, optional): If false, does not compile the loaded model before returning it. Defaults to True.
         use_bias_layer (bool, optional): If true, adds a `PapBias` layer to the model. Defaults to False.
 
@@ -257,12 +271,12 @@ def load_model(
         FileNotFoundError: If the model file is not found.
 
     Returns:
-        tf.keras.Model: The loaded model.
+        tf_keras.Model: The loaded model.
     """
     if not Path(model_path).is_file():
         raise FileNotFoundError(f"The model file was not found at `{model_path}`.")
 
-    model = tf.keras.models.load_model(model_path, custom_objects=CUSTOM_OBJECTS)
+    model = tf_keras.models.load_model(model_path, custom_objects=CUSTOM_OBJECTS)
 
     if input_shape:
         if input_shape != get_model_input_shape(model):
@@ -270,7 +284,7 @@ def load_model(
 
     if use_bias_layer:
         x = PapBias()(model.layers[-1].output)
-        model = tf.keras.Model(inputs=model.input, outputs=x)
+        model = tf_keras.Model(inputs=model.input, outputs=x)
 
     if compile:
         model.compile(optimizer=optimizer, loss=loss_function, metrics=[METRICS])
@@ -282,22 +296,22 @@ def load_models(
     model_path: str,
     input_shape: Tuple[int, int, int] = None,
     loss_function: Optional[sm.losses.Loss] = sm.losses.cce_dice_loss,
-    optimizer: Optional[tf.keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
-    compile: Optional[bool] = True) -> Union[List[tf.keras.Model], List[str]]:
+    optimizer: Optional[tf_keras.optimizers.Optimizer] = Adam(learning_rate=1e-5),
+    compile: Optional[bool] = True) -> Union[List[tf_keras.Model], List[str]]:
     """Loads a list of models under a directory.
 
     Args:
-        model_path (str): The path to a directory containing one or more `tf.keras.Model` files. If path is a file, it must be a `.h5` model file.
+        model_path (str): The path to a directory containing one or more `tf_keras.Model` files. If path is a file, it must be a `.h5` model file.
         input_shape (Tuple[int, int, int], optional): The input shape the loaded models should have in format `(HEIGHT, WIDTH, CHANNELS)`. If not `None`, the function `update_model_input_shape` gets called. Defaults to None.
         loss_function (sm.losses.Loss, optional): The loss function of the model. Defaults to sm.losses.cce_dice_loss.
-        optimizer (tf.keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
+        optimizer (tf_keras.optimizers.Optimizer, optional): The optimizer of the model. Defaults to Adam(learning_rate=1e-5).
         compile (bool, optional): If false, does not compile the loaded model before returning it. Defaults to True.
 
     Raises:
         RuntimeError: [description]
 
     Returns:
-        List[tf.keras.Model]: [description]
+        List[tf_keras.Model]: [description]
     """
 
     model_path = Path(model_path)
