@@ -206,7 +206,10 @@ def list_files(
     """
     if Path(files_path).is_dir():
         patterns = [str(Path(files_path).joinpath(f"*{image_type}")) for image_type in file_types]
-        files_list = tf.data.Dataset.list_files(patterns, shuffle=True, seed=seed)
+        
+        # Force CPU execution for file listing to avoid GPU kernel issues on newer GPUs
+        with tf.device('/CPU:0'):
+            files_list = tf.data.Dataset.list_files(patterns, shuffle=True, seed=seed)
 
         if len(files_list) == 0:
             raise RuntimeError(f"No files were found at `{files_path}`.")
